@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap4 %}
+{% block body %}
+<!-- inner page banner -->
+ <!-- <br><br> <br><br>
+ <br><br>
+ <br><br>
+ <br><br> -->
+
+<div  id="inner_banner" class="section inner_banner_section">
+  <div class="">
+    <div class="row">
+      <div class="col-md-12">
+        <div class="full">
+          <div class="title-holder">
+            <div style="padding-left: 150px;" class="title-holder-cell text-left">
+              <h1 style="font-size: 70px;" class="page-title">صفحة التفاصيل</h1>
+              <ol class="breadcrumb">
+                <li style="font-size: 50px;" class="active">صفحة التفاصيل</li>
+
+                <li><a  style="font-size: 50px;" href="{% url 'laptop:home' %}">الصفحة الرئيسية</a></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- section -->
+<div class="section padding_layout_1 product_detail">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-12">
+        <div class="row d-flex justify-content-between">
+          <!-- العمود الخاص بالصورة -->
+          <div class="col-md-6 order-md-2 ">
+            <div class="">
+              <div class="">
+                <div id="" class="carousel slide" data-ride="carousel">
+                  <div class="carousel-inner">
+                 
+                        <img src="{{ accessorym_details.image.url }}" alt="{{ laptop_detail.name }}" class="w-100" />
+                     
+                 
+                  </div>
+       
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- العمود الخاص بالوصف -->
+          <div class="col-md-6 order-md-1 product_detail_side detail_style1">
+            <div class="product-heading">
+              <h2>{{accessorym_details}}</h2>
+            </div>
+            <div class="product-detail-side">
+              <span style="color: rgb(70, 71, 71);"><del>{{accessorym_details.price}} S.P</del> </span>
+              <span class="rating">
+                <i class="fa fa-star" aria-hidden="true"></i>
+                <i class="fa fa-star" aria-hidden="true"></i>
+                <i class="fa fa-star" aria-hidden="true"></i>
+                <i class="fa fa-star" aria-hidden="true"></i>
+                <i class="fa fa-star-o" aria-hidden="true"></i>
+              </span>
+              <span class="review">(5 customer review)</span>
+            </div>
+            <div class="detail-contant">
+              <p>
+                <pre style="font-size: 20px;">{{accessorym_details.description1}}</pre><br><br>
+      
+              </p>
+              <form class="cart" method="post" action="it_cart.html">
+               
+                <a href="https://wa.me/qr/KLROJSI2MUTOL1?text={{ laptop_detail }}%0Aالسعر: {{ laptop_detail.price2 }}%0Aالوصف: {{ laptop_detail.description1 }}%0Aرابط الصورة: {{ image_url }}" target="_blank">
+                  <span class="fa fa-whatsapp" style="padding-left: 10px; font-size: 40px;"></span>
+                  <span style=" font-size: 30px;margin-left: 5px;">whatsapp</span>
+                </a>
+              </form>
+            </div>
+            <!-- <div class="share-post">
+              <a href="#" class="share-text">Share</a>
+              <ul class="social_icons">
+                <li><a href="#"><i class="fa fa-whatsapp" aria-hidden="true"></i></a></li>
+                <li><a href="#"><i class="fa fa-facebook" aria-hidden="true"></i></a></li>
+                <li><a href="#"><i class="fa fa-instagram" aria-hidden="true"></i></a></li>
+                <li><a href="#"><i class="fa fa-linkedin" aria-hidden="true"></i></a></li>
+              </ul>
+            </div> -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+    
+      </div>
+   
+    </div>
+  </div>
+</div>
+<!-- end section -->
+
+
+
+{% endblock body %}

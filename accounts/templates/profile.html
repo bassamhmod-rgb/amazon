@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+<style>
+body {
+    font-family: "Cairo", sans-serif;
+    background: linear-gradient(to bottom, #0a0f3c, #001f4d);
+    color: #fff;
+    margin: 0;
+    padding: 0;
+}
+
+/* الصندوق الرئيسي */
+.profile-container {
+    width: 90%;
+    max-width: 360px;
+    margin: 200px auto 40px auto; /* زيادة المسافة من الأعلى */
+    padding: 25px 20px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 16px;
+    text-align: center;
+    box-shadow: 0 4px 25px rgba(0,0,0,0.25);
+    backdrop-filter: blur(5px);
+}
+
+/* العناوين */
+.profile-container h2 {
+    color: #1dbbff;
+    font-size: 22px;
+    margin-bottom: 12px;
+}
+
+.profile-container h3 {
+    font-size: 17px;
+    margin-top: 18px;
+    margin-bottom: 10px;
+}
+
+/* النصوص */
+.profile-container p, .profile-container li {
+    font-size: 15.5px;
+}
+
+/* قائمة المشتريات */
+.profile-container ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.profile-container li {
+    background: rgba(255, 255, 255, 0.07);
+    margin: 8px 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    text-align: right;
+}
+
+/* رسالة لا توجد مشتريات */
+.no-items {
+    display: flex;
+    justify-content: flex-end;
+    padding-right: 10px;
+    width: 100%;
+    opacity: 0.9;
+    font-size: 15.5px;
+}
+
+/* الأزرار */
+.profile-container a {
+    display: block;
+    width: 100%;
+    color: #fff;
+    background: linear-gradient(to right, #13a0e6, #0096d7);
+    padding: 12px;
+    border-radius: 12px;
+    text-decoration: none;
+    margin-top: 12px;
+    font-size: 16px;
+    transition: 0.25s;
+}
+
+.profile-container a:hover {
+    background: linear-gradient(to right, #0b86c2, #0079ac);
+}
+
+/* زر الخروج أخف */
+.profile-container a:last-of-type {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+}
+
+.profile-container a:last-of-type:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+/* شاشات أكبر */
+@media (min-width: 768px) {
+    .profile-container {
+        max-width: 500px;
+        padding: 32px;
+    }
+
+    .profile-container h2 {
+        font-size: 26px;
+    }
+}
+</style>
+
+<div class="profile-container">
+    <h2>مرحباً {{ user.username }} 👋</h2>
+    <p>رصيدك الحالي بالليرة السورية: <strong>{{ points_balance }}</strong></p>
+
+    <h3>المشتريات السابقة:</h3>
+    <ul>
+        {% for item in purchases %}
+            <li>{{ item.product.name }} — {{ item.product.price }}$</li>
+        {% empty %}
+            <li class="no-items">لا توجد مشتريات بعد.</li>
+        {% endfor %}
+    </ul>
+
+    <a href="/laptop/">🔙 العودة إلى المتجر</a>
+    <a href="{% url 'logout' %}">تسجيل الخروج</a>
+</div>
+
+{% endblock %}

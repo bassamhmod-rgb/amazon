@@ -1,0 +1,732 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- basic -->
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<!-- mobile metas -->
+<meta name="keywords" content="Laptop Center">
+<meta name="description" content="مركز لابتوبات ">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="initial-scale=1, maximum-scale=1">
+<meta property="og:title" content="Laptop Land">
+<meta property="og:description" content="Welcome to Laptop Land Center, where we offer the best Laptop services!">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- <meta property="og:image" content="https://nouratato.pythonanywhere.com/static/images/noura_logo.png"> -->
+<!-- site metas -->
+<title>LAPTOP LAND</title>
+
+<meta name="author" content="">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<!-- CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/hizoom/1.0.0/hizoom.min.css">
+<!-- JavaScript -->
+
+<!-- site icons -->
+<link rel="icon" href="{% static 'images/fevicon/fevicon.png' %}" type="image/gif" />
+<!-- bootstrap css -->
+<link rel="stylesheet" href="{% static 'csslaptop/bootstrap.min.css' %}" />
+<!-- Site css -->
+<link rel="stylesheet" href="{% static 'csslaptop/style.css' %}" />
+<!-- responsive css -->
+<link rel="stylesheet" href="{% static 'csslaptop/responsive.css' %}" />
+<!-- colors css -->
+<link rel="stylesheet" href="{% static 'csslaptop/colors1.css' %}" />
+<!-- custom css -->
+<link rel="stylesheet" href="{% static 'csslaptop/custom.css' %}" />
+<!-- wow Animation css -->
+<link rel="stylesheet" href="{% static 'csslaptop/animate.css' %}" />
+<!-- revolution slider css -->
+<link rel="stylesheet" type="text/css" href="{% static 'revolution/css/settings.css' %}" />
+<link rel="stylesheet" type="text/css" href="{% static 'revolution/css/layers.css' %}" />
+<link rel="stylesheet" type="text/css" href="{% static 'revolution/css/navigation.css' %}" />
+
+<link href="http://fonts.googleapis.com/earlyaccess/droidarabickufi.css" rel="stylesheet">
+<!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+      <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+      <![endif]-->
+</head>
+<style>
+
+  /* تأثير التكبير عند التمرير */
+  .product_detail_feature_img img {
+      transition: transform 0.5s ease;
+  }
+
+  .product_detail_feature_img:hover img {
+      transform: scale(1.5); /* تكبير الصورة */
+  }
+
+  /* تخصيص الحاوية */
+  .product_detail_feature_img {
+      overflow: hidden;
+  }
+
+  /* تعديل العناوين والنصوص */
+  .product-heading h2 {
+      color: antiquewhite;
+  }
+
+  .product-detail-side .new-price {
+      color: lightseagreen;
+  }
+
+  .rating i {
+      color: gold;
+  }
+
+  .review {
+      color: white;
+  }
+
+  .cart .quantity input {
+      width: 60px;
+      text-align: center;
+  }
+
+  .share-post {
+      background-color: black;
+      padding: 10px;
+      margin-top: 20px;
+  }
+
+  .social_icons li {
+      display: inline-block;
+      margin-right: 10px;
+  }
+
+  .social_icons li a {
+      color: white;
+      font-size: 24px;
+  }
+
+  .share-text {
+      color: white;
+      font-size: 20px;
+      margin-right: 10px;
+  }
+/* تغيير لون الخلفية للنصوص */
+body {
+    font-family: 'Droid Arabic Kufi', sans-serif;
+    background-color: #000000; /* خلفية الصفحة باللون الأسود */
+    color: white; /* النص باللون الأبيض */
+}
+
+/* تغيير الخلفيات الأخرى للعناصر إلى ألوان داكنة */
+.container, .navbar, .footer, .content, .section {
+    background-color: #000000; /* خلفية مظللة باللون الرمادي الداكن */
+    color: white; /* النصوص بالأبيض */
+}
+
+/* تخصيص القوائم أو الروابط */
+a {
+    color: #000000; /* الروابط باللون الرمادي الفاتح */
+}
+
+a:hover {
+    color: white; /* عند التمرير فوق الرابط يتغير للون الأبيض */
+}
+
+/* تخصيص الحواف أو الظلال */
+.card, .box {
+    background-color: #000000; /* خلفية مظللة أخرى باللون الرمادي الداكن */
+    border-color: #444; /* حواف رمادية داكنة */
+}
+
+/* التأكيد على التباين للنصوص */
+h1, h2, h3, h4, h5, h6, p, span {
+    color: white; /* تلوين النصوص الرئيسية بالأبيض */
+}
+
+/* تغيير الخلفية للنصوص في القسم */
+.section.padding_layout_1.light_silver.gross_layout.right_gross_layout {
+    background-color: #1c1c1c; /* تغيير الخلفية إلى اللون الأسود */
+    color: rgb(0, 0, 0); /* تغيير النص إلى اللون الأبيض */
+}
+
+/* التأكد من أن العناوين والنصوص داخل القسم تظهر بالأبيض */
+.section .main_heading h2,
+.section .counter-heading,
+.section .counter-count,
+.section p {
+    color: rgb(0, 0, 0); /* تغيير لون النصوص للأبيض */
+}
+
+/* تغيير لون الأيقونات أيضاً إذا كانت تظهر بألوان أخرى */
+
+
+/* تعديل الروابط داخل هذا القسم إذا وجدت */
+.section a {
+    color: rgb(0, 0, 0); /* الروابط باللون الأبيض */
+}
+
+.section a:hover {
+    color: lightgray; /* تغيير لون الروابط عند المرور عليها */
+}
+/* تغيير الخلفية للنصوص والحقول في القسم */
+.section.padding_layout_1.light_silver.gross_layout.right_gross_layout {
+    background-color: #000000; /* تغيير الخلفية إلى الأسود */
+    color: rgb(0, 0, 0); /* تغيير النصوص إلى الأبيض */
+}
+/* التأكد من أن الحقول تظهر باللون الرمادي الداكن */
+.section input,
+.section textarea,
+.section select {
+    background-color: #000000; /* لون الخلفية للحقول باللون الرمادي الداكن */
+    color: black; /* لون النص داخل الحقول باللون الأسود */
+    border: 1px solid #555; /* حدود الحقول بلون رمادي أفتح */
+}
+
+/* التأكد من أن العناوين والنصوص داخل القسم تظهر بالأبيض */
+.section .main_heading h2,
+.section .counter-heading,
+.section .counter-count,
+.section p {
+    color: white; /* تغيير لون النصوص للأبيض */
+}
+
+.section pre {
+    color: white; /* تغيير لون النصوص للأبيض */
+}
+
+/* تعديل الروابط داخل هذا القسم إذا وجدت */
+.section a {
+    color: rgb(250, 250, 250); /* الروابط باللون الأبيض */
+}
+
+.section a:hover {
+    color: lightgray; /* تغيير لون الروابط عند المرور عليها */
+}
+
+/* إضافة حدود رمادية لكل منتج فقط */
+.product_list {
+    border: 20px solid #2e2e2e; /* حدود رمادية خفيفة حول كل منتج */
+    padding: 15px;
+    border-radius: 0px; /* زوايا مستديرة بسيطة */
+}
+
+/* تعديل لون النصوص داخل المنتجات */
+.product_list h4,
+.product_list p {
+    color: rgb(255, 255, 255); /* النصوص باللون الأسود (أو اللون الأساسي الخاص بك) */
+}
+
+/* تعديل الروابط */
+.product_list a {
+    color: rgb(255, 251, 251); /* الروابط بلون النص الطبيعي */
+}
+
+.product_list a:hover {
+    color: rgb(255, 241, 241); /* تغيير لون الروابط عند التمرير */
+}
+
+
+.header_top {
+  background-color: #007bff; /* الأزرق */
+  color: white; /* الكتابة بيضاء */
+}
+
+.header_top a {
+  color: white; /* اللون الأبيض للروابط */
+}
+
+.header_bottom {
+  background-color: #000000; /* الأسود */
+  color: white; /* الكتابة بيضاء */
+}
+
+.header_bottom a {
+  color: white; /* اللون الأبيض للروابط */
+}
+
+.header_bottom a:hover {
+  color: #007bff; /* تلوين الروابط عند التمرير */
+}
+.menu_side  li a {
+  color: white; /* يجعل الكلمات باللون الأبيض */
+}
+
+.menu_side  li a:hover {
+  color: #007bff; /* اللون الأزرق عند التمرير فوق العناصر */
+}
+.product_img img {
+    transition: transform 0.5s ease;
+}
+
+.product_img:hover img {
+    transform: scale(1.1); /* لتكبير الصورة عند التحريك */
+}
+
+form {
+    background-color: #007bff; /* خلفية زرقاء */
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* ظل خفيف للنموذج */
+}
+
+input.form-control, select.form-control {
+    background-color: #ffffff; /* خلفية بيضاء لحقل الإدخال */
+    color: #000000; /* لون النص أسود */
+    border: 1px solid #000080; /* حدود زرقاء داكنة */
+    border-radius: 5px;
+}
+
+input.form-control::placeholder {
+    color: #000080; /* لون النص التوضيحي placeholder */
+}
+
+/* تنسيق خاص بالحقل الثالث (مثلاً حقل الفئة category) */
+form select:nth-of-type(3) {
+    background-color: #ffffff; /* خلفية بيضاء للحقل الثالث */
+    color: #000000; /* لون النص أسود */
+}
+
+/* زر الإرسال Submit */
+input[type="submit"] {
+    background-color: #28a745; /* لون أخضر للزر */
+    color: #ffffff; /* نص أبيض */
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+input[type="submit"]:hover {
+    background-color: #155724; /* خلفية خضراء داكنة عند التمرير فوق الزر */
+    color: #ffffff; /* النص يبقى أبيض */
+}
+.product_detail_side {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.product_detail_feature_img {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%; /* تأكد من أن الحاوية تأخذ الارتفاع الكامل */
+}
+
+
+@media (max-width: 768px) {
+  body {
+    font-family: 'Droid Arabic Kufi';
+    background-color: #000000; /* خلفية الصفحة باللون الأسود */
+    color: white; /* النص باللون الأبيض */
+}
+
+  .title-holder-cell {
+    text-align: center !important;
+    padding-left: 0 !important;
+  }
+  .page-title {
+    font-size: 40px !important; /* تصغير الخط للشاشات الصغيرة */
+    text-align: center !important;
+
+  }
+  @media (max-width: 768px) {
+  .breadcrumb {
+    display: flex;
+    justify-content: center; /* توسيط العناصر أفقيًا */
+    flex-wrap: nowrap; /* منع العناصر من الانتقال إلى السطر التالي */
+  }
+  .breadcrumb li {
+    font-size: 30px !important;
+    margin-right:8px; /* إضافة مسافة بين العناصر */
+  }
+  .breadcrumb li a {
+    font-size: 30px !important;
+  }
+}
+}
+
+@media (max-width: 768px) { /* تأكد من تطبيق هذا على الأجهزة المحمولة */
+  .service_blog_inner2 {
+    text-align: center; /* محاذاة النص في المنتصف للأجهزة المحمولة */
+  }
+
+  .service_blog_inner2 .icon {
+    margin: 0 auto; /* مركز الأيقونة للأجهزة المحمولة */
+  }
+}
+
+@media (min-width: 769px) { /* تطبيق محاذاة اليمين على الأجهزة المكتبية */
+  .service_blog_inner2 {
+    text-align: right; /* محاذاة النص لليمين على الأجهزة المكتبية */
+  }
+}
+.product_detail_side, .product_detail_feature_img {
+  min-height: 500px; /* تعديل الارتفاع حسب الحاجة */
+}
+
+.carousel-item img {
+  max-height: 500px; /* تأكد من أن الصور تبقى داخل ارتفاع محدد */
+  object-fit: cover; /* تجعل الصور تتناسب مع الإطار المحدد */
+  width: 100%;
+}
+
+/* استهداف الأجهزة المحمولة فقط */
+/* استهداف الأجهزة المحمولة فقط */
+@media (max-width: 768px) {
+    /* تغيير لون أيقونة البحث */
+    .menu_side .search_icon a i {
+        color: white !important; /* التأكيد على اللون الأبيض */
+    }
+
+    /* تأكد من أن جميع الروابط في القائمة تظهر باللون الأبيض أيضًا */
+    .menu_side a {
+        color: white !important; /* التأكيد على اللون الأبيض للروابط */
+    }
+}
+
+#navbar_menu.small-screen #menu-button {
+		display: block;
+		padding: 0;
+		color: #fff;
+		cursor: pointer;
+		font-size: 0;
+		text-transform: uppercase;
+		font-weight: 600;
+		width: 40px;
+		height: 40px;
+		border: solid #ffffff 2px;
+		border-radius: 5px;
+		position: absolute;
+		top: -67px;
+		left: 20px;
+	}
+	#navbar_menu.small-screen #menu-button::after {
+		position: absolute;
+		top: 12px;
+		right: 8px;
+		display: block;
+		height: 13px;
+		width: 20px;
+		border-top: 3px solid #ffffff;
+		border-bottom: 3px solid #ffffff;
+		content: '';
+	}
+
+  /* للحفاظ على ترتيب القائمة كما هو على الشاشات الكبيرة */
+  .custom-menu .first-ul {
+    display: flex;
+    flex-direction: row;
+  }
+
+  /* تعديل ترتيب القائمة على الموبايل */
+  @media (max-width: 768px) {
+    .custom-menu .first-ul {
+      flex-direction: column;
+    }
+
+    /* جعل الصفحة الرئيسية تظهر أولاً على الموبايل */
+    .menu-item-home {
+      order: -1;
+    }
+  }
+</style>
+<body id="default_theme" class="it_service">
+<!-- loader -->
+<!-- <div class="bg_load"> <img class="loader_animation" src="images/loaders/loader_1.png" alt="#" /> </div> -->
+<!-- end loader -->
+<!-- header -->
+<header id="default_header" class="header_style_1">
+  <!-- header top -->
+  <div class="header_top">
+    <div style="background-color: #007bff;" class="container">
+      <div class="row">
+        <div class="col-md-8">
+          <div class="full">
+            <div class="topbar-left">
+              <ul class="list-inline">
+
+                <li> <span class="topbar-label"><i class="fa  fa-home"></i></span> <span class="topbar-hightlight">  حمص وادي الدهب مقابل مشفى الأهرام </span> </li>
+
+                           </ul>
+            </div>
+          </div>
+        </div>
+        <div class="float-right">
+
+
+
+
+
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- end header top -->
+  <!-- header bottom -->
+  <div   style="background-color: #000000;" class="header_bottom" >
+    <div  style="background-color: #000000;"  class="container">
+      <div class="row">
+        <div class="col-lg-3 col-md-12 col-sm-12 col-xs-12" >
+          <!-- logo start -->
+          <div class="logo"> <a href="it_home.html"><img style="width: 200px;height: 100px;" src="{% static 'images/logo2.png' %}" alt="logo" /></a>
+          </div>
+          <!-- logo end -->
+
+        </div>
+        <div class="col-lg-9 col-md-12 col-sm-12 col-xs-12">
+          <!-- menu start -->
+          <div style="text-align: center;" class="menu_side">
+            <div id="navbar_menu" class="custom-menu">
+              <ul class="first-ul">
+                <li class="menu-item-home"><a class="active" href="{% url 'laptop:home' %}">الصفحة الرئيسية</a></li>
+                <li class="menu-item-services"><a style="color: white;">خدماتنا</a>
+                  <ul>
+                    <li><a href="{% url 'laptop:laptop_shop' %}">لابتوبات</a></li>
+                    <li><a href="{% url 'laptop:acessoryl' %}">اكسسوار لابتوب</a></li>
+                    <li><a href="{% url 'laptop:acessorym' %}">اكسسوار موبايل</a></li>
+                  </ul>
+                </li>
+
+                <li class="menu-item-about"><a style="color: white;" href="{% url 'laptop:about' %}">من نحن</a></li>
+                <li class="menu-item-contact"><a style="color: white;" href="{% url 'laptop:contact' %}">تواصل معنا</a></li>
+<!-- b -->
+ <li class="" >
+                    {% if user.is_authenticated %}
+                        <a style="color: white;" href="{% url 'profile' %}">صفحتي الشخصية</a>
+                    {% else %}
+                        <a style="color: white;" href="{% url 'login' %}">تسجيل الدخول</a>
+                    {% endif %}
+<!--  --></li>
+              </ul>
+            </div>
+            <div class="search_icon">
+              <!-- <ul>
+                <li><a style="color: white;" href="#" data-toggle="modal" data-target="#search_bar"><i class="fa fa-search" aria-hidden="true"></i></a></li>
+              </ul> -->
+            </div>
+          </div>
+          <!-- menu end -->
+        </div>
+
+
+      </div>
+
+    </div>
+
+  </div>
+  <!-- header bottom end -->
+
+</header>
+<!-- end header -->
+    {% block body %}
+
+    {% endblock body %}
+
+
+
+
+
+<!-- footer -->
+<footer class="footer_style_2" dir="rtl" style="background-color: #000000;">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="map_section">
+        <div id="map" style="width: 100%; height: 300px;"></div>
+      </div>
+      <div class="footer_blog">
+        <div class="row">
+          <div class="col-md-6 col-sm-12">
+            <div class="main-heading text-center text-md-right">
+              <h2 style="border: none; position: relative;">
+                خدماتنا
+                <span style="display: block; width: 50%; height: 2px; background-color: #fff; margin: 10px auto;"></span> <!-- هذا السطر يضيف الخط في المنتصف -->
+              </h2>
+            </div>
+            <ul class="footer-menu text-center text-md-right">
+              <li><a href="{% url 'laptop:laptop_shop' %}"><i class="fa fa-angle-left"></i> لابتوبات</a></li>
+              <li><a href="{% url 'laptop:acessoryl' %}"><i class="fa fa-angle-left"></i> اكسسوار لابتوب</a></li>
+              <li><a href="{% url 'laptop:acessorym' %}"><i class="fa fa-angle-left"></i> اكسسوار موبايل</a></li>
+            </ul>
+          </div>
+          <div class="col-md-6 col-sm-12">
+            <div class="main-heading text-center text-md-right">
+              <h2 style="border: none; position: relative;">
+                تواصل معنا
+                <span style="display: block; width: 50%; height: 2px; background-color: #fff; margin: 10px auto;"></span> <!-- هذا السطر يضيف الخط في المنتصف -->
+              </h2>
+            </div>
+            <p class="text-center text-md-right">حمص وادي الدهب, مقابل مشفى الأهرام<br><br>
+              <span style="font-size:18px;"><a href="tel:+9876543210">0993178291</a></span>
+            </p>
+
+            <div class="footer_social">
+              <ul class="list-inline text-center text-md-right">
+                <!-- واتساب -->
+                <li class="list-inline-item">
+                  <a href="https://wa.me/0993178291" target="_blank">
+                    <i class="fa fa-whatsapp" style="font-size:30px;color:#25D366;"></i>
+                  </a>
+                </li>
+                <!-- فيسبوك -->
+                <li class="list-inline-item" style="padding-right: 10px;padding-left: 10px;">
+                  <a href="https://www.facebook.com/yourpage" target="_blank">
+                    <i class="fa fa-facebook" style="font-size:30px;color:#3b5998;"></i>
+                  </a>
+                </li>
+                <!-- إنستغرام -->
+                <li class="list-inline-item">
+                  <a href="https://www.instagram.com/yourprofile" target="_blank">
+                    <i class="fa fa-instagram" style="font-size:30px;color:#C13584;"></i>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cprt text-center">
+        <p style="text-align: left;">2024 © حقوق النشر محفوظة لصالح فريق لوجيتكس</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+<!-- end footer -->
+<!-- js section -->
+<script src="{% static 'js/jquery.min.js' %}"></script>
+<script src="{% static 'js/bootstrap.min.js' %}"></script>
+<!-- menu js -->
+<script src="{% static 'js/menumaker.js' %}"></script>
+<!-- wow animation -->
+<script src="{% static 'js/wow.js' %}"></script>
+<!-- custom js -->
+<script src="{% static 'js/custom.js' %}"></script>
+<!-- revolution js files -->
+<script src="{% static 'revolution/js/jquery.themepunch.tools.min.js' %}"></script>
+<script src="{% static 'revolution/js/jquery.themepunch.revolution.min.js' %}"></script>
+<script src="{% static 'revolution/js/extensions/revolution.extension.actions.min.js' %}"></script>
+<script src="{% static 'revolution/js/extensions/revolution.extension.carousel.min.js' %}"></script>
+<script src="{% static 'revolution/js/extensions/revolution.extension.kenburn.min.js' %}"></script>
+<script src="{% static 'revolution/js/extensions/revolution.extension.layeranimation.min.js' %}"></script>
+<script src="{% static 'revolution/js/extensions/revolution.extension.migration.min.js' %}"></script>
+<script src="{% static 'revolution/js/extensions/revolution.extension.navigation.min.js' %}"></script>
+<script src="{% static 'revolution/js/extensions/revolution.extension.parallax.min.js' %}"></script>
+<script src="{% static 'revolution/js/extensions/revolution.extension.slideanims.min.js' %}"></script>
+<script src="{% static 'revolution/js/extensions/revolution.extension.video.min.js' %}"></script>
+<!-- map js -->
+<script>
+  function initMap() {
+      // تحديد الخريطة بناءً على الإحداثيات المحددة
+      var map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 18, // تكبير كبير لعرض المكان بوضوح
+          center: {lat: 34.703694, lng: 36.725118}, // الإحداثيات من الرابط
+          styles: [
+              {
+                  elementType: 'geometry',
+                  stylers: [{color: '#fefefe'}]
+              },
+              {
+                  elementType: 'labels.icon',
+                  stylers: [{visibility: 'off'}]
+              },
+              {
+                  elementType: 'labels.text.fill',
+                  stylers: [{color: '#616161'}]
+              },
+              // المزيد من الأنماط...
+          ]
+      });
+
+      // إضافة الدبوس على الخريطة
+      var marker = new google.maps.Marker({
+          position: {lat: 34.703694, lng: 36.725118}, // الإحداثيات من الرابط
+          map: map,
+          title: 'الموقع المطلوب' // النص الذي يظهر عند الوقوف على الدبوس
+      });
+  }
+</script>
+
+
+<!-- google map js -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA8eaHt9Dh5H57Zh0xVTqxVdBFCvFMqFjQ&callback=initMap"></script>
+<!-- end google map js -->
+<script>
+  function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+  }
+
+
+</script>
+<script>
+$('#rev_slider_4_1').revolution({
+    sliderType: "standard",
+    sliderLayout: "auto",
+    delay: 5000,  // المدة الزمنية قبل الانتقال للشرائح التالية
+    navigation: {
+        arrows: { enable: true }
+    },
+    autoHeight: "on",  // قم بتمكين autoHeight إذا كانت لديك صور بأحجام مختلفة
+    fullScreenAutoWidth: "on",
+    lazyType: "smart",
+    spinner: "spinner0",
+    shuffle: "off",
+    autoPlay: "on",  // يجب التأكد من أن هذه الخاصية مفعلة
+    stopAtSlide: -1,
+    stopAfterLoops: -1
+});
+
+
+</script>
+
+<!-- تحميل jQuery (يجب أن يتم تحميل jQuery أولاً) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="{% static 'path_to_revolution_slider/revolution.tools.min.js' %}"></script>
+<script src="{% static 'path_to_revolution_slider/revslider.min.js' %}"></script>
+<!-- تحميل مكتبة hizoom -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hizoom/1.0.0/hizoom.min.js"></script>
+
+<!-- كود جافا سكريبت الخاص بك -->
+
+<script>
+jQuery(document).ready(function() {
+  jQuery("#rev_slider_4_1").show().revolution({
+    sliderType: "standard",
+    sliderLayout: "auto",
+    delay: 9000, // مدة كل سلايد
+    navigation: {
+      arrows: {enable: true}
+    },
+    parallax: {
+      type: "mouse",
+      origo: "slidercenter",
+      speed: 2000,
+      levels: [2,3,4,5,6,7,12,16,10,50],
+    },
+    gridwidth: 1230,
+    gridheight: 720,
+  });
+});
+</script>
+
+
+{% if request.user.is_authenticated and request.user.is_staff %}
+    <div style="position: fixed; top: 10px; right: 10px; z-index: 99999;">
+        <a href="/admin/" style="
+            background: #1976d2;
+            padding: 8px 14px;
+            color: #fff;
+            font-weight: bold;
+            border-radius: 6px;
+            font-size: 14px;
+            text-decoration: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+        ">لوحة التحكم</a>
+    </div>
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,21 @@
+{% extends "admin/base_site.html" %}
+
+{% block branding %}
+<!-- الشعار الأساسي -->
+{{ block.super }}
+
+<!-- زر العودة -->
+<a href="/" style="
+    margin-left: 20px;
+    background: #1976d2;
+    padding: 6px 12px;
+    border-radius: 6px;
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 14px;
+">
+🏠 العودة للموقع
+</a>
+
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+<style>
+    body {
+        font-family: "Cairo", sans-serif;
+        background: linear-gradient(to bottom, #0a0f3c, #001f4d);
+        margin: 0;
+        padding: 0;
+        color: #fff;
+    }
+
+    .register-container {
+        width: 90%;
+        max-width: 360px;
+        margin: 200px auto;
+        padding: 25px 20px;
+        background: rgba(255,255,255,0.08);
+        border-radius: 16px;
+        text-align: center;
+        box-shadow: 0 4px 25px rgba(0,0,0,0.25);
+        backdrop-filter: blur(5px);
+    }
+
+    .register-container h2 {
+        margin-bottom: 18px;
+        font-size: 22px;
+        color: #1dbbff;
+    }
+
+    .register-container input {
+        width: 100%;
+        height: 42px;
+        margin-bottom: 12px;
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 8px;
+        border: none;
+        background: rgba(255,255,255,0.85);
+    }
+
+    .register-container button {
+        width: 100%;
+        height: 45px;
+        border-radius: 10px;
+        border: none;
+        margin-top: 5px;
+        font-size: 18px;
+        color: #fff;
+        background: linear-gradient(to right, #13a0e6, #0096d7);
+        cursor: pointer;
+        transition: 0.25s;
+    }
+
+    .register-container button:hover {
+        background: linear-gradient(to right, #0b86c2, #0079ac);
+    }
+
+    .login-link {
+        display: block;
+        margin-top: 15px;
+        color: #fff;
+        text-decoration: none;
+        opacity: 0.85;
+    }
+
+    .login-link:hover {
+        color: #ffd700;
+        opacity: 1;
+    }
+
+    .error-msg {
+        background: rgba(255,0,0,0.25);
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        font-size: 15px;
+    }
+</style>
+
+<div class="register-container">
+
+    <h2>إنشاء حساب جديد</h2>
+
+    {% if form.errors %}
+        <p class="error-msg">
+            يرجى تصحيح الأخطاء أدناه.
+        </p>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.username.label_tag }}
+        {{ form.username }}
+
+        {{ form.email.label_tag }}
+        {{ form.email }}
+
+        {{ form.password1.label_tag }}
+        {{ form.password1 }}
+
+        {{ form.password2.label_tag }}
+        {{ form.password2 }}
+
+        <button type="submit">تسجيل</button>
+    </form>
+
+    <p class="login-link">هل لديك حساب؟ <a href="{% url 'login' %}">تسجيل الدخول</a></p>
+
+</div>
+
+{% endblock %}
