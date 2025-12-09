@@ -1,0 +1,372 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تعديل الطلب – {{ store.name }}</title>
+
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body { background:#f7f9fc; font-family:"Cairo",sans-serif; overflow-x: hidden; }
+
+        /* القائمة الجانبية */
+        .sidebar {
+            width:230px; background:#fff; height:100vh; position:fixed; top:0; right:0;
+            padding:20px 15px; border-left:1px solid #e0e0e0; z-index:1050; /* تحسين الطبقات */
+            transition: right 0.3s ease;
+        }
+        .sidebar a {
+            display:block; padding:10px 12px; margin-bottom:8px;
+            color:#333; border-radius:8px; text-decoration:none;
+        }
+        .sidebar a:hover { background:#e9f2ff; color:#0d6efd; }
+        
+        .content { margin-right:240px; padding:20px; transition: margin-right 0.3s ease; }
+
+        /* الموبايل */
+        @media (max-width:768px){
+            .sidebar { right:-260px; }
+            .sidebar.active { right:0; box-shadow: -5px 0 15px rgba(0,0,0,0.1); }
+            .content { margin-right:0; }
+            #toggleSidebar { display:inline-block !important; }
+        }
+
+        /* 4. تحديد نوع الزر لمنع الإرسال */
+        #toggleSidebar {
+            display:none; font-size:28px; background:none; border:none; margin-bottom:10px; cursor: pointer;
+        }
+
+        .table td, .table th { vertical-align: middle; }
+
+        /* تحسين قائمة النتائج */
+        #searchResults, #customerResults {
+            max-height:200px; overflow-y:auto;
+            box-shadow:0 4px 6px rgba(0,0,0,0.15);
+            border: 1px solid #dee2e6;
+        }
+
+        /* أرقام إنكليزية */
+        .en-num { direction:ltr !important; unicode-bidi:plaintext !important; }
+     .back-to-store-btn {
+    background: #d1d5db;
+    color: #111 !important;
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.back-to-store-btn:hover {
+    background: #c5c9d0;
+}
+
+    </style>
+
+</head>
+<body>
+
+<!-- Mobile toggle button -->
+<button id="toggleSidebar">☰</button>
+<!-- Sidebar -->
+{% include "dashboard/sidebar.html" %}
+
+<!-- Content -->
+ <div class="content">
+
+    <h3 class="mb-4">تعديل الطلب رقم #{{ order.id }}</h3>
+
+    <div class="card p-3 mb-3 border-0 shadow-sm">
+        <label class="form-label fw-bold">بحث عن منتج</label>
+        <div class="position-relative">
+            <input type="text" id="productSearch" class="form-control" 
+                   placeholder="اكتب اسم المنتج..." autocomplete="off"
+                   onkeydown="return event.key != 'Enter';">
+            <div id="searchResults" class="list-group mt-1"
+                 style="display:none; position:absolute; width:100%; z-index:1000; background:#fff;"></div>
+        </div>
+    </div>
+
+    <div class="card p-3 mb-3 border-0 shadow-sm">
+        <label class="form-label fw-bold">الزبون</label>
+
+        <div id="customerSearchContainer" class="position-relative"
+             style="{% if order.customer %}display:none{% endif %}">
+            <input type="text" id="customerSearch" class="form-control"
+                   placeholder="ابحث عن زبون (اسم)..." autocomplete="off"
+                   onkeydown="return event.key != 'Enter';">
+            <div id="customerResults" class="list-group mt-1"
+                 style="display:none; position:absolute; width:100%; z-index:1000; background:#fff;"></div>
+        </div>
+
+        <div id="selectedCustomerCard"
+             class="alert alert-success d-flex justify-content-between align-items-center m-0"
+             style="{% if order.customer %}display:flex{% else %}display:none{% endif %}">
+            <div>
+                <span class="fw-bold">👤 الزبون:</span>
+                <span id="selectedCustomerName" class="mx-2 text-dark">
+                  {% if order.customer %}{{ order.customer }}{% endif %}
+                </span>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger bg-white"
+                    onclick="removeCustomer()">❌ تغيير</button>
+        </div>
+    </div>
+
+    <form method="post" id="orderForm">
+        {% csrf_token %}
+
+        <input type="hidden" name="customer_id" id="customer_id"
+               value="{% if order.customer %}{{ order.customer.id }}{% endif %}" required>
+
+        <div class="card border-0 shadow-sm p-3">
+
+            <table class="table table-bordered table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>المنتج</th>
+                        <th style="width:150px">السعر</th>
+                        <th style="width:100px">الكمية</th>
+                        <th>المجموع</th>
+                        <th style="width:60px">حذف</th>
+                    </tr>
+                </thead>
+                <tbody id="orderItems">
+
+                    {% for item in order.items.all %}
+                    <tr>
+                        <td>
+                            {{ item.product.name }}
+                            <input type="hidden" name="product_id[]" value="{{ item.product.id }}">
+                        </td>
+
+                        <td>
+                            <input type="number" name="price[]" value="{{ item.price }}"
+                                   class="form-control price en-num" step="0.01" min="0"
+                                   oninput="calculateTotal()">
+                        </td>
+
+                        <td>
+                            <input type="number" name="quantity[]" value="{{ item.quantity }}"
+                                   min="1" class="form-control quantity en-num"
+                                   oninput="calculateTotal()">
+                        </td>
+
+                        <td class="subtotal fw-bold en-num">{{ item.subtotal }}</td>
+
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm"
+                                    onclick="this.closest('tr').remove(); calculateTotal();">×</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+            </table>
+
+            <hr>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">الحسم</label>
+                    <input type="number" step="0.01" min="0" name="discount"
+                           value="{{ order.discount }}" class="form-control en-num"
+                           oninput="calculateTotal()">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">المدفوع</label>
+                    <input type="number" step="0.01" min="0" name="payment"
+                           value="{{ order.payment }}" class="form-control en-num">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">المجموع الكلي</label>
+                    <input type="text" id="totalDisplay"
+                           class="form-control fw-bold fs-5 text-success en-num"
+                           readonly value="{{ order.items_total }}">
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary px-4">💾 حفظ التعديلات</button>
+                <a href="{% url 'dashboard:orders_list' store.slug %}"
+                   class="btn btn-secondary px-4">إلغاء</a>
+            </div>
+
+        </div>
+    </form>
+</div>
+
+<script>
+/* إظهار/إخفاء القائمة الجانبية */
+document.getElementById("toggleSidebar").onclick = function () {
+    document.getElementById("sidebar").classList.toggle("active");
+};
+
+/* ===================== البحث عن المنتجات ===================== */
+document.getElementById("productSearch").addEventListener("keyup", function () {
+    let q = this.value;
+    if (q.length < 1) {
+        document.getElementById("searchResults").style.display = "none";
+        return;
+    }
+
+    fetch(`/dashboard/{{ store.slug }}/search-products/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            let box = document.getElementById("searchResults");
+            box.innerHTML = "";
+            if(data.results.length === 0){
+                 // رسالة عند عدم وجود نتائج
+                 box.innerHTML = '<div class="list-group-item text-muted">لا يوجد نتائج</div>';
+            } else {
+                data.results.forEach(item => {
+                    let a = document.createElement("a");
+                    a.classList.add("list-group-item", "list-group-item-action");
+                    a.style.cursor = "pointer";
+                    a.innerText = item.name + " – " + item.price + " $";
+                    a.onclick = () => selectProduct(item);
+                    box.appendChild(a);
+                });
+            }
+            box.style.display = "block";
+        });
+});
+
+/* إخفاء القائمة عند النقر خارجها */
+document.addEventListener('click', function(event) {
+    const pBox = document.getElementById('searchResults');
+    const pInput = document.getElementById('productSearch');
+    if (!pBox.contains(event.target) && event.target !== pInput) {
+        pBox.style.display = 'none';
+    }
+    
+    const cBox = document.getElementById('customerResults');
+    const cInput = document.getElementById('customerSearch');
+    if (cBox && !cBox.contains(event.target) && event.target !== cInput) {
+        cBox.style.display = 'none';
+    }
+});
+
+/* إضافة منتج */
+function selectProduct(item) {
+    let tbody = document.getElementById("orderItems");
+    
+    // التأكد من عدم تكرار المنتج (اختياري - يمكن إزالته إذا كنت تسمح بالتكرار)
+    /*
+    let exists = Array.from(tbody.querySelectorAll('input[name="product_id[]"]')).find(input => input.value == item.id);
+    if(exists) {
+        alert('المنتج موجود بالفعل في القائمة');
+        return;
+    }
+    */
+
+    let row = document.createElement("tr");
+
+    row.innerHTML = `
+        <td>${item.name}
+            <input type="hidden" name="product_id[]" value="${item.id}">
+        </td>
+        <td><input type="number" name="price[]" value="${item.price}"
+                   class="form-control price en-num" step="0.01" min="0"
+                   oninput="calculateTotal()"></td>
+        <td><input type="number" name="quantity[]" value="1"
+                   min="1" class="form-control quantity en-num"
+                   oninput="calculateTotal()"></td>
+        <td class="subtotal fw-bold en-num">${parseFloat(item.price).toLocaleString()}</td>
+        <td>
+            <button type="button" class="btn btn-danger btn-sm"
+                    onclick="this.closest('tr').remove(); calculateTotal();">×</button>
+        </td>
+    `;
+
+    tbody.appendChild(row);
+    calculateTotal();
+
+    document.getElementById("searchResults").style.display = "none";
+    document.getElementById("productSearch").value = "";
+    document.getElementById("productSearch").focus(); // إعادة التركيز للبحث التالي
+}
+
+/* حساب مجموع الطلب */
+function calculateTotal() {
+    let total = 0;
+
+    document.querySelectorAll("#orderItems tr").forEach(row => {
+        let price = parseFloat(row.querySelector(".price").value) || 0;
+        let qty   = parseFloat(row.querySelector(".quantity").value) || 0;
+        let sub   = price * qty;
+
+        // تحديث السعر الفرعي في الجدول
+        row.querySelector(".subtotal").innerText = sub.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+        total += sub;
+    });
+
+    let discount = parseFloat(document.querySelector('input[name="discount"]').value) || 0;
+    let finalTotal = total - discount;
+    if(finalTotal < 0) finalTotal = 0;
+
+    document.getElementById("totalDisplay").value = finalTotal.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+}
+
+/* عند تحميل الصفحة – احسب المجموع مباشرة */
+window.addEventListener("load", calculateTotal);
+
+/* ===================== البحث عن زبون ===================== */
+document.getElementById("customerSearch")?.addEventListener("keyup", function () {
+    let q = this.value;
+    if (q.length < 1) {
+        document.getElementById("customerResults").style.display = "none";
+        return;
+    }
+
+    fetch(`/dashboard/{{ store.slug }}/search-customers/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            let box = document.getElementById("customerResults");
+            box.innerHTML = "";
+            if(data.results.length === 0){
+                 box.innerHTML = '<div class="list-group-item text-muted">لا يوجد نتائج</div>';
+            } else {
+                data.results.forEach(item => {
+                    let a = document.createElement("a");
+                    a.classList.add("list-group-item", "list-group-item-action");
+                    a.style.cursor = "pointer";
+                    a.innerText = item.name;
+                    a.onclick = () => selectCustomer(item);
+                    box.appendChild(a);
+                });
+            }
+            box.style.display = "block";
+        });
+});
+
+/* اختيار زبون */
+function selectCustomer(item) {
+    document.getElementById("customer_id").value = item.id;
+    document.getElementById("selectedCustomerName").innerText = item.name;
+
+    document.getElementById("customerSearchContainer").style.display = "none";
+    document.getElementById("selectedCustomerCard").style.display = "flex";
+
+    document.getElementById("customerResults").style.display = "none";
+}
+
+/* تغيير/حذف الزبون */
+function removeCustomer() {
+    document.getElementById("customer_id").value = "";
+    document.getElementById("selectedCustomerCard").style.display = "none";
+    document.getElementById("customerSearchContainer").style.display = "block";
+    document.getElementById("customerSearch").value = "";
+    document.getElementById("customerSearch").focus();
+}
+</script>
+
+</body>
+</html>

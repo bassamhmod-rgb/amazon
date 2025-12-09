@@ -1,0 +1,147 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تفاصيل المنتج – {{ store.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body { background:#f7f9fc; font-family:"Cairo",sans-serif; }
+        .sidebar {
+            width: 230px; background:#fff; height:100vh; position:fixed; top:0; right:0;
+            padding:20px 15px; border-left:1px solid #e0e0e0;
+        }
+        .sidebar a { display:block; padding:10px 12px; margin-bottom:8px; color:#333;
+                     border-radius:8px; text-decoration:none; }
+        .sidebar a:hover { background:#e9f2ff; color:#0d6efd; }
+        .content { margin-right:240px; padding:20px; }
+        .product-main-img { width:180px; height:180px; border-radius:10px; object-fit:cover; }
+        .gallery-img { width:100px; height:100px; border-radius:8px; object-fit:cover; margin:5px; }
+        @media (max-width:768px){
+            .sidebar{ right:-260px; transition:.3s; }
+            .sidebar.active{ right:0; }
+            .content{ margin-right:0; }
+            #toggleSidebar{ display:inline-block; }
+        }
+        #toggleSidebar{ display:none; font-size:28px; background:none; border:none; margin-bottom:10px; }
+     .back-to-store-btn {
+    background: #d1d5db;
+    color: #111 !important;
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.back-to-store-btn:hover {
+    background: #c5c9d0;
+}
+
+    </style>
+
+</head>
+<body>
+
+<!-- Mobile toggle button -->
+<button id="toggleSidebar">☰</button>
+<!-- Sidebar -->
+{% include "dashboard/sidebar.html" %}
+
+<!-- Content -->
+ <div class="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>تفاصيل المنتج</h3>
+        <a href="{% url 'dashboard:product_update' store.slug product.id %}" class="btn btn-warning">
+            تعديل المنتج ✏️
+        </a>
+    </div>
+
+    <!-- معلومات أساسية -->
+    <div class="card p-4 mb-4">
+        <div class="row g-4">
+            <div class="col-md-4 text-center">
+                {% if product.main_image %}
+                    <img src="{{ product.main_image.url }}" class="product-main-img">
+                {% else %}
+                    <img src="https://via.placeholder.com/180" class="product-main-img">
+                {% endif %}
+            </div>
+
+            <div class="col-md-8">
+                <h4 class="mb-3">{{ product.name }}</h4>
+
+                <p><strong>السعر:</strong> {{ product.price|floatformat:2 }} $</p>
+                <p><strong>الكمية المتوفرة:</strong> {{ product.stock }}</p>
+                <p><strong>الفئة:</strong>
+                    {% if product.category %}
+                        {{ product.category.name }}
+                    {% else %}
+                        —— 
+                    {% endif %}
+                </p>
+                <p><strong>الفئة الفرعية:</strong>
+                    {% if product.category2 %}
+                           {{ product.category2.name }}
+                    {% else %}
+        —— 
+                    {% endif %}
+                </p>
+                <p><strong>الوصف:</strong><br>{{ product.description|linebreaks }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- تفاصيل المواصفات -->
+    <div class="card p-4 mb-4">
+        <h5 class="mb-3">مواصفات المنتج</h5>
+
+        {% if product.details.all %}
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>الخاصية</th>
+                    <th>القيمة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in product.details.all %}
+                <tr>
+                    <td>{{ d.title }}</td>
+                    <td>{{ d.value }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p class="text-muted text-center">لا توجد مواصفات</p>
+        {% endif %}
+    </div>
+
+    <!-- معرض الصور -->
+    <div class="card p-4">
+        <h5 class="mb-3">معرض الصور</h5>
+
+        <div class="d-flex flex-wrap">
+            {% for img in product.gallery.all %}
+                <img src="{{ img.image.url }}" class="gallery-img">
+            {% empty %}
+                <p class="text-muted">لا توجد صور إضافية</p>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const toggle = document.getElementById("toggleSidebar");
+    toggle.onclick = () => sidebar.classList.toggle("active");
+</script>
+
+</body>
+</html>

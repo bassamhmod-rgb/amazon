@@ -1,0 +1,155 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>الرصيد – {{ store }}</title>
+
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body { background:#f7f9fc; font-family:"Cairo",sans-serif; }
+
+        .sidebar{
+            width:230px; background:#fff; height:100vh; position:fixed; top:0;right:0;
+            padding:20px 15px; border-left:1px solid #e0e0e0; z-index:999;
+        }
+        .sidebar a{ display:block;padding:10px 12px;margin-bottom:8px;color:#333;text-decoration:none;border-radius:8px; }
+        .sidebar a:hover{ background:#e9f2ff;color:#0d6efd; }
+        .content{ margin-right:240px;padding:20px; }
+
+        @media (max-width:768px){
+            .sidebar{ right:-260px;transition:.3s; }
+            .sidebar.active{ right:0; }
+            .content{ margin-right:0; }
+            #toggleSidebar{ display:inline-block !important; }
+        }
+        #toggleSidebar{ display:none;font-size:28px;background:none;border:none;margin-bottom:10px; }
+
+        .table td, .table th { vertical-align:middle; }
+     .back-to-store-btn {
+    background: #d1d5db;
+    color: #111 !important;
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.back-to-store-btn:hover {
+    background: #c5c9d0;
+}
+
+    </style>
+
+</head>
+<body>
+
+<!-- Mobile toggle button -->
+<button id="toggleSidebar">☰</button>
+<!-- Sidebar -->
+{% include "dashboard/sidebar.html" %}
+
+<!-- Content -->
+ <div class="content">
+
+    <h3 class="mb-4">الرصيد</h3>
+
+    <form class="card p-3 border-0 shadow-sm mb-4">
+        <label class="form-label fw-bold">اختيار زبون</label>
+        <select class="form-control" onchange="location='?customer='+this.value">
+            <option disabled selected>اختر زبوناً...</option>
+
+            {% for c in customers %}
+                <option value="{{ c.id }}" {% if selected_customer and c.id == selected_customer.id %}selected{% endif %}>
+                    {{ c }}
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+
+    {% if selected_customer %}
+
+    <div class="card p-4 shadow-sm border-0 mb-4">
+        <h5 class="fw-bold mb-3">تعديل رصيد {{ selected_customer }}</h5>
+
+        <form method="post">
+            {% csrf_token %}
+            
+            <input type="hidden" name="customer_id" value="{{ selected_customer.id }}">
+
+            <div class="row g-3">
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">الرصيد الحالي</label>
+                    <input type="text" class="form-control" value="{{ balance }}" readonly>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">تعديل الرصيد (إضافة أو سحب)</label>
+                    <input type="number" name="points" class="form-control" required placeholder="مثلاً: +50 أو -20">
+                </div>
+                
+                <div class="col-md-4">
+                    <label class="form-label">ملاحظة (اختياري)</label>
+                    <input type="text" name="note" class="form-control">
+                </div>
+
+            </div>
+
+            <button class="btn btn-primary mt-3 px-4">💾 حفظ التعديل</button>
+        </form>
+    </div>
+
+    <div class="card p-3 shadow-sm border-0">
+        <h5 class="fw-bold mb-3">سجل الحركات</h5>
+
+        <table class="table table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th width="120">النقاط</th>
+                    <th width="140">النوع</th>
+                    <th>ملاحظة</th>
+                    <th width="200">التاريخ</th>
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for item in history %}
+                <tr>
+                    <td class="fw-bold {% if item.points > 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ item.points }}
+                    </td>
+
+                    <td>
+                        {% if item.transaction_type == "add" %}➕ إضافة{% endif %}
+                        {% if item.transaction_type == "subtract" %}➖ سحب{% endif %}
+                        {% if item.transaction_type == "adjust" %}⚙️ تعديل{% endif %}
+                    </td>
+
+                    <td>{{ item.note|default:"—" }}</td>
+                    <td>{{ item.created_at|date:"Y/m/d H:i" }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="4" class="text-center text-muted">لا يوجد حركات.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% endif %}
+
+</div>
+
+<script>
+document.getElementById("toggleSidebar").onclick = () => {
+    document.getElementById("sidebar").classList.toggle("active");
+};
+</script>
+
+</body>
+</html>

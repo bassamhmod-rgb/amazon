@@ -1,0 +1,156 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>مراجعة الطلب – {{ store.name }}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background:#f3f5fa;
+            font-family:"Cairo",sans-serif;
+        }
+
+        .review-box {
+            background:#fff;
+            padding:30px;
+            border-radius:16px;
+            box-shadow:0 8px 18px rgba(0,0,0,0.08);
+            max-width:850px;
+            margin:auto;
+        }
+
+        h5.section-title {
+            font-weight:700;
+            font-size:18px;
+            margin-bottom:15px;
+            display:flex;
+            align-items:center;
+            gap:6px;
+        }
+
+        .info-row {
+            margin-bottom:6px;
+            font-size:15px;
+        }
+
+        .info-row strong {
+            width:120px;
+            display:inline-block;
+        }
+
+        .divider {
+            border-top:1px solid #e8e8e8;
+            margin:25px 0;
+        }
+
+        .confirm-btn {
+            font-size:17px;
+            padding:12px;
+        }
+
+        .back-btn {
+            padding:11px;
+            font-size:16px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container mt-4 mb-5">
+
+    <h2 class="mb-4 text-center">📦 مراجعة الطلب</h2>
+
+    <div class="review-box">
+
+        <!-- ================= المعلومات الشخصية ================ -->
+        <h5 class="section-title">👤 معلومات الزبون</h5>
+
+        <p class="info-row"><strong>الاسم:</strong> {{ data.customer_name }}</p>
+        <p class="info-row"><strong>رقم الهاتف:</strong> {{ data.customer_phone }}</p>
+
+        {% if data.customer_address %}
+            <p class="info-row"><strong>العنوان:</strong> {{ data.customer_address }}</p>
+        {% endif %}
+
+        {% if data.customer_note %}
+            <p class="info-row"><strong>ملاحظات:</strong> {{ data.customer_note }}</p>
+        {% endif %}
+
+        <div class="divider"></div>
+
+        <!-- ⭐ طريقة الدفع المطلوبة -->
+        <p class="info-row"><strong>كيفية الدفع:</strong>
+            {% if data.payment_type == "full" %}
+                تحويل كامل
+            {% elif data.payment_type == "partial" %}
+                دفعة مسبقة + باقي عند التسليم
+            {% elif data.payment_type == "cod" %}
+                الدفع عند الاستلام
+            {% endif %}
+        </p>
+
+        <!-- ================= طريقة الدفع ================ -->
+        <h5 class="section-title">💳 طريقة الدفع</h5>
+
+        {% if payment_method %}
+            <p class="info-row"><strong>الطريقة:</strong> {{ payment_method.name }}</p>
+
+            {% if payment_method.recipient_name %}
+                <p class="info-row"><strong>اسم المستلم:</strong> {{ payment_method.recipient_name }}</p>
+            {% endif %}
+
+            {% if payment_method.phone_number %}
+                <p class="info-row"><strong>رقم الهاتف:</strong> {{ payment_method.phone_number }}</p>
+            {% endif %}
+
+            {% if payment_method.account_number %}
+                <p class="info-row"><strong>رقم الحساب:</strong> {{ payment_method.account_number }}</p>
+            {% endif %}
+
+            {% if payment_method.additional_info %}
+                <p class="info-row"><strong>معلومات إضافية:</strong> {{ payment_method.additional_info }}</p>
+            {% endif %}
+        {% else %}
+            <p class="text-danger">لم يتم اختيار أي طريقة دفع.</p>
+        {% endif %}
+
+        <div class="divider"></div>
+
+        <!-- ================= محتوى الطلب ================ -->
+        <h5 class="section-title">🛒 محتوى الطلب</h5>
+
+        {% for item in cart.items.all %}
+            <p class="info-row">
+                {{ item.quantity }} × {{ item.product.name }}
+                — {{ item.product.price|floatformat:2 }} $
+            </p>
+        {% endfor %}
+
+        <p class="mt-3"><strong>الإجمالي:</strong> {{ cart.total|floatformat:2 }} $</p>
+
+        <div class="divider"></div>
+
+        <!-- ================= الأزرار ================ -->
+        <form action="{% url 'orders:confirm_order' store.slug %}" method="post">
+            {% csrf_token %}
+            <button class="btn btn-success w-100 confirm-btn">
+                ✔ تأكيد الطلب
+            </button>
+        </form>
+
+        <a href="{% url 'orders:checkout' store.slug %}"
+           class="btn btn-secondary w-100 mt-3 back-btn">
+            ← الرجوع وتعديل المعلومات
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+</html>

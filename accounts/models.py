@@ -1,30 +1,35 @@
 from django.db import models
-from django.conf import settings
-from django.db.models import Sum
+from stores.models import Store
 
-class PointsTransaction(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="المستخدم")
-    amount = models.IntegerField(verbose_name="القيمة (موجب للإضافة، سالب للخصم)")
-    date = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ العملية")
-    note = models.CharField(max_length=255, blank=True, null=True, verbose_name="ملاحظات")
-    extra_data = models.TextField(blank=True, null=True, verbose_name="بيانات إضافية")
+class Customer(models.Model):
+    store = models.ForeignKey(Store, on_delete=models.CASCADE)
+    name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=20)
+
+    # الحقول الجديدة 👇
+    address = models.TextField(blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        sign = "+" if self.amount >= 0 else ""
-        return f"{self.user.username}: {sign}{self.amount} نقطة بتاريخ {self.date.strftime('%Y-%m-%d %H:%M')}"
+        return f"{self.name} - {self.phone}"
 
-    @staticmethod
-    def get_user_balance(user):
-        """
-        إرجاع مجموع النقاط للمستخدم بشكل آمن.
-        يستخدم فلتر على user_id (أسرع وأوضح) ويعالج حالة None.
-        """
-        # نستخدم user_id لتجنّب أي تحويل غير مقصود إذا مررنا كائن User أو id
-        user_id = user.id if hasattr(user, "id") else int(user)
-        result = PointsTransaction.objects.filter(user_id=user_id).aggregate(total=Sum('amount'))
-        total = result.get('total')
-        return int(total) if total is not None else 0
+    
 
-    class Meta:
-        verbose_name = "عملية نقاط"
-        verbose_name_plural = "عمليات النقاط"
+
+
+class PointsTransaction(models.Model):
+    TRANSACTION_TYPES = [
+        ("add", "إضافة نقاط"),
+        ("subtract", "سحب نقاط"),
+        ("adjust", "تعديل الرصيد"),
+    ]
+
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="points")
+    points = models.IntegerField()
+    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
+    note = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.customer} - {self.points} pts ({self.transaction_type})"

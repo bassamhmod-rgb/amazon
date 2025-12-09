@@ -1,0 +1,15 @@
+from django.urls import path
+from . import views , views_api     # ← مهم جداً
+
+urlpatterns = [
+
+    path("<slug:store_slug>/checkout/", views.checkout, name="checkout"),
+    path("<slug:store_slug>/my-orders/", views.customer_orders, name="customer_orders"),
+    path("<slug:store_slug>/order/<int:order_id>/", views.order_detail, name="order_detail"),
+    path("<slug:store_slug>/review/", views.review_order, name="review_order"),
+    path("<slug:store_slug>/confirm/", views.confirm_order, name="confirm_order"),
+    path("<slug:store_slug>/success/<int:order_id>/", views.order_success, name="success"),
+
+  # ⭐ API مباشر بدون include
+    path("api/orders/<int:merchant_id>/", views_api.merchant_orders_api, name="merchant_orders_api"),
+]

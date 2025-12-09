@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تأكيد إنشاء الحساب</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: "Cairo", sans-serif;
+            background: #f6f7fb;
+        }
+
+        .box {
+            max-width: 420px;
+            margin: 70px auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 14px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+
+        .msg {
+            background: #e9f4ff;
+            border: 1px solid #bcdcff;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        button, a.btn {
+            width: 100%;
+            display: block;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .primary { background: #1a2a4a; color:#fff; }
+        .secondary { background: #ddd; color:#333; }
+    </style>
+</head>
+
+<body>
+
+<div class="box">
+
+    <div class="msg">
+        📱 الرقم <strong>{{ phone }}</strong><br>
+        غير مسجل مسبقاً.<br>
+        سيتم إنشاء حساب جديد بهذا الرقم.
+    </div>
+
+    <form method="POST" action="{% url 'accounts:quick_register' store.slug %}">
+        {% csrf_token %}
+        <button class="primary">متابعة</button>
+    </form>
+
+    <a href="{% url 'accounts:customer_login' store.slug %}" class="secondary">تراجع</a>
+
+</div>
+
+</body>
+</html>
