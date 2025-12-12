@@ -1,0 +1,99 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>الموردين – {{ store.name }}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body { background:#f7f9fc; font-family:"Cairo",sans-serif; }
+        .sidebar {
+            width:230px; background:#fff; height:100vh;
+            position:fixed; top:0; right:0;
+            padding:20px 15px; border-left:1px solid #e0e0e0;
+        }
+        .sidebar a { display:block; padding:10px; margin-bottom:8px; color:#333; border-radius:8px; }
+        .sidebar a:hover { background:#e9f2ff; color:#0d6efd; }
+        .content { margin-right:240px; padding:20px; }
+
+        @media(max-width:768px){
+            .sidebar{ right:-260px; transition:.3s; }
+            .sidebar.active{ right:0; }
+            .content{ margin-right:0; }
+            #toggleSidebar{ display:inline-block; }
+        }
+
+        #toggleSidebar{
+            display:none; font-size:28px; background:none; border:none;
+        }
+    </style>
+
+</head>
+<body>
+
+<button id="toggleSidebar">☰</button>
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>الموردين</h3>
+        <a href="{% url 'dashboard:supplier_create' store.slug %}" class="btn btn-primary">
+            + إضافة مورد جديد
+        </a>
+    </div>
+
+    <div class="card p-3">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>اسم المورد</th>
+                    <th>الهاتف</th>
+                    <th>العنوان</th>
+                    <th>الرصيد السابق</th>
+                    <th width="150" class="text-center">خيارات</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for supplier in suppliers %}
+                <tr>
+                    <td>{{ supplier.name }}</td>
+                    <td>{{ supplier.phone }}</td>
+                    <td>{{ supplier.address }}</td>
+                    <td>{{ supplier.opening_balance }} ل.س</td>
+
+                    <td class="text-center">
+                        <form method="post"
+                              action="{% url 'dashboard:delete_supplier' store.slug supplier.id %}"
+                              style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit"
+                                class="btn btn-sm btn-danger"
+                                onclick="return confirm('هل تريد حذف المورد؟');">
+                                حذف
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">لا يوجد موردون بعد</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+document.getElementById("toggleSidebar").onclick = () =>
+    document.getElementById("sidebar").classList.toggle("active");
+</script>
+
+</body>
+</html>

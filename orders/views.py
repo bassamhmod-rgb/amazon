@@ -13,48 +13,92 @@ from django.urls import reverse
 
 import uuid
 from django.core.files.storage import default_storage
+#دالة مساعدة
+def get_cart(request, store):
+    # تأمين session key
+    session_key = request.session.session_key
+    if not session_key:
+        request.session.create()
+        session_key = request.session.session_key
 
-@login_required
+    # إذا الزبون مسجّل دخول → cart حسب user
+    if request.user.is_authenticated:
+        cart, created = Cart.objects.get_or_create(
+            user=request.user,
+            store=store
+        )
+        return cart
+
+    # إذا الزبون ضيف → cart حسب session_key
+    cart, created = Cart.objects.get_or_create(
+        session_key=session_key,
+        store=store
+    )
+    return cart
+
 def checkout(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, is_active=True)
 
+    # الزبون من السيشن
     customer_id = request.session.get("customer_id")
     customer = Customer.objects.filter(id=customer_id, store=store).first()
     if not customer:
         login_url = reverse("accounts:customer_login", kwargs={"store_slug": store.slug})
         return redirect(f"{login_url}?next=/orders/{store.slug}/checkout/")
 
-    cart, _ = Cart.objects.get_or_create(user=request.user, store=store)
+    # 🔥 السلة باستخدام get_cart
+    cart = get_cart(request, store)
+
     if cart.items.count() == 0:
         return redirect("cart:cart_detail", store_slug=store.slug)
 
     payment_methods = StorePaymentMethod.objects.filter(store=store, is_active=True)
 
     checkout_data = request.session.get("checkout_data", {})
-    error_message = None
 
-    # ⭐ حساب الحد الأدنى المقترح للدفع الجزئي (مجرد إعلام)
-    # ⭐ حساب الحد الأدنى المقترح للدفع الجزئي (مجرد إعلام)
     required_percent = store.payment_required_percentage or 0
-    required_amount = 0
-
-    if required_percent > 0:
-        required_amount = (cart.get_total() * required_percent) / 100
-
+    required_amount = (cart.get_total() * required_percent) / 100 if required_percent else 0
 
     if request.method == "POST":
 
-        new_name = request.POST.get("customer_name")
-        new_phone = request.POST.get("customer_phone")
-        address = request.POST.get("customer_address")
-        note = request.POST.get("customer_note")
-        payment_type = request.POST.get("payment_type")
-        payment_method_id = request.POST.get("payment_method")
+        new_name = request.POST.get("customer_name") or ""
+        new_phone = request.POST.get("customer_phone") or ""
+        new_address = request.POST.get("customer_address") or ""
+        note = request.POST.get("customer_note") or ""
+        payment_type = request.POST.get("payment_type") or ""
+        payment_method_id = request.POST.get("payment_method") or ""
 
         proof_image_file = request.FILES.get("payment_proof_image")
         transaction_id = request.POST.get("payment_transaction_id", "").strip()
 
-        # إلزامية الإثبات
+        changed = False
+
+        if new_name and new_name != customer.name:
+            customer.name = new_name
+            changed = True
+
+        if new_phone and new_phone != customer.phone:
+            customer.phone = new_phone
+            changed = True
+
+        if new_address and new_address != customer.address:
+            customer.address = new_address
+            changed = True
+
+        if changed:
+            customer.save()
+
+        checkout_data = {
+            "customer_name": new_name or customer.name,
+            "customer_phone": new_phone or customer.phone,
+            "customer_address": new_address or (customer.address or ""),
+            "customer_note": note,
+            "payment_method_id": payment_method_id,
+            "payment_type": payment_type,
+            "payment_transaction_id": transaction_id,
+            "payment_proof_image_path": None,
+        }
+
         if payment_type in ["full", "partial"]:
             if not proof_image_file and not transaction_id:
                 return render(request, "stores/checkout/checkout.html", {
@@ -64,34 +108,16 @@ def checkout(request, store_slug):
                     "cart": cart,
                     "checkout_data": checkout_data,
                     "error_message": "يجب رفع صورة التحويل أو إدخال رقم العملية.",
-                    "required_percent": required_percent,    # ⭐
-                    "required_amount": required_amount,      # ⭐
+                    "required_percent": required_percent,
+                    "required_amount": required_amount,
                 })
 
-        # حفظ صورة الإثبات فوراً قبل الريدايركت
-        proof_image_path = None
         if proof_image_file:
             filename = f"proofs/{uuid.uuid4()}_{proof_image_file.name}"
-            proof_image_path = default_storage.save(filename, proof_image_file)
+            proof_path = default_storage.save(filename, proof_image_file)
+            checkout_data["payment_proof_image_path"] = proof_path
 
-        # تحديث بيانات المستخدم
-        if new_name:
-            customer.name = new_name
-        if new_phone:
-            customer.phone = new_phone
-        customer.save()
-
-        # تخزين البيانات في الجلسة
-        request.session["checkout_data"] = {
-            "customer_name": customer.name,
-            "customer_phone": customer.phone,
-            "customer_address": address,
-            "customer_note": note,
-            "payment_method_id": payment_method_id,
-            "payment_type": payment_type,
-            "payment_transaction_id": transaction_id,
-            "payment_proof_image_path": proof_image_path,
-        }
+        request.session["checkout_data"] = checkout_data
 
         return redirect("orders:review_order", store_slug=store.slug)
 
@@ -100,14 +126,16 @@ def checkout(request, store_slug):
         "customer": customer,
         "payment_methods": payment_methods,
         "cart": cart,
-        "checkout_data": checkout_data,
-
-        # ⭐ إرسال المبلغ المقترح ليظهر فقط عند اختيار الدفع الجزئي
+        "checkout_data": {
+            "customer_name": customer.name,
+            "customer_phone": customer.phone,
+            "customer_address": customer.address or "",
+            "customer_note": "",
+        },
         "required_percent": required_percent,
         "required_amount": required_amount,
     })
 
-@login_required
 def customer_orders(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, is_active=True)
 
@@ -130,7 +158,6 @@ def customer_orders(request, store_slug):
         "customer": customer,
         "orders": orders,
     })
-@login_required
 def order_detail(request, store_slug, order_id):
     store = get_object_or_404(Store, slug=store_slug, is_active=True)
 
@@ -149,37 +176,26 @@ def order_detail(request, store_slug, order_id):
         "order": order,
         "items": items,
     })
-@login_required
 def review_order(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug)
 
-    # جلب الزبون
     customer_id = request.session.get("customer_id")
-    customer = None
-    if customer_id:
-        customer = Customer.objects.filter(id=customer_id, store=store).first()
-
+    customer = Customer.objects.filter(id=customer_id, store=store).first()
     if not customer:
         return redirect("accounts:customer_login")
 
-    # جلب السلة
-    cart, _ = Cart.objects.get_or_create(user=request.user, store=store)
+    cart = get_cart(request, store)
 
-    # بيانات checkout من session
     data = request.session.get("checkout_data")
     if not data:
         return redirect("orders:checkout", store_slug=store.slug)
 
-    # ========= حل مشكلة ظهور None =========
-    # إذا الحقول موجودة لكن فارغة أو None → استخدم قيم الزبون الحقيقية
     if not data.get("customer_name"):
         data["customer_name"] = customer.name
 
     if not data.get("customer_phone"):
         data["customer_phone"] = customer.phone
-    # =======================================
 
-    # جلب طريقة الدفع
     payment_method = None
     method_id = data.get("payment_method_id")
 
@@ -200,43 +216,36 @@ import os
 from django.core.files import File
 from django.core.files.storage import default_storage
 
-@login_required
 def confirm_order(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug)
-    cart, _ = Cart.objects.get_or_create(user=request.user, store=store)
 
-    # بيانات checkout من السيشن
+    cart = get_cart(request, store)
+
     data = request.session.get("checkout_data")
     if not data:
         return redirect("orders:checkout", store_slug=store.slug)
 
-    # الزبون
     customer_id = request.session.get("customer_id")
     customer = Customer.objects.filter(id=customer_id, store=store).first()
     if not customer:
         return redirect("accounts:customer_login")
 
-    # طريقة الدفع
     method = None
     method_id = data.get("payment_method_id")
     if method_id:
         method = StorePaymentMethod.objects.filter(id=method_id, store=store).first()
 
-    # ⭐ المسار المؤقّت الذي خزّناه بالـ checkout
     proof_image_path = data.get("payment_proof_image_path")
     transaction_id = data.get("payment_transaction_id")
 
-    # 🟦 إنشاء الطلب
     order = Order.objects.create(
         store=store,
         customer=customer,
         user=store.owner,
         total=cart.total(),
         status="pending",
-
         shipping_address=data.get("customer_address", ""),
         payment_type=data.get("payment_type"),
-
         payment_method=method,
         payment_method_name=method.name if method else "",
         payment_recipient_name=method.recipient_name if method else "",
@@ -244,21 +253,16 @@ def confirm_order(request, store_slug):
         payment_additional_info=method.additional_info if method else "",
     )
 
-    # ⭐ حفظ صورة أثبات الدفع إذا موجودة
     if proof_image_path:
         with default_storage.open(proof_image_path, "rb") as f:
             filename = os.path.basename(proof_image_path)
             order.payment_proof_image.save(filename, File(f), save=True)
-
-        # حذف الصورة المؤقتة
         default_storage.delete(proof_image_path)
 
-    # ⭐ حفظ رقم العملية
     if transaction_id:
         order.payment_transaction_id = transaction_id
         order.save()
 
-    # نقل عناصر السلة
     for item in cart.items.all():
         OrderItem.objects.create(
             order=order,
@@ -268,16 +272,13 @@ def confirm_order(request, store_slug):
             item_note=item.item_note,
         )
 
-    # تفريغ السلة
     cart.items.all().delete()
 
-    # حذف بيانات الـ checkout
     if "checkout_data" in request.session:
         del request.session["checkout_data"]
 
     return redirect("orders:success", store_slug=store.slug, order_id=order.id)
 
-@login_required
 def order_success(request, store_slug, order_id):
     store = get_object_or_404(Store, slug=store_slug)
     order = get_object_or_404(Order, id=order_id, store=store)

@@ -33,3 +33,30 @@ class PointsTransaction(models.Model):
 
     def __str__(self):
         return f"{self.customer} - {self.points} pts ({self.transaction_type})"
+# الموردين
+class Supplier(models.Model):
+    name = models.CharField(max_length=200)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    address = models.CharField(max_length=255, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+
+    store = models.ForeignKey(
+    "stores.Store",
+    on_delete=models.CASCADE,
+    related_name="suppliers"
+    )
+
+
+    # 🔥 الرصيد السابق بين التاجر والمورّد
+    opening_balance = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="الرصيد السابق بين التاجر والمورّد"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+

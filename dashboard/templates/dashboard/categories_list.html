@@ -3,110 +3,156 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>الفئات – {{ store.name }}</title>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
     <style>
-        body { background:#f7f9fc; font-family:"Cairo",sans-serif; }
-        .sidebar {
-            width: 230px; background:#fff; height:100vh; position:fixed; top:0; right:0;
-            padding:20px 15px; border-left:1px solid #e0e0e0;
+        body {
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
         }
-        .sidebar a { display:block; padding:10px 12px; margin-bottom:8px; color:#333;
-                     border-radius:8px; text-decoration:none; }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+        .sidebar a {
+            display:block; padding:10px 12px; margin-bottom:8px;
+            color:#333; border-radius:8px; text-decoration:none;
+        }
         .sidebar a:hover { background:#e9f2ff; color:#0d6efd; }
-        .content { margin-right:240px; padding:20px; }
+
         @media (max-width:768px){
             .sidebar{ right:-260px; transition:.3s; }
             .sidebar.active{ right:0; }
             .content{ margin-right:0; }
-            #toggleSidebar{ display:inline-block; }
+            #toggleSidebar{ display:inline-block !important; }
         }
-        #toggleSidebar{ display:none; font-size:28px; background:none; border:none; margin-bottom:10px; }
-     .back-to-store-btn {
-    background: #d1d5db;
-    color: #111 !important;
-    padding: 10px 18px;
-    border-radius: 10px;
-    border: none;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
+        /* ===== MOBILE ===== */
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+            .content{ margin-right:0; }
+        }
 
-.back-to-store-btn:hover {
-    background: #c5c9d0;
-}
+        /* ===== ARROW ===== */
+        #sidebarArrow{
+            display:none;
+        }
 
+        @media (max-width:768px){
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+        }
     </style>
-
 </head>
+
 <body>
 
-<!-- Mobile toggle button -->
-<button id="toggleSidebar">☰</button>
+<!-- سهم السايدبار -->
+<div id="sidebarArrow">❯</div>
 
-<!-- Sidebar -->
+<!-- السايدبار -->
 {% include "dashboard/sidebar.html" %}
 
-<!-- Content -->
- <div class="content">
+<!-- المحتوى -->
+<div class="content">
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>الفئات</h3>
-        <a href="{% url 'dashboard:add_category' store.slug %}" class="btn btn-primary">
+    <!-- العنوان + زر الإضافة -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="mb-0">📂 الفئات</h3>
+
+        <a href="{% url 'dashboard:add_category' store.slug %}"
+           class="btn btn-primary">
             + إضافة فئة جديدة
         </a>
     </div>
 
-    <div class="card p-3">
-        <table class="table table-striped align-middle">
-            <thead>
-                <tr>
-                    <th>اسم الفئة</th>
-                    <th width="150" class="text-center">خيارات</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                {% for cat in categories %}
-                <tr>
-                    <td>{{ cat.name }}</td>
-
-                    <td class="text-center">
-
-                        <form method="post" 
-                              action="{% url 'dashboard:delete_category' store.slug cat.id %}" 
-                              style="display:inline;">
-                            {% csrf_token %}
-                            
-                            <button type="submit" class="btn btn-sm btn-danger"
-                                    onclick="return confirm('هل أنت متأكد من حذف هذه الفئة؟');">
-                                حذف
-                            </button>
-                        </form>
-
-                    </td>
-                </tr>
-
-                {% empty %}
-                <tr>
-                    <td colspan="2" class="text-center text-muted">لا يوجد فئات</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-
-        </table>
+    <!-- جدول الفئات -->
+    <div class="card p-3 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>اسم الفئة</th>
+                        <th class="text-center" style="width:140px;">خيارات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cat in categories %}
+                    <tr>
+                        <td>{{ cat.name }}</td>
+                        <td class="text-center">
+                            <form method="post"
+                                  action="{% url 'dashboard:delete_category' store.slug cat.id %}"
+                                  onsubmit="return confirm('هل أنت متأكد من حذف هذه الفئة؟');">
+                                {% csrf_token %}
+                                <button class="btn btn-sm btn-danger">
+                                    حذف
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="2" class="text-center text-muted">
+                            لا يوجد فئات حالياً
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </div>
 
+<!-- JS السهم -->
 <script>
     const sidebar = document.getElementById("sidebar");
-    const toggle = document.getElementById("toggleSidebar");
-    toggle.onclick = () => sidebar.classList.toggle("active");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
 </script>
 
 </body>
 </html>
-    

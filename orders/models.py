@@ -25,6 +25,13 @@ class Order(models.Model):
     is_seen_by_store = models.BooleanField(default=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     customer = models.ForeignKey(Customer, null=True, blank=True, on_delete=models.SET_NULL, related_name="orders")
+    supplier = models.ForeignKey(
+    "accounts.Supplier",
+    on_delete=models.SET_NULL,
+    null=True, blank=True,
+    related_name="orders"
+)
+
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -90,7 +97,27 @@ class OrderItem(models.Model):
     price = models.DecimalField(max_digits=8, decimal_places=2)
     direction = models.IntegerField(default=-1)  # بيع = -1 / شراء = +1
     item_note = models.TextField(blank=True, null=True, verbose_name="ملاحظات المنتج")
+    buy_price = models.DecimalField(
+    
+    max_digits=10,
+    decimal_places=2,
+    null=True,
+    blank=True,
+    help_text="تكلفة القطعة وقت البيع / سعر الشراء"
+)
+
     # 🔥 مجموع البند المعروض (دائمًا موجب)
     @property
     def subtotal(self):
         return self.price * abs(self.quantity)
+    #لحساب متوسط التكلفة عند البيع
+    @property
+    def profit(self):
+        # شراء → لا يوجد ربح
+        if self.direction == 1:
+            return 0
+        
+        if self.buy_price is None:
+            return 0
+        
+        return (self.price - self.buy_price) * abs(self.quantity)

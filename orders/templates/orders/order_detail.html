@@ -4,199 +4,230 @@
 <head>
     <meta charset="UTF-8">
     <title>تفاصيل الطلب – #{{ order.id }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    <!-- Bootstrap RTL -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
     <style>
-        body { background:#f7f9fc; font-family:"Cairo", sans-serif; }
+        :root {
+            --primary-color: #1A2A4A;
+            --light-bg: #F3F5F7;
+        }
 
-        .card-box {
-            background:#fff;
-            border-radius:14px;
-            padding:20px;
-            border:1px solid #e4e4e4;
-            margin-bottom:20px;
-            box-shadow:0 4px 12px rgba(0,0,0,0.05);
+        body {
+            background: var(--light-bg);
+            font-family: "Cairo", sans-serif;
+        }
+
+        /* ⭐ نفس ستايل صفحة التاجر */
+        .detail-container {
+            max-width: 900px;
+            margin: 3.5rem auto;
+            background: #fff;
+            padding: 2rem 2rem;
+            border-radius: 18px;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+            border: 1px solid #e4e6eb;
+        }
+
+        h3 {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 1.3rem;
+        }
+
+        .section-box {
+            background: #fff;
+            border-radius: 14px;
+            padding: 20px;
+            border: 1px solid #e4e4e4;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
         }
 
         .note-box {
-            background:#f3f7ff;
-            padding:5px 10px;
-            border-radius:8px;
-            font-size:0.9rem;
-            color:#005f9e;
+            background: #f3f7ff;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: #005f9e;
+        }
+
+        table th {
+            font-size: 0.95rem;
         }
 
         .back-btn {
-            border-radius:10px;
-            padding:10px 20px;
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 1rem;
+            width: 100%;
+            margin-top: 1rem;
         }
     </style>
 </head>
 
 <body>
 
-<div class="container mt-4">
+<div class="container">
 
-    <h3 class="mb-4">تفاصيل الطلب #{{ order.id }}</h3>
+    <div class="detail-container">
 
-    <!-- ================= معلومات عامة ================= -->
-    <div class="card-box">
-        <div class="row">
+        <h3>تفاصيل الطلب #{{ order.id }}</h3>
 
-            <div class="col-md-6">
-                <p class="fs-5">
-                    <strong>👤 الزبون:</strong>
-                    {% if order.customer %}
-                        <span class="text-primary">{{ order.customer.name }}</span>
-                        <span class="text-muted fs-6">({{ order.customer.phone }})</span>
-                    {% else %}
-                        <span class="text-muted">زبون غير مسجل</span>
-                    {% endif %}
-                </p>
+        <!-- ================= معلومات عامة ================= -->
+        <div class="section-box">
+            <div class="row">
 
-                <p><strong>📍 العنوان:</strong>
-                    {% if order.shipping_address %}
-                        {{ order.shipping_address }}
-                    {% else %}
-                        <span class="text-muted">—</span>
-                    {% endif %}
-                </p>
+                <div class="col-md-6">
+                    <p class="fs-5">
+                        <strong>👤 الزبون:</strong>
+                        {% if order.customer %}
+                            <span class="text-primary">{{ order.customer.name }}</span>
+                            <span class="text-muted fs-6">({{ order.customer.phone }})</span>
+                        {% else %}
+                            <span class="text-muted">زبون غير مسجل</span>
+                        {% endif %}
+                    </p>
 
-                <p><strong>📅 التاريخ:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</p>
+                    <p><strong>📍 العنوان:</strong>
+                        {% if order.shipping_address %}
+                            {{ order.shipping_address }}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </p>
 
-                <p>
-                    <strong>الحالة:</strong>
-                    {% if order.status == "pending" %}
-                        <span class="badge bg-warning text-dark">قيد الانتظار</span>
-                    {% else %}
-                        <span class="badge bg-success">تم التأكيد</span>
-                    {% endif %}
-                </p>
+                    <p><strong>📅 التاريخ:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</p>
+
+                    <p>
+                        <strong>الحالة:</strong>
+                        {% if order.status == "pending" %}
+                            <span class="badge bg-warning text-dark">قيد الانتظار</span>
+                        {% else %}
+                            <span class="badge bg-success">تم التأكيد</span>
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="col-md-6 bg-light p-3 rounded">
+                    <p><strong>مجموع العناصر:</strong> {{ order.items_total|floatformat:2 }} $</p>
+                    <p><strong>الحسم:</strong> <span class="text-danger">{{ order.discount|floatformat:2 }} $</span></p>
+
+                    <p class="fs-5 fw-bold"><strong>الصافي للدفع:</strong> {{ order.net_total|floatformat:2 }} $</p>
+
+                    <hr>
+
+                    <p><strong>المدفوع:</strong> {{ order.payment|floatformat:2 }} $</p>
+
+                    <p><strong>المتبقي:</strong>
+                        <span class="{% if order.remaining > 0 %}text-danger{% else %}text-success{% endif %}">
+                            {{ order.remaining|floatformat:2 }} $
+                        </span>
+                    </p>
+                </div>
+
             </div>
+        </div>
 
-            <div class="col-md-6 bg-light p-3 rounded">
-                <p><strong>مجموع العناصر:</strong> {{ order.items_total|floatformat:2 }} $</p>
-                <p><strong>الحسم:</strong> <span class="text-danger">{{ order.discount|floatformat:2 }} $</span></p>
+        <!-- ================= عناصر الطلب ================= -->
+        <div class="section-box">
+            <h5 class="mb-3" style="color: var(--primary-color); font-weight:700;">🛒 عناصر الطلب</h5>
 
-                <p class="fs-5 fw-bold"><strong>الصافي للدفع:</strong> {{ order.net_total|floatformat:2 }} $</p>
+            <div class="table-responsive">
+                <table class="table table-striped align-middle table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>المنتج</th>
+                            <th>الكمية</th>
+                            <th>السعر الإفرادي</th>
+                            <th>المجموع الفرعي</th>
+                            <th>الملاحظات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{{ item.price|floatformat:2 }} $</td>
+                            <td class="fw-bold">{{ item.subtotal|floatformat:2 }} $</td>
 
+                            <td>
+                                {% if item.item_note %}
+                                    <div class="note-box">📝 {{ item.item_note }}</div>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">لا توجد عناصر في هذا الطلب</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ================= تفاصيل الدفع ================= -->
+        <div class="section-box">
+            <h5 class="mb-3" style="color: var(--primary-color); font-weight:700;">💰 تفاصيل الدفع</h5>
+
+            {% if order.payment_type %}
+                <p>
+                    <strong>نوع الدفع:</strong>
+                    {% if order.payment_type == "full" %}
+                        تحويل كامل
+                    {% elif order.payment_type == "partial" %}
+                        دفعة مسبقة + باقي عند التسليم
+                    {% else %}
+                        الدفع عند الاستلام
+                    {% endif %}
+                </p>
+            {% endif %}
+
+            {% if order.payment_method_name %}
+                <p><strong>طريقة الدفع:</strong> {{ order.payment_method_name }}</p>
+            {% endif %}
+
+            {% if order.payment_recipient_name %}
+                <p><strong>اسم المستلم:</strong> {{ order.payment_recipient_name }}</p>
+            {% endif %}
+
+            {% if order.payment_account_info %}
+                <p><strong>رقم الحساب / المحفظة:</strong> {{ order.payment_account_info }}</p>
+            {% endif %}
+
+            {% if order.payment_additional_info %}
+                <p><strong>معلومات إضافية:</strong> {{ order.payment_additional_info }}</p>
+            {% endif %}
+
+            {% if order.payment_proof_image or order.payment_transaction_id %}
                 <hr>
 
-                <p><strong>المدفوع:</strong> {{ order.payment|floatformat:2 }} $</p>
-
-                <p><strong>المتبقي:</strong>
-                    <span class="{% if order.remaining > 0 %}text-danger{% else %}text-success{% endif %}">
-                        {{ order.remaining|floatformat:2 }} $
-                    </span>
-                </p>
-            </div>
-
-        </div>
-    </div>
-
-    <!-- ================= عناصر الطلب ================= -->
-    <div class="card-box">
-        <h5 class="mb-3">🛒 عناصر الطلب</h5>
-
-        <div class="table-responsive">
-            <table class="table table-striped align-middle table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>المنتج</th>
-                        <th>الكمية</th>
-                        <th>السعر الإفرادي</th>
-                        <th>المجموع الفرعي</th>
-                        <th>الملاحظات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in items %}
-                    <tr>
-                        <td>{{ item.product.name }}</td>
-                        <td>{{ item.quantity }}</td>
-                        <td>{{ item.price|floatformat:2 }} $</td>
-                        <td class="fw-bold">{{ item.subtotal|floatformat:2 }} $</td>
-
-                        <td>
-                            {% if item.item_note %}
-                                <div class="note-box">
-                                    📝 {{ item.item_note }}
-                                </div>
-                            {% else %}
-                                <span class="text-muted">—</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center text-muted">لا توجد عناصر في هذا الطلب</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- ================= تفاصيل الدفع ================= -->
-    <div class="card-box">
-        <h5 class="mb-3">💰 تفاصيل الدفع</h5>
-
-        <!-- نوع الدفع -->
-        {% if order.payment_type %}
-            <p>
-                <strong>نوع الدفع:</strong>
-                {% if order.payment_type == "full" %}
-                    تحويل كامل المبلغ
-                {% elif order.payment_type == "partial" %}
-                    دفعة مسبقة + باقي عند التسليم
-                {% else %}
-                    الدفع عند الاستلام
+                {% if order.payment_proof_image %}
+                    <p><strong>📸 إشعار التحويل:</strong></p>
+                    <img src="{{ order.payment_proof_image.url }}"
+                         style="max-width:240px; border:1px solid #ccc; border-radius:10px;">
                 {% endif %}
-            </p>
-        {% endif %}
 
-        <!-- طريقة الدفع -->
-        {% if order.payment_method_name %}
-            <p><strong>طريقة الدفع:</strong> {{ order.payment_method_name }}</p>
-        {% endif %}
-
-        {% if order.payment_recipient_name %}
-            <p><strong>اسم المستلم:</strong> {{ order.payment_recipient_name }}</p>
-        {% endif %}
-
-        {% if order.payment_account_info %}
-            <p><strong>رقم الحساب / المحفظة:</strong> {{ order.payment_account_info }}</p>
-        {% endif %}
-
-        {% if order.payment_additional_info %}
-            <p><strong>معلومات إضافية:</strong> {{ order.payment_additional_info }}</p>
-        {% endif %}
-
-        <!-- إثبات الدفع -->
-        {% if order.payment_proof_image or order.payment_transaction_id %}
-            <hr>
-
-            {% if order.payment_proof_image %}
-                <p><strong>📸 إشعار التحويل:</strong></p>
-                <img src="{{ order.payment_proof_image.url }}"
-                     style="max-width:240px; border:1px solid #ccc; border-radius:10px;">
+                {% if order.payment_transaction_id %}
+                    <p class="mt-2">
+                        <strong>🔢 رقم عملية الدفع:</strong> {{ order.payment_transaction_id }}
+                    </p>
+                {% endif %}
             {% endif %}
+        </div>
 
-            {% if order.payment_transaction_id %}
-                <p class="mt-2">
-                    <strong>🔢 رقم عملية الدفع:</strong>
-                    {{ order.payment_transaction_id }}
-                </p>
-            {% endif %}
-        {% endif %}
+        <a href="{% url 'orders:customer_orders' store.slug %}" 
+           class="btn btn-secondary back-btn">
+            ← الرجوع لطلباتي
+        </a>
+
     </div>
-
-    <!-- زر الرجوع -->
-    <a href="{% url 'orders:customer_orders' store.slug %}" 
-       class="btn btn-secondary back-btn">
-        ← الرجوع لطلباتي
-    </a>
 
 </div>
 

@@ -19,7 +19,9 @@ from accounts.models import Customer
 from django.contrib import messages
 ###
 from django.contrib.auth.hashers import make_password
-
+from django.db.models import Q
+from accounts.models import Supplier
+from django.http import JsonResponse
 # أما إذا كنت ناقله كمان لـ accounts، الغي السطر اللي فوق واستخدم هاد:
 
 @login_required
@@ -288,121 +290,175 @@ def confirm_order(request, store_slug, order_id):
     order.save()
 
     return redirect("dashboard:order_detail_dashboard", store_slug=store.slug, order_id=order.id)
-
-#اضافة طلب من قبل التاجر
+# إضافة طلب (بيع + شراء)
 @login_required
 def order_create(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
 
     if request.method == "POST":
 
-        # 🟦 1) جلب معرف الزبون (الجزء الجديد)
-        customer_id = request.POST.get("customer_id")
-        customer = None
-        
-        # نتأكد أن القيمة ليست فارغة قبل البحث
-        if customer_id:
-            # نستخدم filter().first() بدلاً من get() لتجنب توقف الموقع لو كان الرقم خطأ
-            customer = Customer.objects.filter(id=customer_id).first()
+        # 1) نوع العملية
+        transaction_type = request.POST.get("transaction_type", "sale")
 
-        # 🟦 2) معالجة المجموع
-        total_raw = request.POST.get("total", "0")
+        # 2) جلب الزبون أو المورد
+        customer = None
+        supplier = None
+
+        if transaction_type == "sale":
+            customer_id = request.POST.get("customer_id")
+            if customer_id and customer_id.isdigit():
+                customer = Customer.objects.filter(id=customer_id, store=store).first()
+
+        elif transaction_type == "purchase":
+            supplier_id = request.POST.get("supplier_id")
+            if supplier_id and supplier_id.isdigit():
+                supplier = Supplier.objects.filter(id=supplier_id, store=store).first()
+
+        # تأمين البيانات — إذا شراء لازم supplier، وإذا بيع لازم customer
+        if transaction_type == "sale" and not customer:
+            messages.error(request, "يجب اختيار زبون لإتمام عملية البيع.")
+            return redirect("dashboard:order_create", store_slug=store.slug)
+
+        if transaction_type == "purchase" and not supplier:
+            messages.error(request, "يجب اختيار مورد لإتمام عملية الشراء.")
+            return redirect("dashboard:order_create", store_slug=store.slug)
+
+        # 3) المجموع
         try:
-            total = float(total_raw)
+            total = float(request.POST.get("total", "0"))
         except:
             total = 0
 
-        # 🟦 3) إنشاء الطلب (تمت إضافة customer)
+        # 4) إنشاء الطلب
         order = Order.objects.create(
             store=store,
-            user=request.user,      # الموظف الذي أنشأ الطلب
-            customer=customer,      # <--- هنا التعديل: ربط الزبون بالطلب
+            user=request.user,
+            transaction_type=transaction_type,
+            customer=customer if transaction_type == "sale" else None,
+            supplier=supplier if transaction_type == "purchase" else None,
             total=total,
             discount=request.POST.get("discount", 0),
             payment=request.POST.get("payment", 0),
             status="pending",
-            transaction_type="sale",
         )
 
-        # 🟦 4) جلب عناصر الطلب وحفظها
-        products = request.POST.getlist("product_id[]")
-        prices   = request.POST.getlist("price[]")
-        qtys     = request.POST.getlist("quantity[]")
-
-        # التحقق من أن القوائم ليست فارغة لتجنب الأخطاء
-        if products:
-            for i in range(len(products)):
-                # حماية إضافية في حال كانت المصفوفات غير متساوية الطول
-                if i < len(prices) and i < len(qtys):
-                    OrderItem.objects.create(
-                        order=order,
-                        product_id=products[i],
-                        price=float(prices[i]),
-                        quantity=float(qtys[i]),
-                        direction=-1,  # بيع
-                    )
-
-        return redirect("dashboard:orders_list", store_slug=store.slug)
-
-    # GET
-    return render(request, "dashboard/order_create.html", {
-        "store": store
-    })
-#تعديل طلب
-@login_required
-def order_update(request, store_slug, order_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
-    order = get_object_or_404(Order, id=order_id, store=store)
-
-    # جميع الزبائن ما عدا التاجر نفسه
-    customers = User.objects.exclude(id=request.user.id)
-
-    if request.method == "POST":
-
-        # 🟦 المجموع الكلي
-        total_raw = request.POST.get("total", "0")
-        try:
-            total = float(total_raw)
-        except:
-            total = 0
-
-        # 🟦 تحديث الطلب الأساسي
-        order.total = total
-        order.discount = request.POST.get("discount", 0)
-        order.payment = request.POST.get("payment", 0)
-
-        # الزبون المختار
-        customer_id = request.POST.get("customer_id")
-        order.customer_id = customer_id if customer_id not in ["", None] else None
-
-        order.save()
-
-        # 🟦 حذف العناصر القديمة وإعادة إضافتها
-        order.items.all().delete()
-
-        # 🟦 إضافة العناصر الجديدة
+        # 5) عناصر الطلب
         products = request.POST.getlist("product_id[]")
         prices   = request.POST.getlist("price[]")
         qtys     = request.POST.getlist("quantity[]")
 
         for i in range(len(products)):
-            OrderItem.objects.create(
-                order=order,
-                product_id=products[i],
-                price=float(prices[i]),
-                quantity=float(qtys[i]),
-                direction=-1  # بيع
-            )
+            product = Product.objects.filter(id=products[i], store=store).first()
+            if not product:
+                continue
+
+            price = float(prices[i])
+            qty   = float(qtys[i])
+
+            if transaction_type == "sale":
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    price=price,
+                    quantity=qty,
+                    direction=-1,
+                    buy_price=product.cost_price if hasattr(product, "cost_price") else 0
+                )
+            else:  # شراء
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    price=price,
+                    quantity=qty,
+                    direction=1,
+                    buy_price=price
+                )
 
         return redirect("dashboard:orders_list", store_slug=store.slug)
 
-    # GET → عرض الصفحة مع البيانات المحمّلة مسبقاً
+    return render(request, "dashboard/order_create.html", {
+        "store": store
+    })
+# تعديل الطلب (بيع + شراء) — بدون حقول supplier
+@login_required
+def order_update(request, store_slug, order_id):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    order = get_object_or_404(Order, id=order_id, store=store)
+    new_orders_count = Order.objects.filter(store=store, is_seen_by_store=False).count()
+
+    if request.method == "POST":
+
+        # 🟦 1) نوع العملية (بيع / شراء)
+        transaction_type = request.POST.get("transaction_type", "sale")
+        order.transaction_type = transaction_type
+
+        # 🟦 2) المجموع
+        try:
+            total = float(request.POST.get("total", "0"))
+        except:
+            total = 0
+
+        order.total = total
+        order.discount = request.POST.get("discount", 0)
+        order.payment = request.POST.get("payment", 0)
+
+        # 🟦 3) زبون أو مورد (حسب النوع)
+        if transaction_type == "sale":
+            customer_id = request.POST.get("customer_id")
+            order.customer_id = customer_id if customer_id else None
+            order.supplier = None  # ← مهم جداً
+
+        else:  # purchase
+            supplier_id = request.POST.get("supplier_id")
+            order.supplier_id = supplier_id if supplier_id else None
+            order.customer = None  # ← مهم جداً
+
+        order.save()
+
+        # 🟦 4) حذف العناصر القديمة
+        order.items.all().delete()
+
+        # 🟦 5) إضافة العناصر الجديدة
+        products = request.POST.getlist("product_id[]")
+        prices   = request.POST.getlist("price[]")
+        qtys     = request.POST.getlist("quantity[]")
+
+        for i in range(len(products)):
+
+            product = Product.objects.filter(id=products[i]).first()
+            if not product:
+                continue
+
+            price = float(prices[i])
+            qty = float(qtys[i])
+
+            # بيع أو شراء؟
+            direction = -1 if transaction_type == "sale" else 1
+
+            # snapshot
+            if transaction_type == "sale":
+                buy_price = product.buy_price  # snapshot للربح
+            else:
+                buy_price = price  # snapshot لتكلفة الشراء
+
+            OrderItem.objects.create(
+                order=order,
+                product=product,
+                price=price,
+                quantity=qty,
+                direction=direction,
+                buy_price=buy_price,
+            )
+
+        return redirect("dashboard:orders_list", store.slug)
+
     return render(request, "dashboard/order_update.html", {
         "store": store,
         "order": order,
-        "customers": customers,
+        "new_orders_count": new_orders_count,   # ← ← ← أضيف هذا
+
     })
-#انتهى تعديل
+
 #فلترة طلبات
 #بالحالة
 #برقم الطلب
@@ -475,6 +531,30 @@ def search_customers(request, store_slug):
     ]
 
     return JsonResponse({"results": results})
+# 🔍 بحث الموردين
+
+
+def search_suppliers(request, store_slug):
+    q = request.GET.get("q", "").strip()
+
+    # جلب الموردين حسب المتجر والكلمة المكتوبة
+    suppliers = Supplier.objects.filter(
+        store__slug=store_slug
+    ).filter(
+        Q(name__icontains=q) | Q(phone__icontains=q)
+    )
+
+    results = [
+        {
+            "id": s.id,
+            "name": s.name,
+            "phone": s.phone or "",
+        }
+        for s in suppliers
+    ]
+
+    return JsonResponse({"results": results})
+
 # ادارة العملاء
 # عرض العملاء
 @login_required
@@ -662,4 +742,66 @@ def merchant_dashboard(request, store_slug):
     return render(request, "dashboard/dashboard.html", {
         "store": store,
         "new_orders_count": new_orders_count,
+    })
+# ادارة الموردين
+#عرض
+@login_required
+def suppliers_list(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    suppliers = Supplier.objects.filter(store=store).order_by("-id")
+
+    return render(request, "dashboard/suppliers_list.html", {
+        "store": store,
+        "suppliers": suppliers,
+    })
+#اضافة 
+
+
+@login_required
+def supplier_create(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+
+    if request.method == "POST":
+        name = request.POST.get("name")
+        phone = request.POST.get("phone")
+        address = request.POST.get("address")
+        email = request.POST.get("email")
+        opening_balance = request.POST.get("opening_balance") or 0
+
+        # منع تكرار الاسم أو الرقم
+        exists = Supplier.objects.filter(store=store).filter(
+            Q(name=name) | Q(phone=phone)
+        ).exists()
+
+        if exists:
+            messages.error(request, "⚠️ هذا المورد مسجّل مسبقاً (اسم أو رقم).")
+            return redirect("dashboard:suppliers_list", store_slug=store.slug)
+
+        Supplier.objects.create(
+            store=store,
+            name=name,
+            phone=phone,
+            address=address,
+            email=email,
+            opening_balance=opening_balance
+        )
+
+        return redirect("dashboard:suppliers_list", store_slug=store.slug)
+
+    return render(request, "dashboard/supplier_create.html", {
+        "store": store
+    })
+#حذف مورد
+@login_required
+def delete_supplier(request, store_slug, supplier_id):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    supplier = get_object_or_404(Supplier, id=supplier_id, store=store)
+
+    if request.method == "POST":
+        supplier.delete()
+        return redirect("dashboard:suppliers_list", store_slug=store.slug)
+
+    return render(request, "dashboard/delete_supplier.html", {
+        "store": store,
+        "supplier": supplier,
     })

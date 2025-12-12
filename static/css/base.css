@@ -91,3 +91,7 @@
     background: var(--primary-color);
     color: #fff;
 }
+.sidebar {
+    right: 0 !important;
+    left: auto !important;
+}

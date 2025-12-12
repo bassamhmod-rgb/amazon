@@ -4,12 +4,31 @@ from stores.models import Store
 from products.models import Product
 
 class Cart(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="carts")
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="carts")
+    user = models.ForeignKey(
+        User,
+        null=True, blank=True,
+        on_delete=models.CASCADE,
+        related_name="carts"
+    )
+
+    session_key = models.CharField(
+        max_length=255,
+        null=True, blank=True,
+        db_index=True
+    )
+
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="carts"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Cart for {self.user} - {self.store}"
+        if self.user:
+            return f"Cart for {self.user} - {self.store}"
+        return f"Cart (session {self.session_key}) - {self.store}"
 
     def total(self):
         return sum(item.subtotal() for item in self.items.all())

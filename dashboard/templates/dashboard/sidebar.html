@@ -1,36 +1,68 @@
 {% load static %}
 
 <div class="sidebar" id="sidebar">
-    <h5 class="mb-4">{{ store.name }}</h5>
 
-    <div class="mb-3">
-        <a href="/store/{{ store.slug }}/" class="back-to-store-btn">
-            ← العودة إلى صفحة العرض
+    <!-- اسم المتجر -->
+    <h5 class="mb-3 text-center fw-bold">
+        {{ store.slug }}
+    </h5>
+
+    <!-- زر العودة -->
+    <a href="/store/{{ store.slug }}/"
+       class="back-to-store-btn mb-3 d-block text-center">
+        ← العودة إلى صفحة العرض
+    </a>
+
+    <hr class="my-3">
+
+    <!-- روابط القائمة -->
+    <nav class="sidebar-links">
+
+        <a href="{% url 'dashboard:home' store.slug %}">
+            🏠 لوحة التحكم
         </a>
-    </div>
 
-    <a href="{% url 'dashboard:home' store.slug %}">🏠 لوحة التحكم</a>
-    <a href="{% url 'dashboard:categories_list' store.slug %}">📂 الفئات</a>
-    <a href="{% url 'dashboard:products_list' store.slug %}">📦 المنتجات</a>
+        <a href="{% url 'dashboard:categories_list' store.slug %}">
+            📂 الفئات
+        </a>
 
-    <a href="{% url 'dashboard:orders_list' store.slug %}"
-       class="position-relative">
-       📑 الطلبات
-       {% if new_orders_count > 0 %}
-       <span class="position-absolute top-0 start-0 translate-middle badge rounded-pill bg-danger"
-             style="font-size: 0.7rem;">
-          {{ new_orders_count }}
-       </span>
-       {% endif %}
+        <a href="{% url 'dashboard:products_list' store.slug %}">
+            📦 المنتجات
+        </a>
+
+        <a href="{% url 'dashboard:orders_list' store.slug %}" class="position-relative">
+            📑 الطلبات
+            {% if new_orders_count > 0 %}
+            <span class="badge bg-danger position-absolute top-50 start-0 translate-middle-y"
+                  style="font-size:0.7rem;">
+                {{ new_orders_count }}
+            </span>
+            {% endif %}
+        </a>
+
+        <a href="{% url 'dashboard:customers_list' store.slug %}">
+            👥 العملاء
+        </a>
+
+        <a href="{% url 'dashboard:suppliers_list' store.slug %}">
+            🏭 الموردين
+        </a>
+
+        <a href="{% url 'dashboard:points_page' store.slug %}">
+            ⭐ النقاط
+        </a>
+
+        <a href="{% url 'dashboard:store_settings' store.slug %}">
+            ⚙ إعدادات المتجر
+        </a>
+
+    </nav>
+
+    <hr class="my-3">
+
+    <!-- تسجيل الخروج -->
+    <a href="{% url 'core:index' %}" class="text-danger fw-semibold">
+        🚪 تسجيل الخروج
     </a>
 
-    <a href="{% url 'dashboard:customers_list' store.slug %}">👥 العملاء</a>
-    <a href="{% url 'dashboard:points_page' store.slug %}">⭐ النقاط</a>
-
-    <a href="{% url 'dashboard:store_settings' store.slug %}">
-        <img src="{% static 'images/settings.png' %}" class="ico">
-        <span>إعدادات المتجر</span>
-    </a>
-
-    <a href="{% url 'core:index' %}" class="text-danger">🚪 تسجيل الخروج</a>
 </div>

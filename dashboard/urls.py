@@ -26,6 +26,13 @@ path("<slug:store_slug>/search-products/", views.search_products, name="search_p
 path("<slug:store_slug>/search-customers/", views.search_customers, name="search_customers"),
 path("<slug:store_slug>/orders/<int:order_id>/edit/", views.order_update, name="order_update"),
 path("<slug:store_slug>/dashboard/order/<int:order_id>/",views.order_detail_dashboard,name="order_detail_dashboard"),
+#موردين
+path("<slug:store_slug>/suppliers/", views.suppliers_list, name="suppliers_list"),
+path("<slug:store_slug>/suppliers/create/", views.supplier_create, name="supplier_create"),
+path("<slug:store_slug>/suppliers/<int:supplier_id>/delete/", views.delete_supplier, name="delete_supplier"),
+
+# للبحث
+path("<slug:store_slug>/search-suppliers/", views.search_suppliers),
 
 # Customers (Clients)
 path("<slug:store_slug>/customers/", views.customers_list, name="customers_list"),
