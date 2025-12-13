@@ -157,35 +157,18 @@
             <table class="table table-striped align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>الصورة</th>
                         <th>الاسم</th>
-                        <th>الفئة</th>
                         <th>السعر</th>
-                        <th>الكمية</th>
-                        <th class="text-center">خيارات</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for product in products_qs %}
                     <tr>
-                        <td>
-                            {% if product.main_image %}
-                                <img src="{{ product.main_image.url }}" class="product-img">
-                            {% else %}
-                                <img src="https://via.placeholder.com/60" class="product-img">
-                            {% endif %}
-                        </td>
+                        
 
                         <td>{{ product.name }}</td>
 
-                        <td>
-                            {% if product.category %}
-                                {{ product.category.name }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-
+                        
                         <td>{{ product.price|floatformat:2 }} $</td>
 
                         <td class="text-center">

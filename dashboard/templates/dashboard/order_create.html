@@ -75,14 +75,7 @@
             </select>
         </div>
 
-        <div class="card p-3 mb-3 border-0 shadow-sm">
-            <label class="form-label fw-bold">بحث عن منتج</label>
-            <div class="position-relative">
-                <input type="text" id="productSearch" class="form-control"
-                       placeholder="اكتب اسم المنتج..." autocomplete="off">
-                <div id="searchResults" class="list-group mt-1"></div>
-            </div>
-        </div>
+        
 
         <!-- زبون -->
         <div id="customerBox" class="card p-3 mb-3 border-0 shadow-sm">
@@ -113,7 +106,14 @@
                 <div id="supplierResults" class="list-group mt-1"></div>
             </div>
         </div>
-
+         <div class="card p-3 mb-3 border-0 shadow-sm">
+            <label class="form-label fw-bold">بحث عن منتج</label>
+            <div class="position-relative">
+                <input type="text" id="productSearch" class="form-control"
+                       placeholder="اكتب اسم المنتج..." autocomplete="off">
+                <div id="searchResults" class="list-group mt-1"></div>
+            </div>
+        </div>
         <div class="card border-0 shadow-sm p-3">
 
             <table class="table table-bordered">
@@ -394,6 +394,24 @@ function calculateTotal() {
     document.getElementById("totalDisplay").value = (total - discount).toLocaleString();
 }
 
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.querySelector("form");
+
+    if (!form) return;
+
+    form.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+            const tag = e.target.tagName.toLowerCase();
+
+            // نسمح بالـ Enter فقط داخل textarea
+            if (tag !== "textarea") {
+                e.preventDefault();
+            }
+        }
+    });
+});
 </script>
 
 </body>

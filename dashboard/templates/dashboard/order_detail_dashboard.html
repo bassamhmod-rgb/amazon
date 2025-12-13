@@ -12,9 +12,12 @@
             width: 230px; background:#fff; height:100vh; position:fixed; top:0; right:0;
             padding:20px 15px; border-left:1px solid #e0e0e0;
         }
-        .sidebar a { display:block; padding:10px 12px; margin-bottom:8px;
-                     color:#333; border-radius:8px; text-decoration:none; }
+        .sidebar a {
+            display:block; padding:10px 12px; margin-bottom:8px;
+            color:#333; border-radius:8px; text-decoration:none;
+        }
         .sidebar a:hover { background:#e9f2ff; color:#0d6efd; }
+
         .content { margin-right:240px; padding:20px; }
 
         @media (max-width:768px){
@@ -25,13 +28,18 @@
         }
 
         #toggleSidebar{
-            display:none; font-size:28px; background:none;
-            border:none; margin-bottom:10px;
+            display:none; font-size:28px;
+            background:none; border:none; margin-bottom:10px;
         }
 
         .note-box {
-            background:#f3f7ff; padding:5px 10px; border-radius:8px;
-            font-size:0.85rem; color:#005f9e; display:inline-block; margin-top:4px;
+            background:#f3f7ff;
+            padding:5px 10px;
+            border-radius:8px;
+            font-size:0.85rem;
+            color:#005f9e;
+            display:inline-block;
+            margin-top:4px;
         }
     </style>
 </head>
@@ -49,12 +57,12 @@
     <div class="card p-3 mb-4 shadow-sm border-0">
         <div class="row">
 
-            <!-- 🔥 جهة التعامل (زبون / مورد) -->
+            <!-- جهة التعامل -->
             <div class="col-md-6">
 
                 {% if order.transaction_type == "sale" %}
                     <p class="fs-5">
-                        <strong>👤 الزبــون:</strong>
+                        <strong>👤 الزبون:</strong>
                         {% if order.customer %}
                             <span class="text-primary">{{ order.customer.name }}</span>
                             {% if order.customer.phone %}
@@ -64,10 +72,9 @@
                             <span class="text-muted">—</span>
                         {% endif %}
                     </p>
-
                 {% else %}
                     <p class="fs-5">
-                        <strong>🏭 المــورد:</strong>
+                        <strong>🏭 المورد:</strong>
                         {% if order.supplier %}
                             <span class="text-primary">{{ order.supplier.name }}</span>
                             {% if order.supplier.phone %}
@@ -91,7 +98,7 @@
                 </p>
             </div>
 
-            <!-- تفاصيل المبلغ -->
+            <!-- المبالغ -->
             <div class="col-md-6 bg-light p-3 rounded">
                 <p><strong>مجموع العناصر:</strong> {{ order.items_total|floatformat:2 }} $</p>
                 <p><strong>الحسم:</strong> <span class="text-danger">{{ order.discount|floatformat:2 }} $</span></p>
@@ -135,7 +142,6 @@
                         <td>{{ item.quantity }}</td>
                         <td>{{ item.price|floatformat:2 }} $</td>
                         <td class="fw-bold">{{ item.subtotal|floatformat:2 }} $</td>
-
                         <td>
                             {% if item.item_note %}
                                 <div class="note-box">📝 {{ item.item_note }}</div>
@@ -154,9 +160,70 @@
         </div>
     </div>
 
-    <!-- أزرار -->
-    <div class="d-flex gap-2">
+    <!-- تفاصيل الدفع (فقط للبيع) -->
+    {% if order.transaction_type == "sale" %}
+    <div class="card p-3 mb-4 shadow-sm border-0">
+        <h5 class="mb-3">💰 تفاصيل الدفع</h5>
 
+        {% if order.payment_type %}
+            <p>
+                <strong>نوع الدفع:</strong>
+                {% if order.payment_type == "full" %}
+                    تحويل كامل
+                {% elif order.payment_type == "partial" %}
+                    دفعة مسبقة + باقي عند التسليم
+                {% else %}
+                    الدفع عند الاستلام
+                {% endif %}
+            </p>
+        {% endif %}
+
+        {% if order.payment_type == "partial" and required_percent > 0 %}
+            <div class="alert alert-warning mt-2">
+                ⚠️ الدفعة المسبقة المقترحة:
+                <strong class="text-danger">
+                    {{ required_amount|floatformat:2 }} $
+                </strong>
+                ({{ required_percent }}%)
+            </div>
+        {% endif %}
+
+        {% if order.payment_method_name %}
+            <p><strong>طريقة الدفع:</strong> {{ order.payment_method_name }}</p>
+        {% endif %}
+
+        {% if order.payment_recipient_name %}
+            <p><strong>اسم المستلم:</strong> {{ order.payment_recipient_name }}</p>
+        {% endif %}
+
+        {% if order.payment_account_info %}
+            <p><strong>رقم الحساب / المحفظة:</strong> {{ order.payment_account_info }}</p>
+        {% endif %}
+
+        {% if order.payment_additional_info %}
+            <p><strong>معلومات إضافية:</strong> {{ order.payment_additional_info }}</p>
+        {% endif %}
+
+        {% if order.payment_proof_image or order.payment_transaction_id %}
+            <hr>
+
+            {% if order.payment_proof_image %}
+                <p><strong>📸 إشعار التحويل:</strong></p>
+                <img src="{{ order.payment_proof_image.url }}"
+                     style="max-width:240px; border:1px solid #ccc; border-radius:10px;">
+            {% endif %}
+
+            {% if order.payment_transaction_id %}
+                <p class="mt-2">
+                    <strong>🔢 رقم العملية:</strong> {{ order.payment_transaction_id }}
+                </p>
+            {% endif %}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- الأزرار -->
+    <div class="d-flex gap-2">
         {% if order.status == "pending" %}
             <a href="{% url 'dashboard:confirm_order' store.slug order.id %}" class="btn btn-success">
                 ✔ تأكيد الطلب
@@ -167,12 +234,15 @@
             {% csrf_token %}
             <button type="submit" class="btn btn-danger"
                     onclick="return confirm('هل أنت متأكد من حذف الطلب؟');">
-              🗑 حذف الطلب
+                🗑 حذف الطلب
             </button>
         </form>
 
-        <a href="{% url 'dashboard:orders_list' store.slug %}" class="btn btn-secondary">← العودة</a>
+        <a href="{% url 'dashboard:orders_list' store.slug %}" class="btn btn-secondary">
+            ← العودة
+        </a>
     </div>
+
 </div>
 
 <script>
