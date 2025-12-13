@@ -34,11 +34,10 @@ class Product(models.Model):
 # ⭐⭐⭐ المخزون الحقيقي = مجموع (الكمية × الاتجاه)
     @property
     def real_stock(self):
-        total = self.orderitem_set.aggregate(
-        total=Sum(F("quantity") * F("direction"))
-        )["total"]
-        return total or 0
-
+        movements = self.order_items.aggregate(
+        total=Sum(F("quantity") * F("direction")))["total"] or 0
+        return self.stock + movements
+    
 class ProductDetails(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="details")
     title = models.CharField(max_length=200)

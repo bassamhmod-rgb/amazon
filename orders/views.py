@@ -214,7 +214,6 @@ def review_order(request, store_slug):
     })
 import os
 from django.core.files import File
-from django.core.files.storage import default_storage
 
 def confirm_order(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug)
@@ -238,11 +237,11 @@ def confirm_order(request, store_slug):
     proof_image_path = data.get("payment_proof_image_path")
     transaction_id = data.get("payment_transaction_id")
 
+    # ✅ التعديل الوحيد هنا (إزالة total)
     order = Order.objects.create(
         store=store,
         customer=customer,
         user=store.owner,
-        total=cart.total(),
         status="pending",
         shipping_address=data.get("customer_address", ""),
         payment_type=data.get("payment_type"),
@@ -278,6 +277,7 @@ def confirm_order(request, store_slug):
         del request.session["checkout_data"]
 
     return redirect("orders:success", store_slug=store.slug, order_id=order.id)
+
 
 def order_success(request, store_slug, order_id):
     store = get_object_or_404(Store, slug=store_slug)
