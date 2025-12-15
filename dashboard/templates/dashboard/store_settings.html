@@ -39,7 +39,7 @@
         }
 
         .theme-preview {
-            width: 55px; 
+            width: 55px;
             height: 35px;
             border-radius: 6px;
             display: inline-block;
@@ -48,8 +48,8 @@
             transition: 0.2s;
         }
 
-        .theme-selected { 
-            border: 3px solid #0d6efd !important; 
+        .theme-selected {
+            border: 3px solid #0d6efd !important;
         }
     </style>
 </head>
@@ -124,9 +124,9 @@
                         <!-- نسبة الدفع المسبق -->
                         <div class="mb-3">
                           <label class="form-label">النسبة المطلوبة للدفع المسبق (%)</label>
-                          <input type="number" 
-                                 name="payment_required_percentage" 
-                                 value="{{ store.payment_required_percentage }}" 
+                          <input type="number"
+                                 name="payment_required_percentage"
+                                 value="{{ store.payment_required_percentage }}"
                                  min="0" max="100"
                                  class="form-control">
                         </div>
@@ -166,10 +166,39 @@
                             {% endif %}
                         </div>
 
+                        <!-- ✅ إعدادات مساحة صورة الهيرو (إضافة جديدة بدون لمس باقي المحتوى) -->
+                        <div class="col-md-6">
+                            <label class="form-label">ارتفاع مساحة صورة الهيرو (px)</label>
+                            <input type="number"
+                                   class="form-control"
+                                   name="hero_height"
+                                   value="{{ store.hero_height }}"
+                                   min="180" max="700"
+                                   step="10">
+                            <div class="text-muted mt-1" style="font-size:13px;">
+                                مثال: 280 / 350 / 420 — كل ما زاد الرقم بتكبر مساحة البانر.
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">طريقة عرض صورة الهيرو</label>
+                            <select class="form-select" name="hero_fit">
+                                <option value="contain" {% if store.hero_fit == "contain" %}selected{% endif %}>
+                                    احتواء (بدون قص)
+                                </option>
+                                <option value="cover" {% if store.hero_fit == "cover" %}selected{% endif %}>
+                                    ملء (مع قص)
+                                </option>
+                            </select>
+                            <div class="text-muted mt-1" style="font-size:13px;">
+                                احتواء = يحافظ على الصورة كاملة. ملء = يملأ الإطار لكنه قد يقص الأطراف.
+                            </div>
+                        </div>
+
                     </div>
 
                     <!-- SECTION PAYMENT METHODS -->
-                    <div class="mt-4 p-3" 
+                    <div class="mt-4 p-3"
                          style="background:#fdfdfd; border:1px solid #e5e7eb; border-radius:12px;">
 
                         <h5 class="mb-2">💳 طرق الدفع الخاصة بالمتجر</h5>
@@ -178,7 +207,7 @@
                             قم بإدارة طرق الدفع التي يستطيع الزبائن استخدامها عند الشراء.
                         </p>
 
-                        <a href="{% url 'stores:payment_methods' store.slug %}" 
+                        <a href="{% url 'stores:payment_methods' store.slug %}"
                            class="btn btn-outline-primary">
                             إدارة طرق الدفع
                         </a>
@@ -203,35 +232,35 @@
                         <!-- Theme 1 -->
                         <label>
                             <input type="radio" name="theme" value="1" {% if store.theme == 1 %}checked{% endif %} hidden>
-                            <span class="theme-preview {% if store.theme == 1 %}theme-selected{% endif %}" 
+                            <span class="theme-preview {% if store.theme == 1 %}theme-selected{% endif %}"
                                   style="background:#5B21B6;"></span>
                         </label>
 
                         <!-- Theme 2 -->
                         <label>
                             <input type="radio" name="theme" value="2" {% if store.theme == 2 %}checked{% endif %} hidden>
-                            <span class="theme-preview {% if store.theme == 2 %}theme-selected{% endif %}" 
+                            <span class="theme-preview {% if store.theme == 2 %}theme-selected{% endif %}"
                                   style="background:#0A3D62;"></span>
                         </label>
 
                         <!-- Theme 3 -->
                         <label>
                             <input type="radio" name="theme" value="3" {% if store.theme == 3 %}checked{% endif %} hidden>
-                            <span class="theme-preview {% if store.theme == 3 %}theme-selected{% endif %}" 
+                            <span class="theme-preview {% if store.theme == 3 %}theme-selected{% endif %}"
                                   style="background:#065F46;"></span>
                         </label>
 
                         <!-- Theme 4 -->
                         <label>
                             <input type="radio" name="theme" value="4" {% if store.theme == 4 %}checked{% endif %} hidden>
-                            <span class="theme-preview {% if store.theme == 4 %}theme-selected{% endif %}" 
+                            <span class="theme-preview {% if store.theme == 4 %}theme-selected{% endif %}"
                                   style="background:#D9480F;"></span>
                         </label>
 
                         <!-- Theme 5 -->
                         <label>
                             <input type="radio" name="theme" value="5" {% if store.theme == 5 %}checked{% endif %} hidden>
-                            <span class="theme-preview {% if store.theme == 5 %}theme-selected{% endif %}" 
+                            <span class="theme-preview {% if store.theme == 5 %}theme-selected{% endif %}"
                                   style="background:#000;"></span>
                         </label>
 

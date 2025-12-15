@@ -746,6 +746,15 @@ def store_settings(request, store_slug):
         if percent.isdigit():
             store.payment_required_percentage = int(percent)
 
+        # 🖼️ 7) إعدادات صورة الهيرو (الجديدة)
+        hero_height = request.POST.get("hero_height", "").strip()
+        if hero_height.isdigit():
+            store.hero_height = int(hero_height)
+
+        hero_fit = request.POST.get("hero_fit")
+        if hero_fit in ["contain", "cover"]:
+            store.hero_fit = hero_fit
+
         # Save all changes
         store.save()
 

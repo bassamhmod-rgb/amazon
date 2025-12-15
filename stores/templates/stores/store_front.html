@@ -18,10 +18,9 @@
         font-family: "Cairo", sans-serif;
         background: var(--soft-bg);
         color: var(--text-dark);
-        overflow-x: hidden; /* يمنع الصفحة كلها من التمدد يمين */
+        overflow-x: hidden;
     }
 
-    /* HEADER */
     .main-header {
         position: sticky;
         top: 0;
@@ -32,52 +31,63 @@
     .brand-title-ar { font-size:0.9rem; font-weight:600; color:var(--text-light); }
     .brand-subtitle { font-size:0.8rem; color:var(--text-light); }
 
-    /* HERO */
     .hero-section { padding: 3rem 0 2rem; color:#fff; }
 
     .store-title-display { 
         font-size:2.4rem; 
         font-weight:700; 
         margin-bottom:1rem;
-        word-break: break-word;  /* منع توسع النص الطويل */
-        overflow-wrap: break-word;
+        word-break: break-word;
     }
 
     .hero-text { 
         max-width:32rem; 
-        word-break: break-word; /* نفس المشكلة هون */
-        overflow-wrap: break-word;
+        word-break: break-word;
     }
 
+    /* ❌ شلنا الارتفاع الثابت */
     .hero-image-placeholder {
         border-radius: 24px;
         overflow: hidden;
-        height: 350px;
         box-shadow: var(--hero-shadow);
+        background: radial-gradient(
+            circle at top left,
+            #FFB400 0,
+            rgba(255,180,0,0.2) 30%,
+            transparent 60%
+        ),
+        radial-gradient(
+            circle at bottom right,
+            #1A2A4A 0,
+            rgba(26,42,74,0.2) 35%,
+            transparent 70%
+        );
     }
 
-    /* SEARCH */
+    .hero-image-placeholder img {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
     input.form-control,
     select.form-select {
         border-radius: 12px;
         border: 1px solid var(--soft-border);
-        box-shadow: none;
     }
 
     button.btn-primary {
         border-radius: 12px;
-        padding: 0.45rem 1rem;
     }
 
-    /* PRODUCTS */
     .store-card {
         border-radius: 16px;
         padding: 1.1rem 1rem 1.3rem;
-        transition: 0.22s;
     }
 
     .store-logo-circle {
-        width:60px; height:60px;
+        width:60px;
+        height:60px;
         border-radius:50%;
         font-weight:700;
         display:flex;
@@ -86,10 +96,19 @@
         margin:0 auto 0.7rem;
     }
 
-    .store-name { font-weight:700; }
-    .store-category { font-size:.85rem; }
+    .product-thumb {
+        width: 100%;
+        height: 120px;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
 
-    .btn-outline-primary { border-radius:12px; }
+    .product-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
 
     .notice-box {
         border-radius:12px;
@@ -100,167 +119,37 @@
         padding: 1.5rem 0;
         margin-top: 2rem;
     }
-
-    .product-thumb {
-        width: 100%;
-        height: 120px;
-        border-radius: 12px;
-        overflow: hidden;
-        margin-bottom: 10px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-
-    .product-thumb img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    /* الموبايل */
-    @media (max-width: 768px) {
-
-        .sidebar {
-            position: fixed;
-            right: -260px;
-            top: 0;
-            height: 100%;
-            width: 260px;
-            transition: 0.3s;
-            z-index: 9999;
-        }
-
-        .sidebar.active {
-            right: 0;
-        }
-
-        .content {
-            margin-right: 0 !important;
-            width: 100% !important;
-        }
-
-        .container, .dashboard-container {
-            max-width: 100% !important;
-            width: 100% !important;
-            padding-left: 10px;
-            padding-right: 10px;
-        }
-
-        /* أهم إصلاح للهاتف — كسر النصوص الطويلة */
-        h1, h2, h3, p, .store-title-display, .hero-text {
-            word-break: break-word !important;
-            overflow-wrap: break-word !important;
-        }
-    }
-/* === توحيد مساحة صورة الهيرو مع الصفحة العامة === */
-.hero-image-placeholder {
-    height: 350px;                 /* نفس الصفحة العامة */
-    border-radius: 24px;           /* نفس الانحناء */
-    overflow: hidden;
-    background: radial-gradient(
-        circle at top left,
-        #FFB400 0,
-        rgba(255,180,0,0.2) 30%,
-        transparent 60%
-    ),
-    radial-gradient(
-        circle at bottom right,
-        #1A2A4A 0,
-        rgba(26,42,74,0.2) 35%,
-        transparent 70%
-    );
-}
-
-/* الصورة نفسها */
-.hero-image-placeholder img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;   /* نفس الصفحة العامة */
-    display: block;
-}
-
-</style>
+    </style>
 </head>
 
 <body>
+
 <header class="main-header">
     <div class="container py-2 d-flex justify-content-between align-items-center">
 
-        <!-- 🔵 لوجو أمازون سوريا -->
         <div>
-            <a href="{% url 'core:index' %}" class="brand-title-en" style="text-decoration:none; color:inherit;">
+            <a href="{% url 'core:index' %}" class="brand-title-en" style="text-decoration:none;">
                 Amazon Syria
             </a><br>
             <span class="brand-title-ar">أمازون سوريا</span><br>
             <span class="brand-subtitle">منصة المتاجر الإلكترونية في سوريا</span>
         </div>
 
-        <!-- 🔴 القسم الأيمن (لوحة التحكم / حساب الزبون / تسجيل الدخول / السلة) -->
         <div class="d-flex align-items-center gap-3">
 
-            <!-- 🛒 زر السلة (دائماً يظهر) -->
-            <a href="{% url 'cart:cart_detail' store.slug %}" 
-                class="cart-btn-theme">
-                    🛒 
-            </a>
-           {% if customer %}
-             <a href="{% url 'orders:customer_orders' store.slug %}" 
-                   class="btn btn-outline-primary"
-                    style="border-radius:12px;">
+            <a href="{% url 'cart:cart_detail' store.slug %}" class="cart-btn-theme">🛒</a>
+
+            {% if customer %}
+                <a href="{% url 'orders:customer_orders' store.slug %}" class="btn btn-outline-primary">
                     📦 طلباتي
-              </a>
-              {% endif %}
-
-
-
-            {% if is_owner %}
-                <!-- ⚙️ التاجر داخل -->
-                <a href="/dashboard/{{ store.slug }}/" class="btn btn-warning" style="border-radius:12px;">
-                    ⚙️ لوحة التحكم
                 </a>
-
-            {% else %}
-                {% if customer %}
-                    <!-- ⭐ الزبون داخل -->
-                    <div class="customer-points-box" style="min-width: 260px;">
-
-                        <div class="welcome-title" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                أهلاً {{ customer.name }}
-                            </div>
-                            <a href="{% url 'accounts:customer_logout' %}" style="font-size: 0.9em; text-decoration: none;">
-                                تسجيل الخروج
-                            </a>
-                        
-                        </div>
-
-                        <div class="points-title">
-                            رصيدك الحالي: {{ balance }} نقطة
-                        </div>
-
-                        <p>
-                            يمكنك زيادة رصيدك من خلال المزيد من عمليات الشراء 
-                            أو دعوة أصدقائك للتسوق من متجر {{ store.slug }}.
-                        </p>
-
-                    </div>
-                {% else %}
-
-                    <!-- 🔐 الزائر -->
-                    <div style="text-align: right; direction: rtl;">
-                         <a href="{% url 'accounts:customer_login' store.slug %}?next={{ request.path }}"
-                            class="btn btn-primary"
-                            style="padding:0.45rem 1.2rem; border-radius:10px; display: block; width: 100%;">
-                            🔐 تسجيل دخول
-                        </a>
-
-                        
-                    </div>
-
-                {% endif %}
             {% endif %}
 
+            {% if is_owner %}
+                <a href="/dashboard/{{ store.slug }}/" class="btn btn-warning">
+                    ⚙️ لوحة التحكم
+                </a>
+            {% endif %}
         </div>
     </div>
 </header>
@@ -271,63 +160,50 @@
 
             <div class="col-md-6 mb-4">
                 <div class="store-title-display">{{ store.slug }}</div>
-
                 <h1 class="hero-title">{{ store.description }}</h1>
                 <p class="hero-text">{{ store.description2 }}</p>
 
-<form method="get" class="mt-3">
+                <form method="get" class="mt-3">
+                    <input type="text" name="q" value="{{ q }}" class="form-control mb-2"
+                           placeholder="ابحث عن منتج...">
 
-    <!-- 🔎 البحث عن المنتج (عرض كامل) -->
-    <div class="mb-2">
-        <input type="text"
-               name="q"
-               value="{{ q }}"
-               class="form-control"
-               placeholder="ابحث عن منتج...">
-    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <select name="category" class="form-select">
+                                <option value="">— الفئة الرئيسية —</option>
+                                {% for c in categories %}
+                                    <option value="{{ c.id }}"
+                                        {% if c.id|stringformat:"s" == current_category %}selected{% endif %}>
+                                        {{ c.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
 
-    <!-- 🟦 الفئتين جنب بعض -->
-    <div class="row g-2">
+                        <div class="col-6">
+                            <select name="category2" class="form-select">
+                                <option value="">— الفئة الثانية —</option>
+                                {% for c in categories %}
+                                    <option value="{{ c.id }}"
+                                        {% if c.id|stringformat:"s" == current_category2 %}selected{% endif %}>
+                                        {{ c.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
 
-        <!-- الفئة الأساسية -->
-        <div class="col-6">
-            <select name="category" class="form-select">
-                <option value="">— الفئة الرئيسية —</option>
-                {% for c in categories %}
-                    <option value="{{ c.id }}"
-                        {% if c.id|stringformat:"s" == current_category %}selected{% endif %}>
-                        {{ c.name }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- الفئة الفرعية -->
-        <div class="col-6">
-            <select name="category2" class="form-select">
-                <option value="">— الفئة الثانية —</option>
-                {% for c in categories %}
-                    <option value="{{ c.id }}"
-                        {% if c.id|stringformat:"s" == current_category2 %}selected{% endif %}>
-                        {{ c.name }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-    </div>
-
-    <!-- زر البحث -->
-    <button class="btn btn-primary mt-3">بحث</button>
-
-</form>
-
+                    <button class="btn btn-primary mt-3">بحث</button>
+                </form>
             </div>
 
             <div class="col-md-6">
-                <div class="hero-image-placeholder">
+                <!-- ✅ الربط الحقيقي -->
+                <div class="hero-image-placeholder"
+                     style="height: {{ store.hero_height }}px;">
                     {% if store.logo %}
-                        <img src="{{ store.logo.url }}" alt="">
+                        <img src="{{ store.logo.url }}"
+                             style="object-fit: {{ store.hero_fit }};">
                     {% else %}
                         <img src="https://via.placeholder.com/600x350">
                     {% endif %}
@@ -338,7 +214,7 @@
     </div>
 </section>
 
-<section id="stores" class="stores-section">
+<section class="stores-section">
     <div class="container text-center">
 
         <h2 class="section-title">{{ store.description3 }}</h2>
@@ -350,30 +226,28 @@
                 <div class="store-card">
 
                     {% if p.main_image %}
-                    <div class="product-thumb">
-                        <img src="{{ p.main_image.url }}" alt="{{ p.name }}">
-                    </div>
+                        <div class="product-thumb">
+                            <img src="{{ p.main_image.url }}" alt="{{ p.name }}">
+                        </div>
                     {% else %}
-                    <div class="store-logo-circle">
-                    {{ p.name|slice:":2" }}
-                    </div>
+                        <div class="store-logo-circle">
+                            {{ p.name|slice:":2" }}
+                        </div>
                     {% endif %}
-
 
                     <div class="store-name">{{ p.name }}</div>
                     <div class="store-category">{{ p.description|default:"منتج" }}</div>
-                    {% if p.real_stock > 0 %}
-                    <div class="text-success fw-bold" style="font-size: 0.85rem;">✔ متوفر</div>
-                    {% else %}
-                     <div class="text-danger fw-bold" style="font-size: 0.85rem;">✘ غير متوفر</div>
-                    {% endif %}
 
+                    {% if p.real_stock > 0 %}
+                        <div class="text-success fw-bold" style="font-size:0.85rem;">✔ متوفر</div>
+                    {% else %}
+                        <div class="text-danger fw-bold" style="font-size:0.85rem;">✘ غير متوفر</div>
+                    {% endif %}
 
                     <a href="{% url 'stores:product_public' store.slug p.id %}"
                        class="btn btn-outline-primary mt-2">
                         عرض المنتج
                     </a>
-
                 </div>
             </div>
             {% empty %}
@@ -384,13 +258,12 @@
         <div class="notice-box mt-4">
             {{ store.description5 }}
         </div>
-
     </div>
 </section>
 
 <footer class="main-footer">
-    <div class="container d-flex flex-column flex-md-row justify-content-between">
-        <div>© <span id="year"></span> Amazon Syria – جميع الحقوق محفوظة.</div>
+    <div class="container">
+        © <span id="year"></span> Amazon Syria – جميع الحقوق محفوظة.
     </div>
 </footer>
 
