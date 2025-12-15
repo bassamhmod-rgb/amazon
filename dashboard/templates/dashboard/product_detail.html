@@ -4,71 +4,145 @@
 <head>
     <meta charset="UTF-8">
     <title>تفاصيل المنتج – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
     <style>
-        body { background:#f7f9fc; font-family:"Cairo",sans-serif; }
-        .sidebar {
-            width: 230px; background:#fff; height:100vh; position:fixed; top:0; right:0;
-            padding:20px 15px; border-left:1px solid #e0e0e0;
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
         }
-        .sidebar a { display:block; padding:10px 12px; margin-bottom:8px; color:#333;
-                     border-radius:8px; text-decoration:none; }
-        .sidebar a:hover { background:#e9f2ff; color:#0d6efd; }
-        .content { margin-right:240px; padding:20px; }
-        .product-main-img { width:180px; height:180px; border-radius:10px; object-fit:cover; }
-        .gallery-img { width:100px; height:100px; border-radius:8px; object-fit:cover; margin:5px; }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        .product-main-img{
+            width:180px;
+            height:180px;
+            border-radius:12px;
+            object-fit:cover;
+        }
+
+        .gallery-img{
+            width:100%;
+            height:100px;
+            border-radius:10px;
+            object-fit:cover;
+        }
+
+        /* ===== SIDEBAR ARROW ===== */
+        #sidebarArrow{
+            display:none;
+        }
+
+        /* ===== MOBILE (نفس صفحة المنتجات) ===== */
         @media (max-width:768px){
-            .sidebar{ right:-260px; transition:.3s; }
+            .sidebar{ right:-260px; }
             .sidebar.active{ right:0; }
-            .content{ margin-right:0; }
-            #toggleSidebar{ display:inline-block; }
+
+            .content{
+                margin-right:0;
+                padding:15px;
+            }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+
+            .product-main-img{
+                width:100%;
+                height:220px;
+            }
+
+            .gallery-grid{
+                display:grid;
+                grid-template-columns:repeat(3,1fr);
+                gap:10px;
+            }
+
+            .table-responsive{
+                overflow-x:auto;
+            }
         }
-        #toggleSidebar{ display:none; font-size:28px; background:none; border:none; margin-bottom:10px; }
-     .back-to-store-btn {
-    background: #d1d5db;
-    color: #111 !important;
-    padding: 10px 18px;
-    border-radius: 10px;
-    border: none;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.back-to-store-btn:hover {
-    background: #c5c9d0;
-}
-
     </style>
-
 </head>
+
 <body>
 
-<!-- Mobile toggle button -->
-<button id="toggleSidebar">☰</button>
-<!-- Sidebar -->
+<!-- سهم السايدبار -->
+<div id="sidebarArrow">❯</div>
+
+<!-- السايدبار -->
 {% include "dashboard/sidebar.html" %}
 
-<!-- Content -->
- <div class="content">
+<div class="content">
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>تفاصيل المنتج</h3>
-        <a href="{% url 'dashboard:product_update' store.slug product.id %}" class="btn btn-warning">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="mb-0">تفاصيل المنتج</h3>
+        <a href="{% url 'dashboard:product_update' store.slug product.id %}"
+           class="btn btn-warning w-100 w-md-auto">
             تعديل المنتج ✏️
         </a>
     </div>
 
     <!-- معلومات أساسية -->
     <div class="card p-4 mb-4">
-        <div class="row g-4">
+        <div class="row g-4 align-items-center">
             <div class="col-md-4 text-center">
                 {% if product.main_image %}
                     <img src="{{ product.main_image.url }}" class="product-main-img">
                 {% else %}
-                    <img src="https://via.placeholder.com/180" class="product-main-img">
+                    <img src="https://via.placeholder.com/300x220" class="product-main-img">
                 {% endif %}
             </div>
 
@@ -77,46 +151,47 @@
 
                 <p><strong>السعر:</strong> {{ product.price|floatformat:2 }} $</p>
                 <p><strong>الكمية المتوفرة:</strong> {{ product.real_stock }}</p>
+
                 <p><strong>الفئة:</strong>
                     {% if product.category %}
                         {{ product.category.name }}
-                    {% else %}
-                        —— 
-                    {% endif %}
+                    {% else %}——{% endif %}
                 </p>
+
                 <p><strong>الفئة الفرعية:</strong>
                     {% if product.category2 %}
-                           {{ product.category2.name }}
-                    {% else %}
-        —— 
-                    {% endif %}
+                        {{ product.category2.name }}
+                    {% else %}——{% endif %}
                 </p>
+
                 <p><strong>الوصف:</strong><br>{{ product.description|linebreaks }}</p>
             </div>
         </div>
     </div>
 
-    <!-- تفاصيل المواصفات -->
+    <!-- المواصفات -->
     <div class="card p-4 mb-4">
         <h5 class="mb-3">مواصفات المنتج</h5>
 
         {% if product.details.all %}
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>الخاصية</th>
-                    <th>القيمة</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for d in product.details.all %}
-                <tr>
-                    <td>{{ d.title }}</td>
-                    <td>{{ d.value }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-bordered mb-0">
+                <thead>
+                    <tr>
+                        <th>الخاصية</th>
+                        <th>القيمة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in product.details.all %}
+                    <tr>
+                        <td>{{ d.title }}</td>
+                        <td>{{ d.value }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
             <p class="text-muted text-center">لا توجد مواصفات</p>
         {% endif %}
@@ -126,21 +201,27 @@
     <div class="card p-4">
         <h5 class="mb-3">معرض الصور</h5>
 
-        <div class="d-flex flex-wrap">
+        {% if product.gallery.all %}
+        <div class="gallery-grid d-md-flex flex-wrap gap-2">
             {% for img in product.gallery.all %}
                 <img src="{{ img.image.url }}" class="gallery-img">
-            {% empty %}
-                <p class="text-muted">لا توجد صور إضافية</p>
             {% endfor %}
         </div>
+        {% else %}
+            <p class="text-muted">لا توجد صور إضافية</p>
+        {% endif %}
     </div>
 
 </div>
 
 <script>
     const sidebar = document.getElementById("sidebar");
-    const toggle = document.getElementById("toggleSidebar");
-    toggle.onclick = () => sidebar.classList.toggle("active");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
 </script>
 
 </body>

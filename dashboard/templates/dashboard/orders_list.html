@@ -4,124 +4,160 @@
 <head>
     <meta charset="UTF-8">
     <title>الطلبات – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
     <style>
-        body { background:#f7f9fc; font-family:"Cairo",sans-serif; }
-
-        .sidebar {
-            width: 230px; background:#fff; height:100vh; position:fixed; top:0; right:0;
-            padding:20px 15px; border-left:1px solid #e0e0e0;
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
         }
-        .sidebar a { display:block; padding:10px 12px; margin-bottom:8px; color:#333;
-                     border-radius:8px; text-decoration:none; }
-        .sidebar a:hover { background:#e9f2ff; color:#0d6efd; }
 
-        .content { margin-right:240px; padding:20px; }
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
 
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        /* ===== SIDEBAR ARROW ===== */
+        #sidebarArrow{
+            display:none;
+        }
+
+        /* ===== MOBILE ===== */
         @media (max-width:768px){
-            .sidebar{ right:-260px; transition:.3s; }
+            .sidebar{ right:-260px; }
             .sidebar.active{ right:0; }
+
             .content{ margin-right:0; }
-            #toggleSidebar{ display:inline-block; }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
         }
 
-        #toggleSidebar{ display:none; font-size:28px; background:none; border:none; margin-bottom:10px; }
-
-        /* ألوان حالة الطلب */
-        .status-pending {
-            color: #d90429;
-            font-weight: 700;
+        /* ===== ORDER STATUS ===== */
+        .status-pending{
+            color:#d90429;
+            font-weight:700;
         }
-        .status-confirmed {
-            color: #2a9d8f;
-            font-weight: 700;
-        }
-
-        .back-to-store-btn {
-            background: #d1d5db;
-            color: #111 !important;
-            padding: 10px 18px;
-            border-radius: 10px;
-            border: none;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .back-to-store-btn:hover {
-            background: #c5c9d0;
+        .status-confirmed{
+            color:#2a9d8f;
+            font-weight:700;
         }
     </style>
 </head>
+
 <body>
 
-<!-- Mobile toggle button -->
-<button id="toggleSidebar">☰</button>
+<!-- سهم السايدبار -->
+<div id="sidebarArrow">❯</div>
 
-<!-- Sidebar -->
+<!-- السايدبار -->
 {% include "dashboard/sidebar.html" %}
 
-<!-- Content -->
+<!-- المحتوى -->
 <div class="content">
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>الطلبات</h3>
-        <a href="{% url 'dashboard:order_create' store.slug %}" class="btn btn-primary mb-3">
-            إضافة طلب جديد +
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="mb-0">📦 الطلبات</h3>
+
+        <a href="{% url 'dashboard:order_create' store.slug %}" class="btn btn-primary">
+            ➕ طلب جديد
         </a>
     </div>
 
     <!-- فلترة -->
     <form method="get" class="row g-2 mb-3">
-        <div class="col-md-3">
+        <div class="col-12 col-md-3">
             <input type="number" name="order_id" class="form-control"
                    value="{{ current_id }}" placeholder="رقم الطلب">
         </div>
 
-        <div class="col-md-3">
+        <div class="col-12 col-md-3">
             <select name="status" class="form-select">
                 <option value="">كل الحالات</option>
-
-                <option value="pending"
-                        {% if current_status == 'pending' %}selected{% endif %}>
+                <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>
                     قيد الانتظار
                 </option>
-
-                <option value="confirmed"
-                        {% if current_status == 'confirmed' %}selected{% endif %}>
+                <option value="confirmed" {% if current_status == 'confirmed' %}selected{% endif %}>
                     تم التأكيد
                 </option>
             </select>
         </div>
 
-        <div class="col-md-2">
+        <div class="col-12 col-md-2">
             <button class="btn btn-secondary w-100">فلترة</button>
         </div>
     </form>
 
     <!-- جدول الطلبات -->
-    <div class="card p-3">
+    <div class="card p-3 shadow-sm">
         <div class="table-responsive">
-            <table class="table table-striped align-middle">
+            <table class="table table-striped align-middle mb-0">
                 <thead>
                     <tr>
                         <th>رقم الطلب</th>
-                        <th>المجموع الكلي</th>
+                        <th>المجموع</th>
                         <th>الحالة</th>
-                        <th>تاريخ الطلب</th>
+                        <th>التاريخ</th>
                         <th>الخصم</th>
                         <th>المدفوع</th>
                         <th>نوع المعاملة</th>
-                        <th class="text-center">خيارات</th>
+                        <th class="text-center">⚙️</th>
                     </tr>
                 </thead>
 
                 <tbody>
                 {% for order in orders %}
                     <tr>
-
                         <td>
                             {{ order.id }}
                             {% if not order.is_seen_by_store %}
@@ -129,9 +165,8 @@
                             {% endif %}
                         </td>
 
-                        <td>{{ order.total|floatformat:2 }} $</td>
+                        <td>{{ order.items_total|floatformat:2 }} $</td>
 
-                        <!-- تمييز الحالة بالألوان -->
                         <td>
                             {% if order.status == "pending" %}
                                 <span class="status-pending">Pending</span>
@@ -150,23 +185,26 @@
                         <td class="text-center">
 
                             <a href="{% url 'dashboard:order_detail_dashboard' store.slug order.id %}"
-                               class="btn btn-info btn-sm">تفاصيل</a>
+                               class="btn btn-info btn-sm" title="تفاصيل">
+                                🔍
+                            </a>
+
+                            <a href="{% url 'dashboard:order_update' store.slug order.id %}"
+                               class="btn btn-primary btn-sm" title="تعديل">
+                                ✏️
+                            </a>
 
                             <form method="post"
                                   action="{% url 'dashboard:delete_order' store.slug order.id %}"
-                                  style="display:inline;">
+                                  style="display:inline;"
+                                  onsubmit="return confirm('هل أنت متأكد من حذف الطلب؟');">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-danger"
-                                        onclick="return confirm('هل أنت متأكد من حذف الطلب؟');">
-                                    🗑 حذف
+                                <button type="submit" class="btn btn-danger btn-sm" title="حذف">
+                                    🗑️
                                 </button>
                             </form>
 
-                            <a href="{% url 'dashboard:order_update' store.slug order.id %}"
-                               class="btn btn-primary btn-sm">✏ تعديل</a>
-
                         </td>
-
                     </tr>
                 {% empty %}
                     <tr>
@@ -184,8 +222,12 @@
 
 <script>
     const sidebar = document.getElementById("sidebar");
-    const toggle = document.getElementById("toggleSidebar");
-    toggle.onclick = () => sidebar.classList.toggle("active");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
 </script>
 
 </body>

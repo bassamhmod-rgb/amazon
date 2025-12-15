@@ -88,6 +88,47 @@
                 user-select:none;
             }
         }
+   /* ===== FIX TABLE ON MOBILE (ORDERS) ===== */
+@media (max-width: 768px){
+
+    /* خلي الجدول قابل للسحب */
+    .table-responsive{
+        overflow-x:auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table{
+        min-width: 600px; /* 🔑 يمنع ضغط الأعمدة */
+    }
+
+    table th,
+    table td{
+        white-space: nowrap;
+        vertical-align: middle;
+        text-align: center;
+    }
+
+    /* حقول الأرقام */
+    table input.form-control{
+        min-width: 90px;   /* 🔥 يحل مشكلة الأرقام المقطوعة */
+        text-align: center;
+        padding: 6px 8px;
+    }
+
+    table .price{
+        min-width: 100px;
+    }
+
+    table .quantity{
+        min-width: 80px;
+    }
+
+    table .subtotal{
+        min-width: 90px;
+        display: inline-block;
+    }
+}
+
     </style>
 </head>
 
@@ -174,12 +215,12 @@
                         <td class="text-center">
                             <a href="{% url 'dashboard:product_detail' current_store.slug product.id %}"
                                class="btn btn-info btn-sm">
-                                تفاصيل
+                                🔍
                             </a>
 
                             <a href="{% url 'dashboard:product_update' current_store.slug product.id %}"
                                class="btn btn-warning btn-sm">
-                                تعديل
+                                ✏️
                             </a>
 
                             <form method="post"

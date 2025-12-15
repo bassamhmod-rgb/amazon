@@ -4,35 +4,53 @@
 <head>
     <meta charset="UTF-8">
     <title>تفاصيل الطلب – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
     <style>
-        body { background:#f7f9fc; font-family:"Cairo",sans-serif; }
-        .sidebar {
-            width: 230px; background:#fff; height:100vh; position:fixed; top:0; right:0;
-            padding:20px 15px; border-left:1px solid #e0e0e0;
-        }
-        .sidebar a {
-            display:block; padding:10px 12px; margin-bottom:8px;
-            color:#333; border-radius:8px; text-decoration:none;
-        }
-        .sidebar a:hover { background:#e9f2ff; color:#0d6efd; }
-
-        .content { margin-right:240px; padding:20px; }
-
-        @media (max-width:768px){
-            .sidebar{ right:-260px; transition:.3s; }
-            .sidebar.active{ right:0; }
-            .content{ margin-right:0; }
-            #toggleSidebar{ display:inline-block; }
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
         }
 
-        #toggleSidebar{
-            display:none; font-size:28px;
-            background:none; border:none; margin-bottom:10px;
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
         }
 
-        .note-box {
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        .note-box{
             background:#f3f7ff;
             padding:5px 10px;
             border-radius:8px;
@@ -41,12 +59,78 @@
             display:inline-block;
             margin-top:4px;
         }
+
+        /* ===== SIDEBAR ARROW ===== */
+        #sidebarArrow{
+            display:none;
+        }
+
+        /* ===== MOBILE (نفس صفحة المنتجات) ===== */
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+
+            .content{
+                margin-right:0;
+                padding:15px;
+            }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+
+            /* الجدول قابل للسحب */
+            .table-responsive{
+                overflow-x:auto;
+                -webkit-overflow-scrolling:touch;
+            }
+
+            table{
+                min-width:700px;
+            }
+
+            table th,
+            table td{
+                white-space:nowrap;
+                vertical-align:middle;
+                text-align:center;
+            }
+
+            /* الأزرار بأسفل الصفحة */
+            .order-actions{
+                flex-direction:column;
+            }
+
+            .order-actions .btn,
+            .order-actions form{
+                width:100%;
+            }
+        }
     </style>
 </head>
 
 <body>
 
-<button id="toggleSidebar">☰</button>
+<!-- سهم السايدبار -->
+<div id="sidebarArrow">❯</div>
+
+<!-- السايدبار -->
 {% include "dashboard/sidebar.html" %}
 
 <div class="content">
@@ -55,7 +139,7 @@
 
     <!-- معلومات عامة -->
     <div class="card p-3 mb-4 shadow-sm border-0">
-        <div class="row">
+        <div class="row g-3">
 
             <!-- جهة التعامل -->
             <div class="col-md-6">
@@ -101,7 +185,9 @@
             <!-- المبالغ -->
             <div class="col-md-6 bg-light p-3 rounded">
                 <p><strong>مجموع العناصر:</strong> {{ order.items_total|floatformat:2 }} $</p>
-                <p><strong>الحسم:</strong> <span class="text-danger">{{ order.discount|floatformat:2 }} $</span></p>
+                <p><strong>الحسم:</strong>
+                    <span class="text-danger">{{ order.discount|floatformat:2 }} $</span>
+                </p>
 
                 <p class="fs-5 fw-bold">
                     <strong>الصافي للدفع:</strong> {{ order.net_total|floatformat:2 }} $
@@ -111,7 +197,8 @@
 
                 <p><strong>المدفوع:</strong> {{ order.payment|floatformat:2 }} $</p>
 
-                <p><strong>المتبقي:</strong>
+                <p>
+                    <strong>المتبقي:</strong>
                     <span class="{% if order.remaining > 0 %}text-danger{% else %}text-success{% endif %}">
                         {{ order.remaining|floatformat:2 }} $
                     </span>
@@ -160,14 +247,13 @@
         </div>
     </div>
 
-    <!-- تفاصيل الدفع (فقط للبيع) -->
+    <!-- تفاصيل الدفع -->
     {% if order.transaction_type == "sale" %}
     <div class="card p-3 mb-4 shadow-sm border-0">
         <h5 class="mb-3">💰 تفاصيل الدفع</h5>
 
         {% if order.payment_type %}
-            <p>
-                <strong>نوع الدفع:</strong>
+            <p><strong>نوع الدفع:</strong>
                 {% if order.payment_type == "full" %}
                     تحويل كامل
                 {% elif order.payment_type == "partial" %}
@@ -210,7 +296,7 @@
             {% if order.payment_proof_image %}
                 <p><strong>📸 إشعار التحويل:</strong></p>
                 <img src="{{ order.payment_proof_image.url }}"
-                     style="max-width:240px; border:1px solid #ccc; border-radius:10px;">
+                     style="max-width:240px;border:1px solid #ccc;border-radius:10px;">
             {% endif %}
 
             {% if order.payment_transaction_id %}
@@ -223,7 +309,7 @@
     {% endif %}
 
     <!-- الأزرار -->
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 order-actions">
         {% if order.status == "pending" %}
             <a href="{% url 'dashboard:confirm_order' store.slug order.id %}" class="btn btn-success">
                 ✔ تأكيد الطلب
@@ -246,8 +332,13 @@
 </div>
 
 <script>
-    document.getElementById("toggleSidebar").onclick = () =>
-        document.getElementById("sidebar").classList.toggle("active");
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
 </script>
 
 </body>

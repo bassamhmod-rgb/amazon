@@ -6,7 +6,12 @@ SECRET_KEY = "change-me"
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "amazonsyria.pythonanywhere.com",
+    "www.amazonsyria.pythonanywhere.com",
+    "127.0.0.1",
+    "localhost",
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",

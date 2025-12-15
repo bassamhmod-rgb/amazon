@@ -5,7 +5,7 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.contrib.auth.models import User
 from django.db.models import Sum
-from products.models import ProductDetails
+from products.models import ProductDetails ,Product, ProductGallery
 
 # --- استيراد المودلز من التطبيقات المختلفة ---
 from products.models import Category, Product
@@ -94,7 +94,6 @@ def products_list(request, store_slug):
     }
     return render(request, "dashboard/products_list.html", context)
 
-
 # 🔹 إضافة منتج جديد
 @login_required
 def product_create(request, store_slug):
@@ -119,6 +118,14 @@ def product_create(request, store_slug):
                         value=v.strip()
                     )
 
+            # 🖼️ إضافة الصور الفرعية (ProductGallery)
+            images = request.FILES.getlist("gallery_images")
+            for img in images:
+                ProductGallery.objects.create(
+                    product=product,
+                    image=img
+                )
+
             return redirect("dashboard:products_list", store_slug=store.slug)
 
     else:
@@ -130,7 +137,6 @@ def product_create(request, store_slug):
         "is_edit": False,
     })
 
-
 # 🔹 تعديل منتج
 @login_required
 def product_update(request, store_slug, product_id):
@@ -140,11 +146,34 @@ def product_update(request, store_slug, product_id):
     if request.method == "POST":
         form = ProductForm(request.POST, request.FILES, instance=product, store=store)
         if form.is_valid():
-            form.save()
+            product = form.save()
+
+            # 🔥 تحديث المواصفات (نحذف القديم ونضيف الجديد)
+            ProductDetails.objects.filter(product=product).delete()
+
+            titles = request.POST.getlist("detail_title")
+            values = request.POST.getlist("detail_value")
+
+            for t, v in zip(titles, values):
+                if t.strip() and v.strip():
+                    ProductDetails.objects.create(
+                        product=product,
+                        title=t.strip(),
+                        value=v.strip()
+                    )
+
+            # 🖼️ إضافة صور فرعية جديدة (بدون حذف القديمة)
+            images = request.FILES.getlist("gallery_images")
+            for img in images:
+                ProductGallery.objects.create(
+                    product=product,
+                    image=img
+                )
+
             return redirect("dashboard:products_list", store_slug=store.slug)
+
     else:
         form = ProductForm(instance=product, store=store)
-
 
     return render(request, "dashboard/product_form.html", {
         "store": store,
@@ -152,7 +181,20 @@ def product_update(request, store_slug, product_id):
         "is_edit": True,
         "product": product,
     })
+#حذف صورة من المعرض
+from django.http import HttpResponseForbidden
+@login_required
+def delete_gallery_image(request, image_id):
+    image = get_object_or_404(ProductGallery, id=image_id)
+    store = image.product.store
 
+    if store.owner != request.user:
+        return HttpResponseForbidden()
+
+    product_id = image.product.id
+    image.delete()
+
+    return redirect("dashboard:product_update", store.slug, product_id)
 
 # 🔹 حذف منتج
 @login_required
@@ -314,7 +356,6 @@ def order_create(request, store_slug):
             if supplier_id and supplier_id.isdigit():
                 supplier = Supplier.objects.filter(id=supplier_id, store=store).first()
 
-        # تأمين البيانات — إذا شراء لازم supplier، وإذا بيع لازم customer
         if transaction_type == "sale" and not customer:
             messages.error(request, "يجب اختيار زبون لإتمام عملية البيع.")
             return redirect("dashboard:order_create", store_slug=store.slug)
@@ -323,26 +364,19 @@ def order_create(request, store_slug):
             messages.error(request, "يجب اختيار مورد لإتمام عملية الشراء.")
             return redirect("dashboard:order_create", store_slug=store.slug)
 
-        # 3) المجموع
-        try:
-            total = float(request.POST.get("total", "0"))
-        except:
-            total = 0
-
-        # 4) إنشاء الطلب
+        # 3) إنشاء الطلب (❌ بدون total)
         order = Order.objects.create(
             store=store,
             user=request.user,
             transaction_type=transaction_type,
             customer=customer if transaction_type == "sale" else None,
             supplier=supplier if transaction_type == "purchase" else None,
-            total=total,
             discount=request.POST.get("discount", 0),
             payment=request.POST.get("payment", 0),
             status="pending",
         )
 
-        # 5) عناصر الطلب
+        # 4) عناصر الطلب
         products = request.POST.getlist("product_id[]")
         prices   = request.POST.getlist("price[]")
         qtys     = request.POST.getlist("quantity[]")
@@ -362,16 +396,16 @@ def order_create(request, store_slug):
                     price=price,
                     quantity=qty,
                     direction=-1,
-                    buy_price=product.cost_price if hasattr(product, "cost_price") else 0
+                    buy_price=product.buy_price,
                 )
-            else:  # شراء
+            else:  # purchase
                 OrderItem.objects.create(
                     order=order,
                     product=product,
                     price=price,
                     quantity=qty,
                     direction=1,
-                    buy_price=price
+                    buy_price=price,
                 )
 
         return redirect("dashboard:orders_list", store_slug=store.slug)
@@ -392,13 +426,7 @@ def order_update(request, store_slug, order_id):
         transaction_type = request.POST.get("transaction_type", "sale")
         order.transaction_type = transaction_type
 
-        # 🟦 2) المجموع
-        try:
-            total = float(request.POST.get("total", "0"))
-        except:
-            total = 0
-
-        order.total = total
+        # 🟦 2) خصم ودفع (❌ بدون total)
         order.discount = request.POST.get("discount", 0)
         order.payment = request.POST.get("payment", 0)
 
@@ -455,10 +483,8 @@ def order_update(request, store_slug, order_id):
     return render(request, "dashboard/order_update.html", {
         "store": store,
         "order": order,
-        "new_orders_count": new_orders_count,   # ← ← ← أضيف هذا
-
+        "new_orders_count": new_orders_count,
     })
-
 #فلترة طلبات
 #بالحالة
 #برقم الطلب
@@ -762,18 +788,22 @@ def supplier_create(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
 
     if request.method == "POST":
-        name = request.POST.get("name")
-        phone = request.POST.get("phone")
+        name = request.POST.get("name", "").strip()
+        phone = request.POST.get("phone", "").strip()
         address = request.POST.get("address")
         email = request.POST.get("email")
         opening_balance = request.POST.get("opening_balance") or 0
 
-        # منع تكرار الاسم أو الرقم
-        exists = Supplier.objects.filter(store=store).filter(
-            Q(name=name) | Q(phone=phone)
-        ).exists()
+        # ✅ منع التكرار فقط إذا القيم موجودة
+        exists_qs = Supplier.objects.filter(store=store)
 
-        if exists:
+        if name:
+            exists_qs = exists_qs.filter(name=name)
+
+        if phone:
+            exists_qs = exists_qs.filter(phone=phone)
+
+        if exists_qs.exists():
             messages.error(request, "⚠️ هذا المورد مسجّل مسبقاً (اسم أو رقم).")
             return redirect("dashboard:suppliers_list", store_slug=store.slug)
 

@@ -11,6 +11,8 @@ urlpatterns = [
     path("<slug:store_slug>/products/add/", views.product_create, name="product_create"),
     path("<slug:store_slug>/products/<int:product_id>/edit/", views.product_update, name="product_update"),
     path("<slug:store_slug>/products/<int:product_id>/delete/", views.product_delete, name="product_delete"),
+    path("products/gallery/<int:image_id>/delete/", views.delete_gallery_image, name="delete_gallery_image"),
+
 # ادارة الفئات
     path('<slug:store_slug>/categories/', views.categories_list, name='categories_list'),
     path('<slug:store_slug>/categories/add/', views.add_category, name='add_category'),

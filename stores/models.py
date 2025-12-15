@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.utils.text import slugify
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
+from PIL import Image, ImageOps
 
 class Store(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="stores")
@@ -22,26 +23,62 @@ class Store(models.Model):
     allow_cash_on_delivery = models.BooleanField(default=False)  # الدفع عند الاستلام
  # ⭐ نسبة الدفع المطلوبة لجميع طرق الدفع
     payment_required_percentage = models.PositiveIntegerField(default=0)
+    # للتحكم بابعاد مساحة الصورة
+    hero_height = models.PositiveIntegerField(
+        default=350,
+        help_text="ارتفاع صورة الهيرو بالبكسل"
+    )
 
-# تعريف "دالة" لعرض الوصف بشكل منسق
-    @property
-    def formatted_description(self):
-        """تُرجع الوصف مسبوقاً برمز النجمة."""
-        return f"🌟 {self.description}"
-    
-    def __str__(self):
-        return self.name
+    hero_fit = models.CharField(
+        max_length=10,
+        choices=[
+            ("contain", "احتواء (بدون قص)"),
+            ("cover", "ملء (مع قص)"),
+        ],
+        default="contain"
+    )
     
     
     def save(self, *args, **kwargs):
+        # توليد slug (مثل ما كان)
         if not self.slug:
             self.slug = slugify(self.name)
+
         super().save(*args, **kwargs)
+
+        # تعديل الصورة بدون قص
+        if self.logo:
+            img = Image.open(self.logo.path).convert("RGBA")
+
+            TARGET_W, TARGET_H = 1280, 509
+
+            # نحافظ على النسبة
+            img.thumbnail((TARGET_W, TARGET_H), Image.LANCZOS)
+
+            # إنشاء خلفية بنفس المقاس
+            background = Image.new("RGBA", (TARGET_W, TARGET_H), (255, 255, 255, 255))
+            # إذا بدك خلفية لون:
+            # background = Image.new("RGBA", (TARGET_W, TARGET_H), "#f7f9fc")
+
+            # توسيط الصورة
+            x = (TARGET_W - img.width) // 2
+            y = (TARGET_H - img.height) // 2
+
+            background.paste(img, (x, y), img)
+
+            # حفظ نهائي
+            background.convert("RGB").save(
+                self.logo.path,
+                quality=90,
+                optimize=True
+            )
+
+    @property
+    def formatted_description(self):
+        return f"🌟 {self.description}"
 
     def __str__(self):
         return self.name
-    
-
 #طرق الدفع
 class StorePaymentMethod(models.Model):
 

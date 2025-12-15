@@ -4,163 +4,230 @@
 <head>
     <meta charset="UTF-8">
     <title>إضافة طلب – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
     <style>
-        body { background:#f7f9fc; font-family:"Cairo",sans-serif; }
-        .sidebar {
-            width: 230px; background:#fff; height:100vh; position:fixed;
-            top:0; right:0; padding:20px 15px;
-            border-left:1px solid #e0e0e0; z-index: 999;
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
         }
-        .content { margin-right:240px; padding:20px; }
-        /* ===== تنسيق القائمة ===== */
 
-        .sidebar a {
-            display:block; padding:10px 12px; margin-bottom:8px;
-            color:#333; border-radius:8px; text-decoration:none;
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
         }
-        .sidebar a:hover { background:#e9f2ff; color:#0d6efd; }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        #sidebarArrow{ display:none; }
 
         @media (max-width:768px){
-            .sidebar{ right:-260px; transition:.3s; }
+            .sidebar{ right:-260px; }
             .sidebar.active{ right:0; }
             .content{ margin-right:0; }
-            #toggleSidebar{ display:inline-block !important; }
-        }
-        /* ===== انتهى ===== */
 
-        #toggleSidebar{
-            display:none; font-size:28px; background:none; border:none; margin-bottom:10px;
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
         }
 
-        #searchResults, #customerResults, #supplierResults {
-            max-height:200px; overflow-y:auto;
+        #searchResults,
+        #customerResults,
+        #supplierResults{
+            max-height:200px;
+            overflow-y:auto;
             box-shadow:0 4px 6px rgba(0,0,0,0.15);
-            display:none; background:#fff; z-index:1000;
-            position:absolute; width:100%;
+            display:none;
+            background:#fff;
+            z-index:1000;
+            position:absolute;
+            width:100%;
         }
 
-        .list-group-item.active {
+        .list-group-item.active{
             background:#0d6efd;
             color:#fff !important;
         }
 
-        .en-num { direction:ltr !important; unicode-bidi:plaintext !important; }
+        .en-num{
+            direction:ltr !important;
+            unicode-bidi:plaintext !important;
+        }
+
+        /* ===== التعديل الوحيد (تحريك الجدول) ===== */
+        @media (max-width:768px){
+            .table-responsive{
+                overflow-x:auto;
+                -webkit-overflow-scrolling:touch;
+            }
+            table{
+                min-width:600px;
+            }
+            table th,
+            table td{
+                white-space:nowrap;
+                text-align:center;
+                vertical-align:middle;
+            }
+        }
     </style>
 </head>
 
 <body>
 
-<button id="toggleSidebar">☰</button>
+<div id="sidebarArrow">❯</div>
+
 {% include "dashboard/sidebar.html" %}
 
 <div class="content">
 
-    <h3 class="mb-4">إضافة طلب جديد</h3>
+<h3 class="mb-4">إضافة طلب جديد</h3>
 
-    <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="customer_id" id="customer_id">
-        <input type="hidden" name="supplier_id" id="supplier_id">
+<form method="post">
+{% csrf_token %}
+<input type="hidden" name="customer_id" id="customer_id">
+<input type="hidden" name="supplier_id" id="supplier_id">
 
-        <div class="card p-3 mb-3 shadow-sm border-0">
-            <label class="form-label fw-bold">نوع العملية</label>
-            <select id="transaction_type" name="transaction_type"
-                    class="form-select" onchange="toggleTransactionFields()">
-                <option value="sale">بيع</option>
-                <option value="purchase">شراء</option>
-            </select>
-        </div>
-
-        
-
-        <!-- زبون -->
-        <div id="customerBox" class="card p-3 mb-3 border-0 shadow-sm">
-            <label class="form-label fw-bold">الزبون</label>
-
-            <div id="customerSearchContainer" class="position-relative">
-                <input type="text" id="customerSearch" class="form-control"
-                       placeholder="ابحث عن زبون..." autocomplete="off">
-                <div id="customerResults" class="list-group mt-1"></div>
-            </div>
-
-            <div id="selectedCustomerCard"
-                 class="alert alert-success d-flex justify-content-between align-items-center m-0"
-                 style="display:none;">
-                <span id="selectedCustomerName" class="fw-bold"></span>
-                <button type="button" class="btn btn-sm btn-outline-danger bg-white"
-                        onclick="removeCustomer()">❌</button>
-            </div>
-        </div>
-
-        <!-- مورد -->
-        <div id="supplierBox" class="card p-3 mb-3 border-0 shadow-sm" style="display:none;">
-            <label class="form-label fw-bold">المورد</label>
-
-            <div class="position-relative">
-                <input type="text" id="supplierSearch" class="form-control"
-                       placeholder="ابحث عن مورد..." autocomplete="off">
-                <div id="supplierResults" class="list-group mt-1"></div>
-            </div>
-        </div>
-         <div class="card p-3 mb-3 border-0 shadow-sm">
-            <label class="form-label fw-bold">بحث عن منتج</label>
-            <div class="position-relative">
-                <input type="text" id="productSearch" class="form-control"
-                       placeholder="اكتب اسم المنتج..." autocomplete="off">
-                <div id="searchResults" class="list-group mt-1"></div>
-            </div>
-        </div>
-        <div class="card border-0 shadow-sm p-3">
-
-            <table class="table table-bordered">
-                <thead class="table-light">
-                <tr>
-                    <th>المنتج</th>
-                    <th width="150">السعر</th>
-                    <th width="100">الكمية</th>
-                    <th>المجموع</th>
-                    <th>حذف</th>
-                </tr>
-                </thead>
-                <tbody id="orderItems"></tbody>
-            </table>
-
-            <hr>
-
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label>الحسم</label>
-                    <input type="number" name="discount" step="0.01"
-                           class="form-control en-num" value="0"
-                           oninput="calculateTotal()">
-                </div>
-
-                <div class="col-md-4">
-                    <label>المدفوع</label>
-                    <input type="number" name="payment" step="0.01"
-                           class="form-control en-num" value="0">
-                </div>
-
-                <div class="col-md-4">
-                    <label>المجموع الكلي</label>
-                    <input type="text" id="totalDisplay"
-                           class="form-control fw-bold fs-5 text-success en-num"
-                           readonly value="0">
-                </div>
-            </div>
-
-            <button class="btn btn-primary mt-4 px-4">💾 حفظ الطلب</button>
-            <a href="{% url 'dashboard:orders_list' store.slug %}"
-               class="btn btn-secondary mt-4 px-4">إلغاء</a>
-
-        </div>
-    </form>
+<div class="card p-3 mb-3 shadow-sm border-0">
+    <label class="form-label fw-bold">نوع العملية</label>
+    <select id="transaction_type" name="transaction_type"
+            class="form-select" onchange="toggleTransactionFields()">
+        <option value="sale">بيع</option>
+        <option value="purchase">شراء</option>
+    </select>
 </div>
 
+<div id="customerBox" class="card p-3 mb-3 border-0 shadow-sm">
+    <label class="form-label fw-bold">الزبون</label>
+    <div id="customerSearchContainer" class="position-relative">
+        <input type="text" id="customerSearch" class="form-control"
+               placeholder="ابحث عن زبون..." autocomplete="off">
+        <div id="customerResults" class="list-group mt-1"></div>
+    </div>
+    <div id="selectedCustomerCard"
+         class="alert alert-success d-flex justify-content-between align-items-center m-0"
+         style="display:none;">
+        <span id="selectedCustomerName" class="fw-bold"></span>
+        <button type="button" class="btn btn-sm btn-outline-danger bg-white"
+                onclick="removeCustomer()">❌</button>
+    </div>
+</div>
+
+<div id="supplierBox" class="card p-3 mb-3 border-0 shadow-sm" style="display:none;">
+    <label class="form-label fw-bold">المورد</label>
+    <div class="position-relative">
+        <input type="text" id="supplierSearch" class="form-control"
+               placeholder="ابحث عن مورد..." autocomplete="off">
+        <div id="supplierResults" class="list-group mt-1"></div>
+    </div>
+</div>
+
+<div class="card p-3 mb-3 border-0 shadow-sm">
+    <label class="form-label fw-bold">بحث عن منتج</label>
+    <div class="position-relative">
+        <input type="text" id="productSearch" class="form-control"
+               placeholder="اكتب اسم المنتج..." autocomplete="off">
+        <div id="searchResults" class="list-group mt-1"></div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm p-3">
+
+    <!-- 🔑 التغليف فقط -->
+    <div class="table-responsive">
+        <table class="table table-bordered">
+            <thead class="table-light">
+            <tr>
+                <th>المنتج</th>
+                <th width="150">السعر</th>
+                <th width="100">الكمية</th>
+                <th>المجموع</th>
+                <th>حذف</th>
+            </tr>
+            </thead>
+            <tbody id="orderItems"></tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label>الحسم</label>
+            <input type="number" name="discount" step="0.01"
+                   class="form-control en-num" value="0"
+                   oninput="calculateTotal()">
+        </div>
+
+        <div class="col-md-4">
+            <label>المدفوع</label>
+            <input type="number" name="payment" step="0.01"
+                   class="form-control en-num" value="0">
+        </div>
+
+        <div class="col-md-4">
+            <label>المجموع الكلي</label>
+            <input type="text" id="totalDisplay"
+                   class="form-control fw-bold fs-5 text-success en-num"
+                   readonly value="0">
+        </div>
+    </div>
+
+    <button class="btn btn-primary mt-4 px-4">💾 حفظ الطلب</button>
+    <a href="{% url 'dashboard:orders_list' store.slug %}"
+       class="btn btn-secondary mt-4 px-4">إلغاء</a>
+
+</div>
+</form>
+</div>
+
+<!-- ===== كل السكربتات بدون أي نقص ===== -->
 <script>
 function toggleTransactionFields() {
     let type = document.getElementById("transaction_type").value;
@@ -393,25 +460,31 @@ function calculateTotal() {
     let discount = parseFloat(document.querySelector("input[name='discount']").value) || 0;
     document.getElementById("totalDisplay").value = (total - discount).toLocaleString();
 }
-
 </script>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const form = document.querySelector("form");
-
     if (!form) return;
 
     form.addEventListener("keydown", function (e) {
         if (e.key === "Enter") {
             const tag = e.target.tagName.toLowerCase();
-
-            // نسمح بالـ Enter فقط داخل textarea
             if (tag !== "textarea") {
                 e.preventDefault();
             }
         }
     });
 });
+</script>
+
+<script>
+const sidebar = document.getElementById("sidebar");
+const arrow = document.getElementById("sidebarArrow");
+arrow.onclick = () => {
+    sidebar.classList.toggle("active");
+    arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+};
 </script>
 
 </body>

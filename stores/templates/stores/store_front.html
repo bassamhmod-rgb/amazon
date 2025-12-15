@@ -153,6 +153,33 @@
             overflow-wrap: break-word !important;
         }
     }
+/* === توحيد مساحة صورة الهيرو مع الصفحة العامة === */
+.hero-image-placeholder {
+    height: 350px;                 /* نفس الصفحة العامة */
+    border-radius: 24px;           /* نفس الانحناء */
+    overflow: hidden;
+    background: radial-gradient(
+        circle at top left,
+        #FFB400 0,
+        rgba(255,180,0,0.2) 30%,
+        transparent 60%
+    ),
+    radial-gradient(
+        circle at bottom right,
+        #1A2A4A 0,
+        rgba(26,42,74,0.2) 35%,
+        transparent 70%
+    );
+}
+
+/* الصورة نفسها */
+.hero-image-placeholder img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;   /* نفس الصفحة العامة */
+    display: block;
+}
+
 </style>
 </head>
 
