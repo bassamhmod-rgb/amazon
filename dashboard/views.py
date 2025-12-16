@@ -199,17 +199,33 @@ def delete_gallery_image(request, image_id):
 # 🔹 حذف منتج
 @login_required
 def product_delete(request, store_slug, product_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
-    product = get_object_or_404(Product, id=product_id, store=store)
+    store = get_object_or_404(
+        Store,
+        slug=store_slug,
+        owner=request.user
+    )
 
-    if request.method == "POST":
-        product.delete()
+    product_qs = Product.objects.filter(
+        id=product_id,
+        store=store
+    )
+
+    if not product_qs.exists():
+        messages.warning(
+            request,
+            "⚠️ المنتج غير موجود أو تم حذفه مسبقاً"
+        )
         return redirect("dashboard:products_list", store_slug=store.slug)
 
-    return render(request, "dashboard/product_confirm_delete.html", {
-        "store": store,
-        "product": product,
-    })
+    if request.method == "POST":
+        product_qs.delete()
+        messages.success(
+            request,
+            "🗑️ تم حذف المنتج بنجاح"
+        )
+
+    return redirect("dashboard:products_list", store_slug=store.slug)
+
 #تفاصيل المنتج
 def product_detail(request, store_slug, product_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)

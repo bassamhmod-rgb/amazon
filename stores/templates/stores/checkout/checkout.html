@@ -159,33 +159,54 @@
             <!--                 ③ طريقة الدفع                        -->
             <!-- ===================================================== -->
             <h5 class="mt-4">💳 اختر طريقة الدفع</h5>
+{% for method in payment_methods %}
+    <div class="method-option mb-2 d-flex align-items-center gap-2">
 
-            {% for method in payment_methods %}
-                <div class="method-option mb-2">
-                    <input type="radio" name="payment_method" value="{{ method.id }}" 
-                           id="method{{ method.id }}" class="form-check-input me-2"
-                           onclick="showDetails({{ method.id }})">
+        <input type="radio"
+               name="payment_method"
+               value="{{ method.id }}"
+               id="method{{ method.id }}"
+               class="form-check-input"
+               onclick="showDetails({{ method.id }})">
 
-                    <label for="method{{ method.id }}" class="form-check-label">
-                        {{ method.name }}
-                    </label>
-                </div>
+        <label for="method{{ method.id }}"
+               class="form-check-label d-flex align-items-center gap-2 mb-0">
 
-                <div id="details{{ method.id }}" class="payment-details-box mb-3">
-                    {% if method.recipient_name %}
-                        <p><strong>اسم المستلم:</strong> {{ method.recipient_name }}</p>
-                    {% endif %}
-                    {% if method.phone_number %}
-                        <p><strong>رقم الهاتف:</strong> {{ method.phone_number }}</p>
-                    {% endif %}
-                    {% if method.account_number %}
-                        <p><strong>رقم الحساب:</strong> {{ method.account_number }}</p>
-                    {% endif %}
-                    {% if method.additional_info %}
-                        <p><strong>معلومات إضافية:</strong> {{ method.additional_info }}</p>
-                    {% endif %}
-                </div>
-            {% endfor %}
+            {% if method.icon %}
+                <img src="{{ method.icon.url }}"
+                     alt="{{ method.name }}"
+                     style="height:28px; width:auto; object-fit:contain;">
+            {% endif %}
+
+            <span>{{ method.name }}</span>
+        </label>
+    </div>
+
+    <div id="details{{ method.id }}" class="payment-details-box mb-3">
+        {% if method.recipient_name %}
+            <p><strong>اسم المستلم:</strong> {{ method.recipient_name }}</p>
+        {% endif %}
+        {% if method.phone_number %}
+            <p><strong>رقم الهاتف:</strong> {{ method.phone_number }}</p>
+        {% endif %}
+        {% if method.account_number %}
+<p>
+    <strong>رقم الحساب:</strong>
+    <span id="wallet">{{ method.account_number }}</span>
+
+    <button type="button"
+            onclick="navigator.clipboard.writeText(wallet.innerText) && (this.innerText='✔')">
+        نسخ
+    </button>
+</p>
+{% endif %}
+
+
+        {% if method.additional_info %}
+            <p><strong>معلومات إضافية:</strong> {{ method.additional_info }}</p>
+        {% endif %}
+    </div>
+{% endfor %}
 
             <!-- ===================================================== -->
             <!--                 ④ إثبات الدفع                         -->
