@@ -110,17 +110,18 @@
         }
 
         .store-logo-circle {
-            width: 60px;
-            height: 60px;
-            border-radius: 999px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 0.7rem;
-            background: radial-gradient(circle, #FFB400, #fde68a);
-            font-weight: 700;
-            color: #111;
-        }
+    width: 100px;          /* كان 60 */
+    height: 100px;         /* كان 60 */
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.7rem;
+    background: radial-gradient(circle, #FFB400, #fde68a);
+    font-weight: 700;
+    color: #111;
+}
+
 
         .notice-box {
             background-color: #fefce8;
@@ -292,28 +293,37 @@
         <p class="section-subtitle">شبكة متاجر مستقلة — لكل متجر صفحته الخاصة</p>
 
         <div class="row g-3 mt-2">
-            {% for store in stores %}
-            <div class="col-6 col-md-3">
-                <div class="store-card">
+           {% for store in stores %}
+<div class="col-6 col-md-3">
+    <div class="store-card">
 
-                    <div class="store-logo-circle">
-                        {{ store.slug|slice:":2"|upper }}
-                    </div>
-
-                    <div class="store-slug">{{ store.slug }}</div>
-
-                    <div class="store-category">
-                        {{ store.description|default:"متجر" }}
-                    </div>
-
-                    <a href="{% url 'stores:store_front' store.slug %}"
-                       class="btn btn-outline-primary mt-2">
-                        زيارة المتجر
-                    </a>
-
-                </div>
+        {% if store.logo %}
+            <div class="store-logo-circle p-0">
+                <img src="{{ store.logo.url }}"
+                     alt="{{ store.name }}"
+                     style="width:100%; height:100%; object-fit:cover; border-radius:50%;">
             </div>
-            {% endfor %}
+        {% else %}
+            <div class="store-logo-circle">
+                {{ store.slug|slice:":2"|upper }}
+            </div>
+        {% endif %}
+
+        <div class="store-slug">{{ store.slug }}</div>
+
+        {% if store.description %}
+            <div class="store-category">{{ store.description }}</div>
+        {% endif %}
+
+        <a href="{% url 'stores:store_front' store.slug %}"
+           class="btn btn-outline-primary mt-2">
+            زيارة المتجر
+        </a>
+
+    </div>
+</div>
+{% endfor %}
+
         </div>
 
         <div class="notice-box mt-4">
