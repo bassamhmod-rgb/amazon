@@ -50,18 +50,53 @@
             transition:.3s;
         }
 
-        .product-main-img{
+        /* ===== PRODUCT MAIN IMAGE (LOGO-LIKE SQUARE) ===== */
+        .product-main-img-wrapper{
             width:180px;
             height:180px;
-            border-radius:12px;
-            object-fit:cover;
+            border-radius:14px;
+            background:#fff;
+            margin:0 auto;
+
+            display:flex;
+            align-items:center;
+            justify-content:center;
+
+            overflow:hidden;
         }
 
-        .gallery-img{
+        .product-main-img{
+            max-width:100%;
+            max-height:100%;
+            width:auto;
+            height:auto;
+            display:block;
+            object-fit:contain;
+            object-position:center;
+        }
+
+        /* ===== GALLERY IMAGE (SAME LOGIC) ===== */
+        .gallery-img-wrapper{
             width:100%;
             height:100px;
             border-radius:10px;
-            object-fit:cover;
+            background:#fff;
+
+            display:flex;
+            align-items:center;
+            justify-content:center;
+
+            overflow:hidden;
+        }
+
+        .gallery-img{
+            max-width:100%;
+            max-height:100%;
+            width:auto;
+            height:auto;
+            display:block;
+            object-fit:contain;
+            object-position:center;
         }
 
         /* ===== SIDEBAR ARROW ===== */
@@ -69,7 +104,7 @@
             display:none;
         }
 
-        /* ===== MOBILE (نفس صفحة المنتجات) ===== */
+        /* ===== MOBILE ===== */
         @media (max-width:768px){
             .sidebar{ right:-260px; }
             .sidebar.active{ right:0; }
@@ -99,7 +134,7 @@
                 user-select:none;
             }
 
-            .product-main-img{
+            .product-main-img-wrapper{
                 width:100%;
                 height:220px;
             }
@@ -119,10 +154,8 @@
 
 <body>
 
-<!-- سهم السايدبار -->
 <div id="sidebarArrow">❯</div>
 
-<!-- السايدبار -->
 {% include "dashboard/sidebar.html" %}
 
 <div class="content">
@@ -139,11 +172,13 @@
     <div class="card p-4 mb-4">
         <div class="row g-4 align-items-center">
             <div class="col-md-4 text-center">
-                {% if product.main_image %}
-                    <img src="{{ product.main_image.url }}" class="product-main-img">
-                {% else %}
-                    <img src="https://via.placeholder.com/300x220" class="product-main-img">
-                {% endif %}
+                <div class="product-main-img-wrapper">
+                    {% if product.main_image %}
+                        <img src="{{ product.main_image.url }}" class="product-main-img">
+                    {% else %}
+                        <img src="https://via.placeholder.com/300x220" class="product-main-img">
+                    {% endif %}
+                </div>
             </div>
 
             <div class="col-md-8">
@@ -153,15 +188,11 @@
                 <p><strong>الكمية المتوفرة:</strong> {{ product.real_stock }}</p>
 
                 <p><strong>الفئة:</strong>
-                    {% if product.category %}
-                        {{ product.category.name }}
-                    {% else %}——{% endif %}
+                    {% if product.category %}{{ product.category.name }}{% else %}——{% endif %}
                 </p>
 
                 <p><strong>الفئة الفرعية:</strong>
-                    {% if product.category2 %}
-                        {{ product.category2.name }}
-                    {% else %}——{% endif %}
+                    {% if product.category2 %}{{ product.category2.name }}{% else %}——{% endif %}
                 </p>
 
                 <p><strong>الوصف:</strong><br>{{ product.description|linebreaks }}</p>
@@ -204,7 +235,9 @@
         {% if product.gallery.all %}
         <div class="gallery-grid d-md-flex flex-wrap gap-2">
             {% for img in product.gallery.all %}
-                <img src="{{ img.image.url }}" class="gallery-img">
+                <div class="gallery-img-wrapper">
+                    <img src="{{ img.image.url }}" class="gallery-img">
+                </div>
             {% endfor %}
         </div>
         {% else %}
