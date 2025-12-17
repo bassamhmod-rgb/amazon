@@ -2,18 +2,17 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تعديل الطلب – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
-     <style>
+    <style>
         body{
             background:#f7f9fc;
             font-family:"Cairo",sans-serif;
-            overflow-x:hidden; /* 🔑 مهم جدًا */
+            overflow-x:hidden;
         }
 
         /* ===== SIDEBAR ===== */
@@ -51,13 +50,12 @@
         }
 
         /* ===== SIDEBAR ARROW ===== */
-        #sidebarArrow{
-            display:none;
-        }
+        #sidebarArrow{ display:none; }
 
         @media (max-width:768px){
             .sidebar{ right:-260px; }
             .sidebar.active{ right:0; }
+
             .content{ margin-right:0; }
 
             #sidebarArrow{
@@ -81,7 +79,9 @@
             }
         }
 
-        #searchResults, #customerResults, #supplierResults {
+        #searchResults,
+        #customerResults,
+        #supplierResults{
             max-height:200px;
             overflow-y:auto;
             box-shadow:0 4px 6px rgba(0,0,0,0.15);
@@ -101,245 +101,445 @@
             direction:ltr !important;
             unicode-bidi:plaintext !important;
         }
-    /* ===== FIX TABLE ON MOBILE (ORDERS) ===== */
-@media (max-width: 768px){
 
-    /* خلي الجدول قابل للسحب */
-    .table-responsive{
-        overflow-x:auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    table{
-        min-width: 600px; /* 🔑 يمنع ضغط الأعمدة */
-    }
-
-    table th,
-    table td{
-        white-space: nowrap;
-        vertical-align: middle;
-        text-align: center;
-    }
-
-    /* حقول الأرقام */
-    table input.form-control{
-        min-width: 90px;   /* 🔥 يحل مشكلة الأرقام المقطوعة */
-        text-align: center;
-        padding: 6px 8px;
-    }
-
-    table .price{
-        min-width: 100px;
-    }
-
-    table .quantity{
-        min-width: 80px;
-    }
-
-    table .subtotal{
-        min-width: 90px;
-        display: inline-block;
-    }
-}
-
+        /* ===== MOBILE TABLE (تحريك الجدول) ===== */
+        @media (max-width:768px){
+            .table-responsive{
+                overflow-x:auto;
+                -webkit-overflow-scrolling:touch;
+            }
+            table{
+                min-width:600px;
+            }
+            table th,
+            table td{
+                white-space:nowrap;
+                text-align:center;
+                vertical-align:middle;
+            }
+        }
     </style>
 </head>
 
 <body>
 
-<!-- سهم السايدبار -->
 <div id="sidebarArrow">❯</div>
 
-<!-- السايدبار -->
 {% include "dashboard/sidebar.html" %}
 
 <div class="content">
 
     <h3 class="mb-4">تعديل الطلب رقم #{{ order.id }}</h3>
 
-    <!-- نوع العملية -->
-    <div class="card p-3 mb-3 shadow-sm border-0">
-        <label class="form-label fw-bold">نوع العملية</label>
-        <select id="transaction_type" class="form-select" onchange="toggleFields()">
-            <option value="sale" {% if order.transaction_type == 'sale' %}selected{% endif %}>بيع</option>
-            <option value="purchase" {% if order.transaction_type == 'purchase' %}selected{% endif %}>شراء</option>
-        </select>
-    </div>
-
     <form method="post">
-    {% csrf_token %}
+        {% csrf_token %}
 
-    <input type="hidden" name="transaction_type" id="transaction_type_hidden"
-           value="{{ order.transaction_type }}">
-    <input type="hidden" name="customer_id" id="customer_id" value="{{ order.customer.id }}">
-    <input type="hidden" name="supplier_id" id="supplier_id" value="{{ order.supplier.id }}">
+        <input type="hidden" name="transaction_type" id="transaction_type" value="{{ order.transaction_type }}">
+        <input type="hidden" name="customer_id" id="customer_id" value="{% if order.customer %}{{ order.customer.id }}{% endif %}">
+        <input type="hidden" name="supplier_id" id="supplier_id" value="{% if order.supplier %}{{ order.supplier.id }}{% endif %}">
 
-    <!-- بحث منتج -->
-    <div class="card p-3 mb-3 border-0 shadow-sm">
-        <label class="form-label fw-bold">بحث عن منتج</label>
-        <div class="position-relative">
-            <input type="text" id="productSearch" class="form-control"
-                   placeholder="اكتب اسم المنتج..." autocomplete="off">
-            <div id="searchResults" class="list-group mt-1"></div>
-        </div>
-    </div>
-
-    <!-- زبون -->
-    <div id="customerBox" class="card p-3 mb-3 border-0 shadow-sm"
-         style="{% if order.transaction_type == 'purchase' %}display:none{% endif %}">
-        <label class="form-label fw-bold">الزبون</label>
-
-        <div id="customerSearchContainer" class="position-relative"
-             style="{% if order.customer %}display:none{% endif %}">
-            <input type="text" id="customerSearch" class="form-control"
-                   placeholder="ابحث..." autocomplete="off">
-            <div id="customerResults" class="list-group mt-1"></div>
+        <!-- نوع العملية -->
+        <div class="card p-3 mb-3">
+            <label class="fw-bold">نوع العملية</label>
+            <select id="transactionSelect" class="form-select" onchange="toggleTransactionFields()">
+                <option value="sale" {% if order.transaction_type == 'sale' %}selected{% endif %}>بيع</option>
+                <option value="purchase" {% if order.transaction_type == 'purchase' %}selected{% endif %}>شراء</option>
+            </select>
         </div>
 
-        <div id="selectedCustomerCard"
-             class="alert alert-success d-flex justify-content-between align-items-center m-0"
-             style="{% if order.customer %}display:flex{% else %}display:none{% endif %}">
-            <span id="selectedCustomerName">{{ order.customer }}</span>
-            <button type="button" class="btn btn-sm btn-outline-danger bg-white"
-                    onclick="removeCustomer()">❌</button>
-        </div>
-    </div>
+        <!-- زبون -->
+        <div id="customerBox" class="card p-3 mb-3">
+            <label class="fw-bold">الزبون</label>
 
-    <!-- مورد -->
-    <div id="supplierBox" class="card p-3 mb-3 border-0 shadow-sm"
-         style="{% if order.transaction_type == 'sale' %}display:none{% endif %}">
-        <label class="form-label fw-bold">المورد</label>
-        <div class="position-relative">
-            <input type="text" id="supplierSearch" class="form-control"
-                   value="{% if order.supplier %}{{ order.supplier.name }}{% endif %}"
-                   placeholder="ابحث..." autocomplete="off">
-            <div id="supplierResults" class="list-group mt-1"></div>
-        </div>
-    </div>
+            <div id="customerSearchContainer" class="position-relative"
+                 style="{% if order.customer %}display:none{% endif %}">
+                <input type="text" id="customerSearch" class="form-control" placeholder="ابحث عن زبون..." autocomplete="off">
+                <div id="customerResults" class="list-group mt-1"></div>
+            </div>
 
-    <!-- جدول المنتجات -->
-    <div class="card border-0 shadow-sm p-0">
-        <div class="table-responsive p-3">
-            <table class="table table-bordered mb-0">
+            <div id="selectedCustomerCard"
+                 class="alert alert-success d-flex justify-content-between align-items-center m-0"
+                 style="{% if order.customer %}display:flex{% else %}display:none{% endif %}">
+                <span id="selectedCustomerName">{% if order.customer %}{{ order.customer }}{% endif %}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger bg-white" onclick="removeCustomer()">❌</button>
+            </div>
+        </div>
+
+        <!-- مورد -->
+        <div id="supplierBox" class="card p-3 mb-3">
+            <label class="fw-bold">المورد</label>
+            <div class="position-relative">
+                <input type="text" id="supplierSearch" class="form-control"
+                       value="{% if order.supplier %}{{ order.supplier.name }}{% endif %}"
+                       placeholder="ابحث عن مورد..." autocomplete="off">
+                <div id="supplierResults" class="list-group mt-1"></div>
+            </div>
+        </div>
+
+        <!-- بحث منتج -->
+        <div class="card p-3 mb-3">
+            <label class="fw-bold">بحث عن منتج</label>
+            <div class="position-relative">
+                <input type="text" id="productSearch" class="form-control" placeholder="اكتب اسم المنتج..." autocomplete="off">
+                <div id="searchResults" class="list-group mt-1"></div>
+            </div>
+        </div>
+
+        <!-- جدول المنتجات -->
+        <div class="table-responsive">
+            <table class="table table-bordered">
                 <thead class="table-light">
                 <tr>
                     <th>المنتج</th>
-                    <th width="150">السعر</th>
+                    <th width="140">السعر</th>
                     <th width="100">الكمية</th>
                     <th>المجموع</th>
                     <th width="60">حذف</th>
                 </tr>
                 </thead>
+
                 <tbody id="orderItems">
                 {% for item in order.items.all %}
-                <tr>
-                    <td>
-                        {{ item.product.name }}
-                        <input type="hidden" name="product_id[]" value="{{ item.product.id }}">
-                    </td>
-                    <td>
-                        <input type="number" name="price[]" step="0.01"
-                               value="{{ item.price }}"
-                               class="form-control price en-num"
-                               oninput="calculateTotal()">
-                    </td>
-                    <td>
-                        <input type="number" name="quantity[]" step="0.01" min="0.01"
-                               value="{{ item.quantity }}"
-                               class="form-control quantity en-num"
-                               oninput="calculateTotal()">
-                    </td>
-                    <td class="subtotal fw-bold en-num">{{ item.subtotal }}</td>
-                    <td>
-                        <button type="button" class="btn btn-danger btn-sm"
-                                onclick="this.closest('tr').remove(); calculateTotal()">×</button>
-                    </td>
-                </tr>
+                    <tr>
+                        <td>
+                            {{ item.product.name }}
+                            <input type="hidden" name="product_id[]" value="{{ item.product.id }}">
+                        </td>
+                        <td>
+                            <input type="number" name="price[]" value="{{ item.price }}" step="0.01"
+                                   class="form-control price en-num" oninput="calculateTotal()">
+                        </td>
+                        <td>
+                            <input type="number" name="quantity[]" value="{{ item.quantity }}" step="0.01" min="0.01"
+                                   class="form-control quantity en-num" oninput="calculateTotal()">
+                        </td>
+                        <td class="subtotal fw-bold en-num">{{ item.subtotal }}</td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm"
+                                    onclick="this.closest('tr').remove();calculateTotal()">×</button>
+                        </td>
+                    </tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
 
-        <hr class="m-0">
-
-        <div class="p-3">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label>الحسم</label>
-                    <input type="number" name="discount" step="0.01"
-                           value="{{ order.discount }}"
-                           class="form-control en-num"
-                           oninput="calculateTotal()">
-                </div>
-
-                <div class="col-md-4">
-                    <label>المدفوع</label>
-                    <input type="number" name="payment" step="0.01"
-                           value="{{ order.payment }}"
-                           class="form-control en-num">
-                </div>
-
-                <div class="col-md-4">
-                    <label>المجموع الكلي</label>
-                    <input type="text" id="totalDisplay" readonly
-                           class="form-control fw-bold fs-5 text-success en-num"
-                           value="{{ order.items_total }}">
-                </div>
+        <div class="row g-3 mt-3">
+            <div class="col-md-4">
+                <label>الحسم</label>
+                <input type="number" name="discount" value="{{ order.discount }}" step="0.01"
+                       class="form-control en-num" oninput="calculateTotal()">
             </div>
-
-            <button class="btn btn-primary mt-4">💾 حفظ التعديلات</button>
+            <div class="col-md-4">
+                <label>المدفوع</label>
+                <input type="number" name="payment" value="{{ order.payment }}" step="0.01"
+                       class="form-control en-num">
+            </div>
+            <div class="col-md-4">
+                <label>المجموع الكلي</label>
+                <input type="text" id="totalDisplay" readonly
+                       class="form-control fw-bold text-success en-num"
+                       value="{{ order.items_total }}">
+            </div>
         </div>
-    </div>
 
-    <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const form = document.querySelector("form");
-        if (!form) return;
+        <button class="btn btn-primary mt-4">💾 حفظ التعديلات</button>
 
-        form.addEventListener("keydown", function (e) {
-            if (e.key === "Enter") {
-                const tag = e.target.tagName.toLowerCase();
-                if (tag !== "textarea") {
-                    e.preventDefault();
-                }
-            }
-        });
-    });
-    </script>
-</form>
-
+    </form>
 </div>
 
 <script>
-/* سهم السايدبار */
+/* منع Enter من إرسال الفورم بالغلط */
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.querySelector("form");
+    if (!form) return;
+
+    form.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+            const tag = e.target.tagName.toLowerCase();
+            if (tag !== "textarea") e.preventDefault();
+        }
+    });
+});
+
+/* ===== SIDEBAR ARROW ===== */
 const sidebar = document.getElementById("sidebar");
 const arrow   = document.getElementById("sidebarArrow");
 
-arrow.onclick = () => {
-    sidebar.classList.toggle("active");
-    arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
-};
-
-/* منطق الصفحة كما هو */
-function toggleFields(){
-    let t = document.getElementById("transaction_type").value;
-    document.getElementById("transaction_type_hidden").value = t;
-    document.getElementById("customerBox").style.display = t === "sale" ? "block" : "none";
-    document.getElementById("supplierBox").style.display = t === "purchase" ? "block" : "none";
+if (arrow && sidebar){
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
 }
-toggleFields();
 
+/* ===== نوع العملية ===== */
+function toggleTransactionFields(){
+    const t = document.getElementById("transactionSelect").value;
+    document.getElementById("transaction_type").value = t;
+
+    document.getElementById("customerBox").style.display = (t === "sale") ? "block" : "none";
+    document.getElementById("supplierBox").style.display = (t === "purchase") ? "block" : "none";
+}
+toggleTransactionFields();
+
+/* ============================ PRODUCTS (أسهم + Enter) ============================ */
+let productIndex = -1;
+const productSearchEl = document.getElementById("productSearch");
+const searchResultsEl = document.getElementById("searchResults");
+const orderItemsEl = document.getElementById("orderItems");
+
+productSearchEl.addEventListener("keyup", function(e){
+    if (["ArrowDown","ArrowUp","Enter"].includes(e.key)) return;
+
+    const q = this.value.trim();
+    if (!q){
+        searchResultsEl.style.display="none";
+        searchResultsEl.innerHTML="";
+        productIndex=-1;
+        return;
+    }
+
+    fetch(`/dashboard/{{ store.slug }}/search-products/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            searchResultsEl.innerHTML="";
+            productIndex=-1;
+
+            (data.results || []).forEach(item => {
+                const a = document.createElement("a");
+                a.className = "list-group-item list-group-item-action";
+                a.innerText = `${item.name} – ${item.price} $`;
+                a.onclick = () => selectProduct(item);
+                searchResultsEl.appendChild(a);
+            });
+
+            searchResultsEl.style.display="block";
+        });
+});
+
+productSearchEl.addEventListener("keydown", function(e){
+    const items = searchResultsEl.querySelectorAll(".list-group-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown"){
+        e.preventDefault();
+        productIndex = (productIndex + 1) % items.length;
+    } else if (e.key === "ArrowUp"){
+        e.preventDefault();
+        productIndex = (productIndex - 1 + items.length) % items.length;
+    } else if (e.key === "Enter"){
+        e.preventDefault();
+        if (productIndex >= 0) items[productIndex].click();
+        return;
+    } else if (e.key === "Escape"){
+        searchResultsEl.style.display="none";
+        return;
+    }
+
+    items.forEach((el,i)=>el.classList.toggle("active", i===productIndex));
+});
+
+function selectProduct(item){
+    const row = document.createElement("tr");
+    row.innerHTML = `
+        <td>${item.name}
+            <input type="hidden" name="product_id[]" value="${item.id}">
+        </td>
+        <td>
+            <input type="number" name="price[]" value="${item.price}" step="0.01"
+                   class="form-control price en-num" oninput="calculateTotal()">
+        </td>
+        <td>
+            <input type="number" name="quantity[]" value="1" step="0.01" min="0.01"
+                   class="form-control quantity en-num" oninput="calculateTotal()">
+        </td>
+        <td class="subtotal fw-bold en-num">${item.price}</td>
+        <td>
+            <button type="button" class="btn btn-danger btn-sm"
+                    onclick="this.closest('tr').remove();calculateTotal()">×</button>
+        </td>
+    `;
+
+    orderItemsEl.appendChild(row);
+
+    productSearchEl.value="";
+    searchResultsEl.style.display="none";
+    searchResultsEl.innerHTML="";
+    productIndex=-1;
+
+    calculateTotal();
+}
+
+/* ============================ CUSTOMERS (أسهم + Enter) ============================ */
+let customerIndex = -1;
+
+const customerSearchEl = document.getElementById("customerSearch");
+const customerResultsEl = document.getElementById("customerResults");
+const customerIdEl = document.getElementById("customer_id");
+const selectedCustomerNameEl = document.getElementById("selectedCustomerName");
+const customerSearchContainerEl = document.getElementById("customerSearchContainer");
+const selectedCustomerCardEl = document.getElementById("selectedCustomerCard");
+
+if (customerSearchEl){
+    customerSearchEl.addEventListener("keyup", function(e){
+        if (["ArrowDown","ArrowUp","Enter"].includes(e.key)) return;
+
+        const q = this.value.trim();
+        if (!q){
+            customerResultsEl.style.display="none";
+            customerResultsEl.innerHTML="";
+            customerIndex=-1;
+            return;
+        }
+
+        fetch(`/dashboard/{{ store.slug }}/search-customers/?q=` + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(data => {
+                customerResultsEl.innerHTML="";
+                customerIndex=-1;
+
+                (data.results || []).forEach(item => {
+                    const a = document.createElement("a");
+                    a.className = "list-group-item list-group-item-action";
+                    a.innerText = item.phone ? `${item.name} – ${item.phone}` : item.name;
+                    a.onclick = () => selectCustomer(item);
+                    customerResultsEl.appendChild(a);
+                });
+
+                customerResultsEl.style.display="block";
+            });
+    });
+
+    customerSearchEl.addEventListener("keydown", function(e){
+        const items = customerResultsEl.querySelectorAll(".list-group-item");
+        if (!items.length) return;
+
+        if (e.key === "ArrowDown"){
+            e.preventDefault();
+            customerIndex = (customerIndex + 1) % items.length;
+        } else if (e.key === "ArrowUp"){
+            e.preventDefault();
+            customerIndex = (customerIndex - 1 + items.length) % items.length;
+        } else if (e.key === "Enter"){
+            e.preventDefault();
+            if (customerIndex >= 0) items[customerIndex].click();
+            return;
+        } else if (e.key === "Escape"){
+            customerResultsEl.style.display="none";
+            return;
+        }
+
+        items.forEach((el,i)=>el.classList.toggle("active", i===customerIndex));
+    });
+}
+
+function selectCustomer(item){
+    customerIdEl.value = item.id;
+    selectedCustomerNameEl.innerText = item.name;
+
+    customerSearchContainerEl.style.display="none";
+    selectedCustomerCardEl.style.display="flex";
+    customerResultsEl.style.display="none";
+    customerResultsEl.innerHTML="";
+    customerIndex=-1;
+}
+
+function removeCustomer(){
+    customerIdEl.value="";
+    customerSearchEl.value="";
+    customerSearchContainerEl.style.display="block";
+    selectedCustomerCardEl.style.display="none";
+    customerResultsEl.style.display="none";
+    customerResultsEl.innerHTML="";
+    customerIndex=-1;
+}
+
+/* ============================ SUPPLIERS (أسهم + Enter) ============================ */
+let supplierIndex = -1;
+
+const supplierSearchEl = document.getElementById("supplierSearch");
+const supplierResultsEl = document.getElementById("supplierResults");
+const supplierIdEl = document.getElementById("supplier_id");
+
+supplierSearchEl.addEventListener("keyup", function(e){
+    if (["ArrowDown","ArrowUp","Enter"].includes(e.key)) return;
+
+    const q = this.value.trim();
+    if (!q){
+        supplierResultsEl.style.display="none";
+        supplierResultsEl.innerHTML="";
+        supplierIndex=-1;
+        return;
+    }
+
+    fetch(`/dashboard/{{ store.slug }}/search-suppliers/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            supplierResultsEl.innerHTML="";
+            supplierIndex=-1;
+
+            (data.results || []).forEach(item => {
+                const a = document.createElement("a");
+                a.className = "list-group-item list-group-item-action";
+                a.innerText = item.phone ? `${item.name} – ${item.phone}` : item.name;
+                a.onclick = () => selectSupplier(item);
+                supplierResultsEl.appendChild(a);
+            });
+
+            supplierResultsEl.style.display="block";
+        });
+});
+
+supplierSearchEl.addEventListener("keydown", function(e){
+    const items = supplierResultsEl.querySelectorAll(".list-group-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown"){
+        e.preventDefault();
+        supplierIndex = (supplierIndex + 1) % items.length;
+    } else if (e.key === "ArrowUp"){
+        e.preventDefault();
+        supplierIndex = (supplierIndex - 1 + items.length) % items.length;
+    } else if (e.key === "Enter"){
+        e.preventDefault();
+        if (supplierIndex >= 0) items[supplierIndex].click();
+        return;
+    } else if (e.key === "Escape"){
+        supplierResultsEl.style.display="none";
+        return;
+    }
+
+    items.forEach((el,i)=>el.classList.toggle("active", i===supplierIndex));
+});
+
+function selectSupplier(item){
+    supplierIdEl.value = item.id;
+    supplierSearchEl.value = item.name;
+
+    supplierResultsEl.style.display="none";
+    supplierResultsEl.innerHTML="";
+    supplierIndex=-1;
+}
+
+/* ============================ TOTAL ============================ */
 function calculateTotal(){
     let total = 0;
+
     document.querySelectorAll("#orderItems tr").forEach(row=>{
-        let p = parseFloat(row.querySelector(".price").value)||0;
-        let q = parseFloat(row.querySelector(".quantity").value)||0;
-        let s = p*q;
-        row.querySelector(".subtotal").innerText = s.toLocaleString();
-        total+=s;
+        const price = parseFloat(row.querySelector(".price").value) || 0;
+        const qty   = parseFloat(row.querySelector(".quantity").value) || 0;
+        const sub   = price * qty;
+
+        row.querySelector(".subtotal").innerText = sub.toLocaleString();
+        total += sub;
     });
-    let d = parseFloat(document.querySelector("input[name='discount']").value)||0;
-    document.getElementById("totalDisplay").value = (total-d).toLocaleString();
+
+    const discountInput = document.querySelector("input[name='discount']");
+    const discount = discountInput ? (parseFloat(discountInput.value) || 0) : 0;
+
+    const totalDisplay = document.getElementById("totalDisplay");
+    totalDisplay.value = (total - discount).toLocaleString();
 }
 calculateTotal();
 </script>
