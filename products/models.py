@@ -37,7 +37,31 @@ class Product(models.Model):
         movements = self.order_items.aggregate(
         total=Sum(F("quantity") * F("direction")))["total"] or 0
         return self.stock + movements
-    
+    # حساب سعر التكلفة 
+    def get_avg_buy_price(self):
+        from orders.models import OrderItem
+
+        total_qty = 0
+        total_cost = 0
+
+        items = OrderItem.objects.filter(product=self).order_by("id")
+
+        for item in items:
+            if item.direction == 1:  # شراء
+                total_qty += item.quantity
+                total_cost += item.buy_price * item.quantity
+
+            elif item.direction == -1:  # بيع
+                total_qty -= item.quantity
+                total_cost -= item.buy_price * item.quantity
+
+            if total_qty <= 0:
+                return 0
+
+            return total_cost / total_qty
+
+######
+
 class ProductDetails(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="details")
     title = models.CharField(max_length=200)

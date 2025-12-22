@@ -52,6 +52,11 @@ class Order(models.Model):
         on_delete=models.CASCADE,
         related_name="orders"
     )
+    accounting_invoice_number = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="رقم الفاتورة في برنامج المحاسبة"
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 

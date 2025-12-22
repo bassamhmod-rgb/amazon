@@ -390,6 +390,7 @@ def order_create(request, store_slug):
             discount=request.POST.get("discount", 0),
             payment=request.POST.get("payment", 0),
             status="pending",
+
         )
 
         # 4) عناصر الطلب
@@ -412,7 +413,7 @@ def order_create(request, store_slug):
                     price=price,
                     quantity=qty,
                     direction=-1,
-                    buy_price=product.buy_price,
+                    buy_price = product.get_avg_buy_price()
                 )
             else:  # purchase
                 OrderItem.objects.create(

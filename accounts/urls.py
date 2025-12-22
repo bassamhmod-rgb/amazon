@@ -2,6 +2,7 @@ from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
 from .views import customer_logout
+from . import views_api
 
 app_name = "accounts"
 
@@ -15,5 +16,9 @@ urlpatterns = [
 
     path("<slug:store_slug>/customer/login/", views.customer_login, name="customer_login"),
     path("<slug:store_slug>/customer/quick-register/", views.quick_register, name="quick_register"),
+#لل api
+    path("api/customers/<int:merchant_id>/", views_api.merchant_customers_api),
+    path("api/suppliers/<int:merchant_id>/", views_api.merchant_suppliers_api),
+
 ]
 
