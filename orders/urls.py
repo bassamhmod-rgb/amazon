@@ -11,5 +11,6 @@ urlpatterns = [
     path("<slug:store_slug>/success/<int:order_id>/", views.order_success, name="success"),
 
   # ⭐ API مباشر بدون include
-    path("api/orders/<int:merchant_id>/", views_api.merchant_orders_api, name="merchant_orders_api"),
+    path("api/orders/<int:merchant_id>/", views_api.merchant_orders_api),
+    path("api/set-invoice-number/", views_api.set_invoice_number),
 ]
