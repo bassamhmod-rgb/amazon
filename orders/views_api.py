@@ -17,7 +17,9 @@ def merchant_orders_api(request, merchant_id):
 
     orders = Order.objects.filter(
         store=store,
+        status="confirmed",                 # ✅ فقط المؤكدة
         accounting_invoice_number__isnull=True
+   
     ).order_by("created_at")
 
     result = []
@@ -38,6 +40,7 @@ def merchant_orders_api(request, merchant_id):
             "transaction_type": order.transaction_type,  # sale / purchase
             "items_total": float(items_total),
             "payment": float(order.payment or 0),
+            "discount": float(order.discount or 0),      # ✅ الحسم
             "created_at": order.created_at.strftime("%Y-%m-%d"),
             "party_name": (
                 order.customer.name if order.customer

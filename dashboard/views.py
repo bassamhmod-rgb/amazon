@@ -379,7 +379,9 @@ def order_create(request, store_slug):
         if transaction_type == "purchase" and not supplier:
             messages.error(request, "يجب اختيار مورد لإتمام عملية الشراء.")
             return redirect("dashboard:order_create", store_slug=store.slug)
-
+            
+        status = "confirmed" if transaction_type == "purchase" else "pending"
+        
         # 3) إنشاء الطلب (❌ بدون total)
         order = Order.objects.create(
             store=store,
@@ -389,7 +391,7 @@ def order_create(request, store_slug):
             supplier=supplier if transaction_type == "purchase" else None,
             discount=request.POST.get("discount", 0),
             payment=request.POST.get("payment", 0),
-            status="pending",
+            status=status,
 
         )
 

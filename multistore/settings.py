@@ -57,7 +57,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "stores.context_processors.current_store",
-
+                "orders.context_processors.merchant_notifications",
             ],
         },
     },

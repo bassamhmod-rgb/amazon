@@ -180,10 +180,27 @@ button.btn-primary {
             {% endif %}
 
             {% if is_owner %}
-                <a href="/dashboard/{{ store.slug }}/" class="btn btn-warning">
-                    ⚙️ لوحة التحكم
-                </a>
-            {% endif %}
+<div class="d-flex align-items-center gap-2">
+
+    <a href="/dashboard/{{ store.slug }}/"
+       class="btn btn-warning">
+        ⚙️ لوحة التحكم
+    </a>
+
+    {% if unexported_orders_count > 0 %}
+        <span class="badge bg-danger fs-6">
+            طلبات للترحيل ({{ unexported_orders_count }})
+        </span>
+    {% else %}
+        <span class="badge bg-secondary fs-6">
+            طلبات للترحيل (0)
+        </span>
+    {% endif %}
+
+</div>
+{% endif %}
+
+
         </div>
     </div>
 </header>
