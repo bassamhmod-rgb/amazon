@@ -19,6 +19,15 @@ urlpatterns = [
 #لل api
     path("api/customers/<int:merchant_id>/", views_api.merchant_customers_api),
     path("api/suppliers/<int:merchant_id>/", views_api.merchant_suppliers_api),
-
-]
+    path(
+        "api/create_customer_from_access/",
+        views_api.create_customer_from_access,
+        name="create_customer_from_access"
+    ),
+    path(
+        "api/create_supplier_from_access/",
+        views_api.create_supplier_from_access,
+        name="create_supplier_from_access"
+    ),
+    ]
 

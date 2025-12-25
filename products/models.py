@@ -2,32 +2,72 @@ from django.db import models
 from stores.models import Store
 from django.db.models import Sum, F
 
-
 class Category(models.Model):
-    name = models.CharField(max_length=255)
     store = models.ForeignKey("stores.Store", on_delete=models.CASCADE, related_name="categories")
-    
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store", "name"],
+                name="unique_category_name_per_store"
+            ),
+        ]
+
     def __str__(self):
         return self.name
 
 
+
 class Product(models.Model):
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="products")
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="products"
+    )
+
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+
     price = models.DecimalField(max_digits=8, decimal_places=2)
     buy_price = models.DecimalField(
-    max_digits=10,
-    decimal_places=2,
-    default=0,
-    help_text="متوسط سعر شراء المنتج"
-)
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="متوسط سعر شراء المنتج"
+    )
 
     stock = models.IntegerField(default=0)
     main_image = models.ImageField(upload_to="products/", blank=True, null=True)
-    category = models.ForeignKey(Category,on_delete=models.SET_NULL,null=True,blank=True,related_name="products")
-    category2 = models.ForeignKey(Category,on_delete=models.SET_NULL,null=True,blank=True,related_name="secondary_products")
+
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="products"
+    )
+
+    category2 = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="secondary_products"
+    )
+
     active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store", "name"],
+                name="unique_product_name_per_store"
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
 
     def __str__(self):
         return self.name
