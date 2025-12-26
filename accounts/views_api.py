@@ -64,11 +64,17 @@ def create_customer_from_access(request):
 
     try:
         data = json.loads(request.body.decode("utf-8"))
-
+        
         merchant_id = data.get("store")   # ← نفس منطق التصدير
         name = data.get("name", "").strip()
         phone = data.get("phone", "").strip()
-
+        if name == "أخطاء التسجيل":
+            return JsonResponse({"status": "ignored"})
+        if name == "مرتجع إلى مورد":
+            return JsonResponse({"status": "ignored"})
+        if name == "اتلاف":
+            return JsonResponse({"status": "ignored"})
+        
         if not merchant_id or not name:
             return JsonResponse({"error": "بيانات ناقصة"}, status=400)
 
@@ -101,6 +107,11 @@ def create_customer_from_access(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from django.db.models import Q
+import json
+
 @csrf_exempt
 def create_supplier_from_access(request):
     if request.method != "POST":
@@ -110,22 +121,29 @@ def create_supplier_from_access(request):
         data = json.loads(request.body.decode("utf-8"))
 
         merchant_id = data.get("store")
-        name = data.get("name", "").strip()
-        phone = data.get("phone", "").strip()
+        name = (data.get("name") or "").strip()
+        phone = data.get("phone")
+        if name == "أخطاء التسجيل":
+            return JsonResponse({"status": "ignored"})
+        if name == "فاتورة بدء":
+            return JsonResponse({"status": "ignored"})
+        if name == "مرتجع من زبون":
+            return JsonResponse({"status": "ignored"})
+        # توحيد phone
+        if phone in ("", None):
+            phone = None
+        else:
+            phone = str(phone).strip()
 
         if not merchant_id or not name:
             return JsonResponse({"error": "بيانات ناقصة"}, status=400)
 
-        # نفس منطقكم: merchant_id → store
         store = Store.objects.filter(owner_id=merchant_id).first()
         if not store:
             return JsonResponse({"error": "Merchant not found"}, status=404)
 
-        if Supplier.objects.filter(
-            store=store
-        ).filter(
-            Q(name=name) | Q(phone=phone)
-        ).exists():
+        # منع التكرار بالاسم فقط
+        if Supplier.objects.filter(store=store, name=name).exists():
             return JsonResponse({"status": "exists"})
 
         Supplier.objects.create(

@@ -4,10 +4,12 @@ from products.models import Category
 from stores.models import Store
 from products.models import Product
 import json
+from django.db.models import F
 #تصدير
 @csrf_exempt
 def merchant_categories_api(request, merchant_id):
     store = Store.objects.filter(owner_id=merchant_id).first()
+    
     if not store:
         return JsonResponse([], safe=False)
 
@@ -30,11 +32,44 @@ def merchant_products_api(request, merchant_id):
         "name",
         "price",
         "description",
-        "category__name",
+       category_name=F("category__name"),
     )
 
     return JsonResponse(list(products), safe=False)
 #استيراد
+@csrf_exempt
+def create_category_from_access(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+
+        merchant_id = data.get("store")
+        name = data.get("name", "").strip()
+        if name == "بدون":
+            return JsonResponse({"status": "ignored"})
+        if not merchant_id or not name:
+            return JsonResponse({"error": "بيانات ناقصة"}, status=400)
+
+        store = Store.objects.filter(owner_id=merchant_id).first()
+        if not store:
+            return JsonResponse({"error": "Merchant not found"}, status=404)
+
+        # ✅ منع تكرار الفئة (مو المنتج)
+        if Category.objects.filter(store=store, name=name).exists():
+            return JsonResponse({"status": "exists"})
+
+        Category.objects.create(
+            store=store,
+            name=name
+        )
+
+        return JsonResponse({"status": "created"})
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
 @csrf_exempt
 def create_product_from_access(request):
     if request.method != "POST":

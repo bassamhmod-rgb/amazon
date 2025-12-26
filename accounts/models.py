@@ -1,5 +1,6 @@
 from django.db import models
 from stores.models import Store
+from django.db.models import Q
 
 class Customer(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
@@ -95,16 +96,18 @@ class Supplier(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["store", "name"],
-                name="unique_supplier_name_per_store"
-            ),
-            models.UniqueConstraint(
-                fields=["store", "phone"],
-                name="unique_supplier_phone_per_store"
-            ),
-        ]
+      constraints = [
+        models.UniqueConstraint(
+            fields=["store", "name"],
+            name="unique_supplier_name_per_store"
+        ),
+        models.UniqueConstraint(
+            fields=["store", "phone"],
+            condition=Q(phone__isnull=False) & ~Q(phone=""),
+            name="unique_supplier_phone_per_store_when_exists"
+        ),
+    ]
+
 
     def __str__(self):
         return self.name
