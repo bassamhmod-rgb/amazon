@@ -218,7 +218,15 @@
                    readonly value="0">
         </div>
     </div>
-
+<!-- ⭐ خانة الكاش باك -->
+<div class="row g-3 mt-3" id="cashbackBox" style="display:none;">
+<div class="col-md-4">
+<label class="fw-bold text-primary">الكاش باك (نقاط)</label>
+<input type="number" name="cashback_amount"
+       step="0.01" class="form-control en-num"
+       placeholder="محسوب تلقائياً ويمكن التعديل">
+</div>
+</div>
     <button class="btn btn-primary mt-4 px-4">💾 حفظ الطلب</button>
     <a href="{% url 'dashboard:orders_list' store.slug %}"
        class="btn btn-secondary mt-4 px-4">إلغاء</a>
@@ -229,10 +237,16 @@
 
 <!-- ===== كل السكربتات بدون أي نقص ===== -->
 <script>
+document.addEventListener("DOMContentLoaded", function () {
+    toggleTransactionFields();
+});
+</script>
+<script>
 function toggleTransactionFields() {
     let type = document.getElementById("transaction_type").value;
     document.getElementById("customerBox").style.display = type === "sale" ? "block" : "none";
     document.getElementById("supplierBox").style.display = type === "purchase" ? "block" : "none";
+    document.getElementById("cashbackBox").style.display = type === "sale" ? "block" : " remindingnone";
 }
 toggleTransactionFields();
 
@@ -455,10 +469,13 @@ function calculateTotal() {
 
         row.querySelector(".subtotal").innerText = sub.toLocaleString();
         total += sub;
+
     });
 
     let discount = parseFloat(document.querySelector("input[name='discount']").value) || 0;
     document.getElementById("totalDisplay").value = (total - discount).toLocaleString();
+    updateCashbackPreview();
+
 }
 </script>
 
@@ -485,6 +502,39 @@ arrow.onclick = () => {
     sidebar.classList.toggle("active");
     arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
 };
+</script>
+
+<script>
+function updateCashbackPreview() {
+    const rows = document.querySelectorAll("#orderItems tr");
+    let items = [];
+
+    rows.forEach(row => {
+        items.push({
+            product_id: row.querySelector("input[name='product_id[]']").value,
+            price: row.querySelector("input[name='price[]']").value,
+            quantity: row.querySelector("input[name='quantity[]']").value
+        });
+    });
+
+    if (items.length === 0) return;
+
+    fetch("/dashboard/stores/{{ store.slug }}/cashback-preview/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: JSON.stringify({ items: items })
+    })
+    .then(r => r.json())
+    .then(data => {
+        const input = document.querySelector("input[name='cashback_amount']");
+        if (input) {
+            input.value = data.cashback;
+        }
+    });
+}
 </script>
 
 </body>

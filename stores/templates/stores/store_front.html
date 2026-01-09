@@ -177,10 +177,21 @@ button.btn-primary {
                 <a href="{% url 'orders:customer_orders' store.slug %}" class="btn btn-outline-primary">
                     📦 طلباتي
                 </a>
-            {% endif %}
+                
+                <a href="{% url 'accounts:customer_logout' %}?next={{ request.path }}" class="btn btn-outline-primary">
+                    📦  تسجيل خروج
+                </a>
+                
 
-            {% if is_owner %}
-<div class="d-flex align-items-center gap-2">
+                {% endif %}
+                <a href="{% url 'accounts:customer_points' store.slug %}" class="btn btn-outline-primary">
+                    📦 رصيدي
+                </a>
+
+
+            
+{% if is_owner %}
+<div class="d-flex flex-column gap-2 align-items-start">
 
     <a href="/dashboard/{{ store.slug }}/"
        class="btn btn-warning">
@@ -199,7 +210,6 @@ button.btn-primary {
 
 </div>
 {% endif %}
-
 
         </div>
     </div>

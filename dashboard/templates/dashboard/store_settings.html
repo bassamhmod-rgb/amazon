@@ -204,6 +204,22 @@
                                  min="0" max="100"
                                  class="form-control">
                         </div>
+                        <!-- ⭐ نسبة الكاش باك من ربح الطلب -->
+<div class="mb-3">
+  <label class="form-label">
+      نسبة الكاش باك من ربح الطلب (%)
+  </label>
+  <input type="number"
+         name="cashback_percentage"
+         value="{{ store.cashback_percentage }}"
+         min="0"
+         max="100"
+         step="0.01"
+         class="form-control">
+  <div class="text-muted mt-1" style="font-size:13px;">
+      مثال: 2.5 = 2.5% من ربح الطلب يتم إرجاعها كاش باك.
+  </div>
+</div>
 
                         <!-- الوصفات -->
                         <div class="col-md-12">

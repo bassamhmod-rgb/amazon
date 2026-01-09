@@ -28,6 +28,13 @@ path("<slug:store_slug>/search-products/", views.search_products, name="search_p
 path("<slug:store_slug>/search-customers/", views.search_customers, name="search_customers"),
 path("<slug:store_slug>/orders/<int:order_id>/edit/", views.order_update, name="order_update"),
 path("<slug:store_slug>/dashboard/order/<int:order_id>/",views.order_detail_dashboard,name="order_detail_dashboard"),
+#لاظهار الكاش باك
+path(
+    "stores/<slug:store_slug>/cashback-preview/",
+    views.cashback_preview,
+    name="cashback_preview"
+),
+
 #موردين
 path("<slug:store_slug>/suppliers/", views.suppliers_list, name="suppliers_list"),
 path("<slug:store_slug>/suppliers/create/", views.supplier_create, name="supplier_create"),
@@ -42,6 +49,12 @@ path("<slug:store_slug>/customers/add/", views.customer_create, name="customer_c
 path("<slug:store_slug>/customers/<int:customer_id>/delete/", views.delete_customer, name="delete_customer"),
 # ادارة النقاط
 path("<slug:store_slug>/points/", views.points_page, name="points_page"),
+path(
+    "stores/<slug:store_slug>/points/delete/<int:transaction_id>/",
+    views.delete_points_transaction,
+    name="delete_points_transaction"
+),
+
 #اعدادات
 path("<slug:store_slug>/settings/", views.store_settings, name="store_settings"),
 

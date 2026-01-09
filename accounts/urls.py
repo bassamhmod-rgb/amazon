@@ -3,6 +3,7 @@ from django.contrib.auth import views as auth_views
 from . import views
 from .views import customer_logout
 from . import views_api
+from .views import customer_points
 
 app_name = "accounts"
 
@@ -13,6 +14,7 @@ urlpatterns = [
 
     path("customer/register/<slug:store_slug>/", views.customer_register, name="customer_register"),
     path("customer/logout/", customer_logout, name="customer_logout"),
+
 
     path("<slug:store_slug>/customer/login/", views.customer_login, name="customer_login"),
     path("<slug:store_slug>/customer/quick-register/", views.quick_register, name="quick_register"),
@@ -29,5 +31,34 @@ urlpatterns = [
         views_api.create_supplier_from_access,
         name="create_supplier_from_access"
     ),
+    path(
+        "api/merchant/<int:merchant_id>/points/export/",
+        views_api.merchant_points_export_api,
+        name="merchant_points_export"
+    ),
+    path(
+        "api/merchant/points/confirm/",
+        views_api.merchant_points_confirm_api,
+        name="merchant_points_confirm"
+    ),
+    # 🔹 استيراد النقاط من الأكسس إلى المتجر
+    path(
+        "api/merchant/<int:merchant_id>/points/import/",
+        views_api.create_cashback_from_access,
+        name="create_cashback_from_access"
+    ),
+
+    path(
+        "api/get-customer-id/",
+        views_api.get_customer_id_for_access,
+        name="get_customer_id_for_access"
+    ),
+    #مسار صفحة النقاط للزبون
+    path(
+        "<slug:store_slug>/points/", customer_points, name="customer_points"),
+#مسار الدخول للنقاط
+path("<slug:store_slug>/customer/login/", views.customer_points_login, name="customer_points_login"),
+
+   #path("<slug:store_slug>/customer/login/", views.customer_login, name="customer_login"),
     ]
 

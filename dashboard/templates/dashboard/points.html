@@ -55,7 +55,7 @@
             display:none;
         }
 
-        /* ===== MOBILE (نفس صفحة المنتجات) ===== */
+        /* ===== MOBILE ===== */
         @media (max-width:768px){
             .sidebar{ right:-260px; }
             .sidebar.active{ right:0; }
@@ -85,7 +85,6 @@
                 user-select:none;
             }
 
-            /* الجداول */
             .table-responsive{
                 overflow-x:auto;
                 -webkit-overflow-scrolling:touch;
@@ -107,13 +106,10 @@
 
 <body>
 
-<!-- سهم السايدبار -->
 <div id="sidebarArrow">❯</div>
 
-<!-- Sidebar -->
 {% include "dashboard/sidebar.html" %}
 
-<!-- Content -->
 <div class="content">
 
     <h3 class="mb-4">الرصيد</h3>
@@ -173,6 +169,7 @@
                         <th>النوع</th>
                         <th>ملاحظة</th>
                         <th>التاريخ</th>
+                        <th>حذف</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -188,10 +185,18 @@
                         </td>
                         <td>{{ item.note|default:"—" }}</td>
                         <td>{{ item.created_at|date:"Y/m/d H:i" }}</td>
+                        <td>
+                            <form method="post"
+                                  action="{% url 'dashboard:delete_points_transaction' store.slug item.id %}"
+                                  onsubmit="return confirm('هل أنت متأكد من حذف هذا السجل؟');">
+                                {% csrf_token %}
+                                <button class="btn btn-sm btn-danger">🗑</button>
+                            </form>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center text-muted">
+                        <td colspan="5" class="text-center text-muted">
                             لا يوجد حركات.
                         </td>
                     </tr>

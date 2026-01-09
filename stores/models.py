@@ -4,6 +4,7 @@ from django.utils.text import slugify
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from PIL import Image, ImageOps
+from decimal import Decimal
 
 class Store(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="stores")
@@ -29,6 +30,13 @@ class Store(models.Model):
         help_text="ارتفاع صورة الهيرو بالبكسل"
     )
 
+    # ⭐ نسبة الكاش باك من ربح الطلب (٪)
+    cashback_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="نسبة الكاش باك من ربح الطلب (مثال: 5 = 5%)"
+    )
     hero_fit = models.CharField(
         max_length=10,
         choices=[

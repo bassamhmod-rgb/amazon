@@ -1,6 +1,9 @@
 from django.db import models
 from stores.models import Store
 from django.db.models import Sum, F
+from decimal import Decimal
+from orders.models import OrderItem
+
 
 class Category(models.Model):
     store = models.ForeignKey("stores.Store", on_delete=models.CASCADE, related_name="categories")
@@ -19,6 +22,7 @@ class Category(models.Model):
 
 
 
+
 class Product(models.Model):
     store = models.ForeignKey(
         Store,
@@ -30,6 +34,7 @@ class Product(models.Model):
     description = models.TextField(blank=True)
 
     price = models.DecimalField(max_digits=8, decimal_places=2)
+
     buy_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -41,7 +46,7 @@ class Product(models.Model):
     main_image = models.ImageField(upload_to="products/", blank=True, null=True)
 
     category = models.ForeignKey(
-        Category,
+        "products.Category",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -49,7 +54,7 @@ class Product(models.Model):
     )
 
     category2 = models.ForeignKey(
-        Category,
+        "products.Category",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -66,39 +71,53 @@ class Product(models.Model):
             ),
         ]
 
-    
     def __str__(self):
         return self.name
-# ⭐⭐⭐ المخزون الحقيقي = مجموع (الكمية × الاتجاه)
+
+    # ⭐⭐⭐ المخزون الحقيقي = المخزون الابتدائي + الحركات
     @property
     def real_stock(self):
         movements = self.order_items.aggregate(
-        total=Sum(F("quantity") * F("direction")))["total"] or 0
+            total=Sum(F("quantity") * F("direction"))
+        )["total"] or 0
         return self.stock + movements
-    # حساب سعر التكلفة 
-    def get_avg_buy_price(self):
-        from orders.models import OrderItem
 
-        total_qty = 0
-        total_cost = 0
+    # ⭐ حساب متوسط سعر الشراء (آمن 100%)
+    def get_avg_buy_price(self):
+        total_qty = Decimal("0")
+        total_cost = Decimal("0")
 
         items = OrderItem.objects.filter(product=self).order_by("id")
 
         for item in items:
+            qty = Decimal(item.quantity or 0)
+
+            # ⛑️ حماية من None بالبيانات القديمة
+            buy_price = (
+                Decimal(item.buy_price)
+                if item.buy_price is not None
+                else Decimal("0")
+            )
+
+            cost = buy_price * qty
+
             if item.direction == 1:  # شراء
-                total_qty += item.quantity
-                total_cost += item.buy_price * item.quantity
+                total_qty += qty
+                total_cost += cost
 
             elif item.direction == -1:  # بيع
-                total_qty -= item.quantity
-                total_cost -= item.buy_price * item.quantity
+                total_qty -= qty
+                total_cost -= cost
 
+            # إذا انتهى المخزون نعيد الحساب
             if total_qty <= 0:
-                return 0
+                total_qty = Decimal("0")
+                total_cost = Decimal("0")
 
+        if total_qty > 0:
             return total_cost / total_qty
 
-######
+        return Decimal("0")
 
 class ProductDetails(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="details")

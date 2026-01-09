@@ -6,7 +6,6 @@ from django.http import JsonResponse
 from django.contrib.auth.models import User
 from django.db.models import Sum
 from products.models import ProductDetails ,Product, ProductGallery
-
 # --- استيراد المودلز من التطبيقات المختلفة ---
 from products.models import Category, Product
 from products.forms import CategoryForm, ProductForm
@@ -23,6 +22,8 @@ from django.db.models import Q
 from accounts.models import Supplier
 from django.http import JsonResponse
 # أما إذا كنت ناقله كمان لـ accounts، الغي السطر اللي فوق واستخدم هاد:
+from decimal import Decimal, InvalidOperation
+from django.db.models import Sum
 
 @login_required
 def dashboard_home(request, store_slug):
@@ -324,31 +325,119 @@ def order_detail_dashboard(request, store_slug, order_id):
     required_amount = 0
 
     if required_percent > 0:
-        # نستخدم صافي الدفع لأنّه الأنسب في الطلب
         required_amount = (order.net_total * required_percent) / 100
+
+    # 👁️ تعليم الطلب كمقروء
     if not order.is_seen_by_store:
         order.is_seen_by_store = True
         order.save(update_fields=["is_seen_by_store"])
+
+    # ===============================
+    # 🎁 حساب الكاش باك (للبيع فقط)
+    # ===============================
+    total_profit = 0
+    suggested_cashback = 0
+    has_cashback = False
+
+    if order.transaction_type == "sale" and order.customer:
+        for item in order.items.all():
+            buy_price = item.buy_price or 0
+            total_profit += (item.price - buy_price) * item.quantity
+
+        percent = store.cashback_percentage or 0
+        suggested_cashback = (total_profit * percent) / 100 if total_profit > 0 else 0
+
+        # 🛡️ هل تم تسجيل كاش باك سابقًا؟
+        has_cashback = PointsTransaction.objects.filter(
+            customer=order.customer,
+            note=f"كاش باك من طلب بيع رقم {order.id}"
+        ).exists()
 
     return render(request, "dashboard/order_detail_dashboard.html", {
         "store": store,
         "order": order,
 
-        # ⭐ نرسل البيانات للصفحة
+        # الدفع المسبق
         "required_percent": required_percent,
         "required_amount": required_amount,
+
+        # الكاش باك
+        "total_profit": total_profit,
+        "suggested_cashback": suggested_cashback,
+        "has_cashback": has_cashback,
     })
+
 #تأكيد الطلب
 @login_required
 def confirm_order(request, store_slug, order_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
     order = get_object_or_404(Order, id=order_id, store=store)
 
+    # تأكيد الطلب
     order.status = "confirmed"
-    order.save()
+    order.save(update_fields=["status"])
+
+    # ===============================
+    # 🎁 حفظ الكاش باك (للبيع فقط)
+    # ===============================
+    if order.transaction_type == "sale" and order.customer:
+
+        # منع التكرار
+        exists = PointsTransaction.objects.filter(
+            customer=order.customer,
+            note=f"كاش باك من طلب بيع رقم {order.id}"
+        ).exists()
+
+        if not exists:
+            cashback_raw = request.POST.get("cashback_amount", "").strip()
+
+            try:
+                cashback_value = Decimal(cashback_raw) if cashback_raw != "" else Decimal("0")
+            except:
+                cashback_value = Decimal("0")
+
+            if cashback_value > 0:
+                PointsTransaction.objects.create(
+                    customer=order.customer,
+                    customer_name=str(order.customer),
+                    points=cashback_value,
+                    transaction_type="add",
+                    note=f"كاش باك من طلب بيع رقم {order.id}",
+                )
 
     return redirect("dashboard:order_detail_dashboard", store_slug=store.slug, order_id=order.id)
-# إضافة طلب (بيع + شراء)
+
+#اضافة طلب من التاجر بيع او شراء
+
+
+
+from decimal import Decimal, InvalidOperation
+
+def _to_decimal(val, default="0"):
+    try:
+        # إذا القيمة Decimal أصلًا
+        if isinstance(val, Decimal):
+            return val
+
+        # إذا None
+        if val is None:
+            return Decimal(default)
+
+        # إذا رقم (int / float)
+        if isinstance(val, (int, float)):
+            return Decimal(str(val))
+
+        # إذا نص
+        val = str(val).strip()
+        if val == "":
+            return Decimal(default)
+
+        return Decimal(val)
+
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal(default)
+
+
 @login_required
 def order_create(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -379,10 +468,10 @@ def order_create(request, store_slug):
         if transaction_type == "purchase" and not supplier:
             messages.error(request, "يجب اختيار مورد لإتمام عملية الشراء.")
             return redirect("dashboard:order_create", store_slug=store.slug)
-            
-        status = "confirmed" if transaction_type == "purchase" else "pending"
-        
-        # 3) إنشاء الطلب (❌ بدون total)
+
+        status = "confirmed"
+
+        # 3) إنشاء الطلب
         order = Order.objects.create(
             store=store,
             user=request.user,
@@ -392,7 +481,6 @@ def order_create(request, store_slug):
             discount=request.POST.get("discount", 0),
             payment=request.POST.get("payment", 0),
             status=status,
-
         )
 
         # 4) عناصر الطلب
@@ -400,23 +488,31 @@ def order_create(request, store_slug):
         prices   = request.POST.getlist("price[]")
         qtys     = request.POST.getlist("quantity[]")
 
+        total_profit = Decimal("0")  # فقط للبيع
+
         for i in range(len(products)):
             product = Product.objects.filter(id=products[i], store=store).first()
             if not product:
                 continue
 
-            price = float(prices[i])
-            qty   = float(qtys[i])
+            price = _to_decimal(prices[i])
+            qty   = _to_decimal(qtys[i])
 
             if transaction_type == "sale":
+                buy_price = _to_decimal(product.get_avg_buy_price())
+
                 OrderItem.objects.create(
                     order=order,
                     product=product,
                     price=price,
                     quantity=qty,
                     direction=-1,
-                    buy_price = product.get_avg_buy_price()
+                    buy_price=buy_price,
                 )
+
+                # الربح = (سعر البيع - سعر الشراء) * الكمية
+                total_profit += (price - buy_price) * qty
+
             else:  # purchase
                 OrderItem.objects.create(
                     order=order,
@@ -427,11 +523,39 @@ def order_create(request, store_slug):
                     buy_price=price,
                 )
 
+        # 5) ⭐ إضافة النقاط (الكاش باك) — فقط عند البيع
+        if transaction_type == "sale" and customer:
+
+            cashback_manual = (request.POST.get("cashback_amount") or "").strip()
+
+            try:
+                if cashback_manual != "":
+                    points_value = Decimal(cashback_manual)
+                else:
+                    percent = store.cashback_percentage or Decimal("0")
+                    points_value = (total_profit * percent) / Decimal("100")
+            except InvalidOperation:
+                points_value = Decimal("0")
+
+            # حماية
+            if points_value < 0:
+                points_value = Decimal("0")
+
+            if points_value > 0:
+                PointsTransaction.objects.create(
+                    customer=customer,
+                    customer_name=str(customer),
+                    points=points_value,
+                    transaction_type="add",
+                    note=f"كاش باك من طلب بيع رقم {order.id}",
+                )
+
         return redirect("dashboard:orders_list", store_slug=store.slug)
 
     return render(request, "dashboard/order_create.html", {
         "store": store
     })
+
 # تعديل الطلب (بيع + شراء) — بدون حقول supplier
 @login_required
 def order_update(request, store_slug, order_id):
@@ -504,6 +628,7 @@ def order_update(request, store_slug, order_id):
         "order": order,
         "new_orders_count": new_orders_count,
     })
+
 #فلترة طلبات
 #بالحالة
 #برقم الطلب
@@ -711,6 +836,23 @@ def points_page(request, store_slug):
         "balance": balance,
         "history": PointsTransaction.objects.filter(customer=customer).order_by("-id") if customer else [],
     })
+#حذف سجل نقاط
+@login_required
+def delete_points_transaction(request, store_slug, transaction_id):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+
+    transaction = get_object_or_404(
+        PointsTransaction,
+        id=transaction_id
+    )
+
+    transaction.delete()
+
+    messages.success(request, "🗑 تم حذف سجل النقاط بنجاح.")
+
+    # ✅ رجوع لنفس صفحة الرصيد بدون أسماء مسارات
+    return redirect(request.META.get("HTTP_REFERER", "/"))
+
 
 # اعدادات التاجر
 
@@ -764,6 +906,24 @@ def store_settings(request, store_slug):
         percent = request.POST.get("payment_required_percentage", "").strip()
         if percent.isdigit():
             store.payment_required_percentage = int(percent)
+
+        # ⭐ 7) نسبة الكاش باك من ربح الطلب
+        from decimal import Decimal, InvalidOperation
+
+        cashback = request.POST.get("cashback_percentage", "").strip()
+
+        try:
+           if cashback != "":
+              cashback_value = Decimal(cashback)
+
+              if Decimal("0") <= cashback_value <= Decimal("100"):
+                 store.cashback_percentage = cashback_value
+              else:
+                 messages.error(request, "⚠️ نسبة الكاش باك يجب أن تكون بين 0 و 100.")
+                 return redirect(f"/dashboard/{store.slug}/settings/")
+        except InvalidOperation:
+            messages.error(request, "⚠️ قيمة نسبة الكاش باك غير صحيحة.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
 
         # 🖼️ 7) إعدادات صورة الهيرو (الجديدة)
         hero_height = request.POST.get("hero_height", "").strip()
@@ -862,4 +1022,38 @@ def delete_supplier(request, store_slug, supplier_id):
     return render(request, "dashboard/delete_supplier.html", {
         "store": store,
         "supplier": supplier,
+    })
+# اظهار قيمة الكاش باك بالطلب و تعديلو و تفاصيلو
+# dashboard/views.py
+
+import json
+@login_required
+def cashback_preview(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+
+    data = json.loads(request.body)
+    total_cashback = Decimal("0")
+
+    for item in data.get("items", []):
+        # ⛑️ حماية
+        if not item.get("product_id"):
+            continue
+
+        price = Decimal(item.get("price") or 0)
+        qty = Decimal(item.get("quantity") or 0)
+
+        if qty <= 0 or price <= 0:
+            continue
+
+        product = Product.objects.get(id=item["product_id"], store=store)
+        buy_price = product.get_avg_buy_price()
+
+        profit = (price - buy_price) * qty
+        if profit > 0:
+            total_cashback += (
+                profit * Decimal(store.cashback_percentage) / Decimal("100")
+            )
+
+    return JsonResponse({
+        "cashback": float(total_cashback.quantize(Decimal("0.01")))
     })

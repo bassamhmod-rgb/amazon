@@ -40,9 +40,15 @@ class Customer(models.Model):
                 name="unique_customer_phone_per_store"
             ),
         ]
+    def save(self, *args, **kwargs):
+        # 🔐 ضمان الاسم: إذا فاضي → خليه رقم الهاتف
+        if not self.name:
+            self.name = self.phone
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} - {self.phone}"
+    
 
     
 
@@ -56,11 +62,16 @@ class PointsTransaction(models.Model):
     ]
 
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="points")
-    points = models.IntegerField()
+    customer_name = models.CharField(max_length=150)
+    points = models.DecimalField(max_digits=10, decimal_places=2)
     transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
     note = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    access_id = models.IntegerField(
+        blank=True,
+        null=True,
+        help_text="رقم السجل في جدول الكاش باك ببرنامج المحاسبة"
+    )
     def __str__(self):
         return f"{self.customer} - {self.points} pts ({self.transaction_type})"
 # الموردين

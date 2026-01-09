@@ -3,8 +3,12 @@ from django.views.decorators.csrf import csrf_exempt
 from accounts.models import Customer
 from stores.models import Store
 from accounts.models import Supplier
+from .models import PointsTransaction
+from django.shortcuts import get_object_or_404
+from django.utils.dateparse import parse_datetime
 
 #تصدير
+# تصدير العملاء من المتجر إلى الأكسس
 @csrf_exempt
 def merchant_customers_api(request, merchant_id):
     """
@@ -16,6 +20,7 @@ def merchant_customers_api(request, merchant_id):
         return JsonResponse({"error": "Merchant not found"}, status=404)
 
     customers = Customer.objects.filter(store=store).values(
+        "id",        # ← هذا هو المفتاح الذهبي
         "name",
         "phone",
     )
@@ -45,6 +50,50 @@ def merchant_suppliers_api(request, merchant_id):
         "merchant_id": merchant_id,
         "suppliers": list(suppliers)
     })
+
+#نقل الكاش باك
+@csrf_exempt
+def merchant_points_export_api(request, merchant_id):
+    store = Store.objects.filter(owner_id=merchant_id).first()
+    if not store:
+        return JsonResponse({"error": "Merchant not found"}, status=404)
+
+    points = PointsTransaction.objects.filter(
+        customer__store=store,
+        access_id__isnull=True
+    ).select_related("customer")
+
+    data = []
+    for p in points:
+        data.append({
+            "id": p.id,  # 🔑 مهم نرجع نربط عليه
+            "rkmamel_m": p.customer_id,
+            "asm": p.customer.name,
+            "amount": p.points,
+            "trans_date": p.created_at.strftime("%Y-%m-%d"),
+            "note": p.note or "",
+        })
+
+    return JsonResponse({
+        "merchant_id": merchant_id,
+        "points": data
+    })
+#ارجاع رقم السجل
+@csrf_exempt
+def merchant_points_confirm_api(request):
+    import json
+
+    data = json.loads(request.body)
+
+    for item in data:
+        PointsTransaction.objects.filter(
+            id=int(item["points_id"])   # 🔴 تحويل صريح
+        ).update(
+            access_id=int(item["access_id"])
+        )
+
+    return JsonResponse({"status": "ok"})
+
 
 ## استيراد من البرنامج
 
@@ -153,6 +202,93 @@ def create_supplier_from_access(request):
         )
 
         return JsonResponse({"status": "created"})
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+# استيراد الكاش باك
+from datetime import datetime
+from django.utils.dateparse import parse_date
+from datetime import datetime
+
+@csrf_exempt
+def create_cashback_from_access(request, merchant_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+
+        rkmamel = data.get("rkmamel")  # رقم العميل بالبرنامج
+        customer_name = (data.get("customer_name") or "").strip()
+        amount = data.get("amount")
+        trans_date = data.get("trans_date")
+        note = data.get("note", "")
+
+        if not customer_name or amount is None or not trans_date:
+            return JsonResponse({"error": "بيانات ناقصة"}, status=400)
+
+        store = Store.objects.filter(owner_id=merchant_id).first()
+        if not store:
+            return JsonResponse({"error": "Merchant not found"}, status=404)
+
+        customer = Customer.objects.filter(
+            store=store,
+            name=customer_name
+        ).first()
+
+        if not customer:
+            return JsonResponse({
+                "error": "العميل غير موجود بالمتجر",
+                "customer_name": customer_name
+            }, status=400)
+
+        date_only = parse_date(trans_date)
+        if not date_only:
+            return JsonResponse({"error": "Invalid trans_date"}, status=400)
+
+        created_at = datetime.combine(date_only, datetime.min.time())
+
+        pt = PointsTransaction.objects.create(
+            customer=customer,
+            access_id=rkmamel,
+            points=int(amount),
+            created_at=created_at,
+            note=note
+        )
+
+        # 🔑 نرجّع ID سجل النقاط
+        return JsonResponse({
+            "status": "created",
+            "points_id": pt.id
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+# لترجيع رقم العميل للأكسس
+@csrf_exempt
+def get_customer_id_for_access(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        access_row_id = data.get("access_row_id")
+
+        if not access_row_id:
+            return JsonResponse({"error": "Missing access_row_id"}, status=400)
+
+        pt = PointsTransaction.objects.filter(
+            access_id=access_row_id
+        ).select_related("customer").first()
+
+        if not pt or not pt.customer_id:
+            return JsonResponse({"error": "Not found"}, status=404)
+
+        return JsonResponse({
+            "access_row_id": access_row_id,
+            "customer_id": pt.customer_id
+        })
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
