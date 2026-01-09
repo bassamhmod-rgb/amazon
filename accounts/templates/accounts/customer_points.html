@@ -228,22 +228,23 @@
 
     <!-- Summary -->
     <div class="points-summary">
-        <div class="card total">
-            <span class="label">الرصيد الكلي</span>
-            <span class="value">{{ total_points }}</span>
-        </div>
-
-        <div class="card blocked">
-            <span class="label">نقاط معلّقة</span>
-            <span class="value">{{ blocked_points }}</span>
-            <small>آخر 3 طلبات</small>
-        </div>
-
-        <div class="card withdrawable">
-            <span class="label">القابل للسحب</span>
-            <span class="value">{{ withdrawable_points }}</span>
-        </div>
+    <div class="card total">
+        <span class="label">الرصيد الكلي</span>
+        <span class="value">{{ total_points|floatformat:2 }}</span>
     </div>
+
+    <div class="card blocked">
+        <span class="label">نقاط معلّقة</span>
+        <span class="value">{{ blocked_points|floatformat:2 }}</span>
+        <small>آخر 3 طلبات</small>
+    </div>
+
+    <div class="card withdrawable">
+        <span class="label">القابل للسحب</span>
+        <span class="value">{{ withdrawable_points|floatformat:2 }}</span>
+    </div>
+</div>
+
 
     <!-- Transactions -->
     <h3 class="section-title">📋 سجل العمليات</h3>
@@ -264,8 +265,9 @@
                     <td>{{ t.created_at|date:"Y-m-d H:i" }}</td>
                     <td>{{ t.get_transaction_type_display }}</td>
                     <td class="{% if t.points < 0 %}minus{% else %}plus{% endif %}">
-                        {{ t.points }}
-                    </td>
+    {{ t.points|floatformat:2 }}
+</td>
+
                     <td>{{ t.note|default:"—" }}</td>
                 </tr>
                 {% empty %}

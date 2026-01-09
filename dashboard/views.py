@@ -787,29 +787,40 @@ def delete_customer(request, store_slug, customer_id):
         "customer": customer,
     })
 
-#ادارة النقاط
+# ادارة النقاط
+
 def points_page(request, store_slug):
 
-    # ✅ دائماً لازم نجيب المتجر أول شي
+    # ✅ دائماً نجيب المتجر أول شي
     store = get_object_or_404(Store, slug=store_slug)
 
     customer_id = request.GET.get("customer")
     customer = None
-    balance = 0
+    balance = Decimal("0.0")
 
     # إذا تم اختيار زبون
     if customer_id:
-        customer = get_object_or_404(Customer, id=customer_id)
+        customer = get_object_or_404(Customer, id=customer_id, store=store)
 
-        balance = PointsTransaction.objects.filter(customer=customer).aggregate(
-            total=Sum("points")
-        )["total"] or 0
+        balance = (
+            PointsTransaction.objects
+            .filter(customer=customer)
+            .aggregate(total=Sum("points"))["total"]
+            or Decimal("0.0")
+        )
 
         # إذا في POST (إضافة أو خصم نقاط)
         if request.method == "POST":
-            value = int(request.POST.get("points"))
+            raw_value = request.POST.get("points")
             note = request.POST.get("note", "")
 
+            try:
+                value = Decimal(raw_value)
+            except (TypeError, InvalidOperation):
+                messages.error(request, "❌ قيمة النقاط غير صالحة")
+                return redirect(f"/dashboard/{store_slug}/points/?customer={customer.id}")
+
+            # تحديد نوع العملية
             if value > 0:
                 transaction_type = "add"
             elif value < 0:
@@ -819,10 +830,13 @@ def points_page(request, store_slug):
 
             PointsTransaction.objects.create(
                 customer=customer,
+                customer_name=str(customer),
                 points=value,
                 transaction_type=transaction_type,
                 note=note,
             )
+
+            messages.success(request, "✅ تم تعديل الرصيد بنجاح")
 
             return redirect(f"/dashboard/{store_slug}/points/?customer={customer.id}")
 
@@ -830,12 +844,18 @@ def points_page(request, store_slug):
     customers = Customer.objects.filter(store=store)
 
     return render(request, "dashboard/points.html", {
-        "store": store,                              # ← مهم لعرض اسم المتجر
+        "store": store,
         "customers": customers,
         "selected_customer": customer,
         "balance": balance,
-        "history": PointsTransaction.objects.filter(customer=customer).order_by("-id") if customer else [],
+        "history": (
+            PointsTransaction.objects
+            .filter(customer=customer)
+            .order_by("-id")
+            if customer else []
+        ),
     })
+
 #حذف سجل نقاط
 @login_required
 def delete_points_transaction(request, store_slug, transaction_id):
