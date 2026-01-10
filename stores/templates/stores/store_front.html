@@ -152,6 +152,13 @@ button.btn-primary {
     display:block;
 }
 
+.main-header {
+    z-index: 2000;
+}
+
+.dropdown-menu {
+    z-index: 3000;
+}
 
 </style>
 </head>
@@ -237,11 +244,11 @@ button.btn-primary {
     </a>
 {% endif %}
 {% if is_owner %}
-            <li>
+            
                 <a href="/dashboard/{{ store.slug }}/" class="btn btn-outline-danger d-none d-md-inline">
                     ⚙️ لوحة التحكم
                 </a>
-            </li>
+            
              <!-- طلبات للترحيل -->
     
     {% if unexported_orders_count > 0 %}
