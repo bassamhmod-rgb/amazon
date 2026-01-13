@@ -273,12 +273,13 @@
                         <div class="col-md-6">
                             <label class="form-label">طريقة عرض صورة الهيرو</label>
                             <select class="form-select" name="hero_fit">
-                                <option value="contain" {% if store.hero_fit == "contain" %}selected{% endif %}>
-                                    احتواء (بدون قص)
-                                </option>
                                 <option value="cover" {% if store.hero_fit == "cover" %}selected{% endif %}>
                                     ملء (مع قص)
                                 </option>
+                                <option value="contain" {% if store.hero_fit == "contain" %}selected{% endif %}>
+                                    احتواء (بدون قص)
+                                </option>
+                                
                             </select>
                             <div class="text-muted mt-1" style="font-size:13px;">
                                 احتواء = يحافظ على الصورة كاملة. ملء = يملأ الإطار لكنه قد يقص الأطراف.

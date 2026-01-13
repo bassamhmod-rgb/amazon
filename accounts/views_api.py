@@ -292,3 +292,67 @@ def get_customer_id_for_access(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+#للاشعارات
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from .models import SystemNotification, AccountingClient
+from django.db.models import Q
+from django.db import models
+
+
+@csrf_exempt
+def accounting_notifications(request):
+    access_id = request.GET.get("access_id")
+
+    if not access_id:
+        return JsonResponse({"error": "access_id required"}, status=400)
+
+    try:
+        client = AccountingClient.objects.select_related("store").get(
+            access_id=access_id
+        )
+    except AccountingClient.DoesNotExist:
+        return JsonResponse({"error": "invalid access_id"}, status=403)
+
+    now = timezone.now()
+
+    notifications = (
+        SystemNotification.objects
+        .filter(channel__in=["accounting", "both"])
+        .filter(
+            Q(is_global=True) |
+            Q(target_store=client.store) |
+            Q(target_accounting_client=client)
+        )
+        .filter(
+            Q(expires_at__isnull=True) |
+            Q(expires_at__gt=now)
+        )
+        .order_by("id")
+    )
+
+    data = []
+    max_id = client.last_notification_id
+
+    for n in notifications:
+        if n.id > client.last_notification_id:
+            data.append({
+                "id": n.id,
+                "title": n.title,
+                "message": n.message,
+                "severity": n.severity,
+                "created_at": n.created_at.isoformat(),
+            })
+            max_id = max(max_id, n.id)
+
+    # 🔥 التحديث الإجباري
+    if max_id > client.last_notification_id:
+        client.last_notification_id = max_id
+        client.last_seen = now
+        client.save(update_fields=["last_notification_id", "last_seen"])
+
+    return JsonResponse(
+        {"notifications": data},
+        json_dumps_params={"ensure_ascii": False}
+    )

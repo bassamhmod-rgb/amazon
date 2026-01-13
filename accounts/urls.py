@@ -4,6 +4,7 @@ from . import views
 from .views import customer_logout
 from . import views_api
 from .views import customer_points
+from .views_api import accounting_notifications
 
 app_name = "accounts"
 
@@ -60,5 +61,14 @@ urlpatterns = [
 path("<slug:store_slug>/customer/login/", views.customer_points_login, name="customer_points_login"),
 
    #path("<slug:store_slug>/customer/login/", views.customer_login, name="customer_login"),
+  # للاشعارات
+  # from django.urls import path
+
+path(
+        "api/accounting/notifications/",
+        accounting_notifications,
+        name="accounting_notifications"
+    ),
+  
     ]
 
