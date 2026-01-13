@@ -240,3 +240,13 @@ def customer_points_login(request, store_slug):
         "store": store,
         "message": message,
     })
+#عند حصول خطأ
+from django.shortcuts import redirect
+from django.contrib import messages
+
+def csrf_failure(request, reason=""):
+    messages.warning(
+        request,
+        "انتهت الجلسة، يرجى إعادة المحاولة."
+    )
+    return redirect("accounts:merchant_login")

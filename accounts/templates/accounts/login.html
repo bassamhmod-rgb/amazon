@@ -100,6 +100,14 @@
         <div class="login-container">
 
             <h2 class="text-center login-title mb-3">تسجيل دخول التاجر</h2>
+{% if messages %}
+  {% with messages|first as message %}
+    <div class="alert alert-{{ message.tags }} text-center"
+         style="border-radius:12px;">
+        {{ message }}
+    </div>
+  {% endwith %}
+{% endif %}
 
             <form method="post">
                 {% csrf_token %}
