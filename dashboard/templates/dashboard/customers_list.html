@@ -146,8 +146,7 @@
                                   style="display:inline;">
                                 {% csrf_token %}
                                 <button type="submit"
-                                        class="btn btn-sm btn-danger"
-                                        onclick="return confirm('هل أنت متأكد من حذف العميل؟');">
+                                        class="btn btn-danger js-confirm-delete">
                                     حذف
                                 </button>
                             </form>
@@ -177,6 +176,6 @@
         arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
     };
 </script>
-
+<script src="{% static 'js/confirm_delete.js' %}"></script>
 </body>
 </html>

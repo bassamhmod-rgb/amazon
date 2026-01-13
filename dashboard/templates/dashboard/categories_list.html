@@ -123,7 +123,7 @@
                                   action="{% url 'dashboard:delete_category' store.slug cat.id %}"
                                   onsubmit="return confirm('هل أنت متأكد من حذف هذه الفئة؟');">
                                 {% csrf_token %}
-                                <button class="btn btn-sm btn-danger">
+                                <button class="btn btn-danger js-confirm-delete">
                                     حذف
                                 </button>
                             </form>
@@ -153,6 +153,6 @@
         arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
     };
 </script>
-
+<script src="{% static 'js/confirm_delete.js' %}"></script>
 </body>
 </html>

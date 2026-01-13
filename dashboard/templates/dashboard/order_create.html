@@ -246,7 +246,8 @@ function toggleTransactionFields() {
     let type = document.getElementById("transaction_type").value;
     document.getElementById("customerBox").style.display = type === "sale" ? "block" : "none";
     document.getElementById("supplierBox").style.display = type === "purchase" ? "block" : "none";
-    document.getElementById("cashbackBox").style.display = type === "sale" ? "block" : " remindingnone";
+    document.getElementById("cashbackBox").style.display = type === "sale" ? "block" : "none";
+
 }
 toggleTransactionFields();
 

@@ -199,7 +199,7 @@
                                   style="display:inline;"
                                   onsubmit="return confirm('هل أنت متأكد من حذف الطلب؟');">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-danger btn-sm" title="حذف">
+                                <button type="submit" class="btn btn-danger js-confirm-delete">
                                     🗑️
                                 </button>
                             </form>
@@ -229,6 +229,6 @@
         arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
     };
 </script>
-
+<script src="{% static 'js/confirm_delete.js' %}"></script>
 </body>
 </html>

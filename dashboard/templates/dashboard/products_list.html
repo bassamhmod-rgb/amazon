@@ -229,8 +229,7 @@
                                   onsubmit="return confirm('هل أنت متأكد من حذف المنتج؟');">
                                 {% csrf_token %}
                                 <button type="submit"
-                                 class="btn btn-danger"
-                                  onclick="return confirmDelete(this);">
+                                 class="btn btn-danger js-confirm-delete">
                                    x
                                 </button>
 
@@ -261,19 +260,7 @@
         arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
     };
 </script>
-<script>
-function confirmDelete(btn) {
-    if (!confirm("⚠️ هل أنت متأكد من حذف الطلب؟ لا يمكن التراجع.")) {
-        return false; // ألغِ الإرسال
-    }
-
-    btn.disabled = true;      // عطّل الزر
-    btn.innerText = "جارٍ الحذف...";
-
-    btn.form.submit();        // أرسل الفورم
-    return false;             // امنع submit الافتراضي
-}
-</script>
+<script src="{% static 'js/confirm_delete.js' %}"></script>
 
 </body>
 </html>
