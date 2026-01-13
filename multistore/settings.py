@@ -67,6 +67,7 @@ WSGI_APPLICATION = "multistore.wsgi.application"
 #مشان دالة الخطأ
 CSRF_FAILURE_VIEW = "accounts.views.csrf_failure"
 #
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",

@@ -69,6 +69,10 @@ path(
         accounting_notifications,
         name="accounting_notifications"
     ),
-  
+path(
+    "api/merchant/<int:merchant_id>/status/",
+    views_api.merchant_status,
+    name="merchant_status"
+),
     ]
 

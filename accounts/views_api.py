@@ -356,3 +356,21 @@ def accounting_notifications(request):
         {"notifications": data},
         json_dumps_params={"ensure_ascii": False}
     )
+#لاختبار من اكسس اذا الحساب فعال
+from django.http import JsonResponse
+from accounts.models import Store
+
+def merchant_status(request, merchant_id):
+    store = Store.objects.filter(id=merchant_id).first()
+
+    if not store:
+        return JsonResponse(
+            {"error": "Store not found"},
+            status=404
+        )
+
+    return JsonResponse({
+        "id": store.id,
+        "is_active": store.is_active,
+    })
+
