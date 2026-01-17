@@ -69,3 +69,18 @@ class SystemNotificationAdmin(admin.ModelAdmin):
 
     class Media:
         js = ("admin/js/system_notification_admin.js",)
+# للتحديث
+from django.contrib import admin
+from .models import AppUpdate
+
+
+@admin.register(AppUpdate)
+class AppUpdateAdmin(admin.ModelAdmin):
+    list_display = (
+        "app_name",
+        "version",
+        "prices_version",
+        "updated_at",
+    )
+
+    readonly_fields = ("updated_at",)

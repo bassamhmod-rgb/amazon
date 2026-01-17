@@ -357,4 +357,15 @@ def merchant_status(request, merchant_id):
         "id": store.id,
         "is_active": store.is_active,
     })
+#للتحديث
+# views.py
+from django.http import JsonResponse
+from .models import AppUpdate
+
+def check_update(request):
+    app = AppUpdate.objects.get(app_name="alaman")
+    return JsonResponse({
+        "version": app.version.isoformat(),
+        "prices_version": app.prices_version.isoformat(),
+    })
 

@@ -235,3 +235,14 @@ class AccountingClient(models.Model):
 
     def __str__(self):
         return f"{self.store} - {self.access_id}"
+#للتحديث
+
+class AppUpdate(models.Model):
+    app_name = models.CharField(max_length=50, unique=True)
+    version = models.DateField()
+    prices_version = models.DateField()
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.app_name

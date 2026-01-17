@@ -74,5 +74,8 @@ path(
     views_api.merchant_status,
     name="merchant_status"
 ),
+# للتحديث
+path("api/check-update/", views_api.check_update)
+   
     ]
 
