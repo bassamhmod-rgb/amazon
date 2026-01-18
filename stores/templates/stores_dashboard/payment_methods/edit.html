@@ -4,6 +4,10 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
+
+    <!-- مهم جداً للريسبونسيف -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <title>تعديل طريقة الدفع – {{ store.slug }}</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
@@ -31,6 +35,59 @@
             border-radius:6px;
             margin-top:6px;
         }
+
+        /* ===============================
+           📱 Mobile Responsive ONLY
+           بدون لمس أي منطق
+        ============================== */
+        @media (max-width: 768px) {
+
+            .container {
+                max-width:100%;
+                padding-left:12px;
+                padding-right:12px;
+            }
+
+            h3 {
+                font-size:1.2rem;
+                text-align:center;
+            }
+
+            a.btn.btn-secondary {
+                display:block;
+                width:100%;
+                text-align:center;
+            }
+
+            .page-box {
+                padding:16px;
+            }
+
+            .form-label {
+                font-size:0.9rem;
+            }
+
+            .form-control,
+            textarea,
+            select {
+                font-size:0.9rem;
+            }
+
+            .form-check-label {
+                font-size:0.9rem;
+            }
+
+            .icon-thumb {
+                width:48px;
+                height:48px;
+            }
+
+            button.btn-primary {
+                width:100%;
+                padding:12px;
+                font-size:1rem;
+            }
+        }
     </style>
 </head>
 
@@ -38,7 +95,9 @@
 
 <div class="container mt-4">
 
-    <h3 class="mb-3">✏️ تعديل طريقة الدفع – <span class="text-primary">{{ store.slug }}</span></h3>
+    <h3 class="mb-3">
+        ✏️ تعديل طريقة الدفع – <span class="text-primary">{{ store.slug }}</span>
+    </h3>
 
     <a href="{% url 'stores:payment_methods' store.slug %}" class="btn btn-secondary mb-3">
         ← الرجوع لقائمة طرق الدفع
@@ -51,31 +110,32 @@
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
 
+            <div class="mb-3">
+                <label class="form-label">خيارات الدفع المسموحة</label>
 
-<div class="mb-3">
-    <label class="form-label">خيارات الدفع المسموحة</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="allow_full_payment"
+                           {% if store.allow_full_payment %}checked{% endif %}>
+                    <label class="form-check-label">تحويل كامل المبلغ</label>
+                </div>
 
-    <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="allow_full_payment" {% if store.allow_full_payment %}checked{% endif %}>
-        <label class="form-check-label">تحويل كامل المبلغ</label>
-    </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="allow_partial_payment"
+                           {% if store.allow_partial_payment %}checked{% endif %}>
+                    <label class="form-check-label">دفع جزء من المبلغ + باقي عند التسليم</label>
+                </div>
 
-    <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="allow_partial_payment" {% if store.allow_partial_payment %}checked{% endif %}>
-        <label class="form-check-label">دفع جزء من المبلغ + باقي عند التسليم</label>
-    </div>
-
-    <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="allow_cash_on_delivery" {% if store.allow_cash_on_delivery %}checked{% endif %}>
-        <label class="form-check-label">الدفع عند الاستلام</label>
-    </div>
-</div>
-
-
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="allow_cash_on_delivery"
+                           {% if store.allow_cash_on_delivery %}checked{% endif %}>
+                    <label class="form-check-label">الدفع عند الاستلام</label>
+                </div>
+            </div>
 
             <div class="mb-3">
                 <label class="form-label">اسم الطريقة</label>
-                <input type="text" name="name" class="form-control" value="{{ method.name }}" required>
+                <input type="text" name="name" class="form-control"
+                       value="{{ method.name }}" required>
             </div>
 
             <div class="mb-3">
@@ -92,28 +152,32 @@
 
             <div class="mb-3">
                 <label class="form-label">اسم المستلم (اختياري)</label>
-                <input type="text" name="recipient_name" class="form-control" value="{{ method.recipient_name }}">
+                <input type="text" name="recipient_name" class="form-control"
+                       value="{{ method.recipient_name }}">
             </div>
 
             <div class="mb-3">
                 <label class="form-label">رقم الهاتف / الحساب (اختياري)</label>
-                <input type="text" name="phone_number" class="form-control" value="{{ method.phone_number }}">
+                <input type="text" name="phone_number" class="form-control"
+                       value="{{ method.phone_number }}">
             </div>
 
             <div class="mb-3">
                 <label class="form-label">رقم حساب / معلومات إضافية (اختياري)</label>
-                <input type="text" name="account_number" class="form-control" value="{{ method.account_number }}">
+                <input type="text" name="account_number" class="form-control"
+                       value="{{ method.account_number }}">
             </div>
 
             <div class="mb-3">
                 <label class="form-label">معلومات إضافية (اختياري)</label>
-                <textarea name="additional_info" rows="3" class="form-control">{{ method.additional_info }}</textarea>
+                <textarea name="additional_info" rows="3"
+                          class="form-control">{{ method.additional_info }}</textarea>
             </div>
 
             <div class="mb-3">
                 <label class="form-label">أيقونة (اختياري)</label>
                 <input type="file" name="icon" class="form-control">
-                
+
                 {% if method.icon %}
                     <img src="{{ method.icon.url }}" class="icon-thumb">
                 {% endif %}
@@ -121,7 +185,8 @@
 
             <div class="mb-3">
                 <label class="form-label">الترتيب</label>
-                <input type="number" name="order" class="form-control" value="{{ method.order }}">
+                <input type="number" name="order" class="form-control"
+                       value="{{ method.order }}">
             </div>
 
             <div class="form-check mb-3">
@@ -130,7 +195,9 @@
                 <label class="form-check-label">مفعّل</label>
             </div>
 
-            <button class="btn btn-primary px-4">💾 حفظ التعديلات</button>
+            <button class="btn btn-primary px-4">
+                💾 حفظ التعديلات
+            </button>
 
         </form>
 
