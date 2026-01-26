@@ -135,7 +135,7 @@ from django.shortcuts import render, redirect
 
 def customer_points(request, store_slug):
     customer_id = request.session.get("customer_id")
-    customer = Customer.objects.filter(id=customer_id).first()
+    customer = Customer.objects.filter(id=customer_id,store__slug=store_slug).first()
 
     # 🔴 إذا مو مسجّل دخول → روح ع login
     if not customer:
