@@ -9,6 +9,8 @@ from decimal import Decimal
 class Store(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="stores")
     name = models.CharField(max_length=200)
+    rkmdb = models.CharField(max_length=100, blank=True, null=True)
+    rkmtb = models.CharField(max_length=100, blank=True, null=True)
     slug = models.SlugField(unique=True)
     logo = models.ImageField(upload_to="store_logos/", blank=True, null=True)
     mobile = models.CharField(max_length=20)
