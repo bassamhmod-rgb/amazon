@@ -1,0 +1,12 @@
+Internal Server Error: /store/api/check-by-rkmdb/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\views\decorators\csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "e:\my\amazon_syria\src\stores\views_api.py", line 51, in check_store_by_rkmdb
+    "rkmdb": rkmdb
+UnboundLocalError: local variable 'rkmdb' referenced before assignment
+"GET /store/api/check-by-rkmdb/ HTTP/1.1" 500 67510
