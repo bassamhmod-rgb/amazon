@@ -33,8 +33,10 @@ def update_store_codes_from_access(request):
 
         return JsonResponse({
             "status": "updated",
+            "store_id": store.id,
             "mobile": mobile
         })
+       
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
