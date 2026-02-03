@@ -13,7 +13,7 @@ class Store(models.Model):
     rkmtb = models.CharField(max_length=100, blank=True, null=True)
     slug = models.SlugField(unique=True)
     logo = models.ImageField(upload_to="store_logos/", blank=True, null=True)
-    mobile = models.CharField(max_length=20)
+    mobile = models.CharField(max_length=20, unique=True, blank=True, null=True)
     theme = models.IntegerField(default=1, choices=[(i, f"Theme {i}") for i in range(1, 6)])
     description = models.TextField(blank=True)
     description2 = models.TextField(blank=True)
