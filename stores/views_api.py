@@ -4,7 +4,7 @@ import json
 from stores.models import Store
 
 #لنقل الارقام من gcod
-@csrf_exempt
+@csrf_exempt 
 def update_store_codes_from_access(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST only"}, status=405)
@@ -23,7 +23,17 @@ def update_store_codes_from_access(request):
         if not store:
             return JsonResponse({"status": "not_found", "mobile": mobile}, status=404)
 
-        # ✅ كلها نصوص
+        # 🔴 الشرط الجديد – بدون تخريب القديم
+        if store.rkmdb or store.rkmtb:
+            return JsonResponse(
+                {
+                    "status": "already_set",
+                    "message": "codes already exist for this store"
+                },
+                status=409
+            )
+
+        # ✅ نفس الشغل القديم تمامًا
         if number:
             store.rkmdb = number
         if sna:
@@ -36,7 +46,6 @@ def update_store_codes_from_access(request):
             "store_id": store.id,
             "mobile": mobile
         })
-       
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
