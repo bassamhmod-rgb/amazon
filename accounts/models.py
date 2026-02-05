@@ -239,8 +239,8 @@ class AccountingClient(models.Model):
 
 class AppUpdate(models.Model):
     app_name = models.CharField(max_length=50, unique=True)
-    version = models.DateField()
-    prices_version = models.DateField()
+    version = models.PositiveIntegerField()
+    prices_version = models.PositiveIntegerField()
 
     updated_at = models.DateTimeField(auto_now=True)
 
