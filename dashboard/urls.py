@@ -57,6 +57,12 @@ path(
 
 #اعدادات
 path("<slug:store_slug>/settings/", views.store_settings, name="store_settings"),
+#الجرد
+path(
+    "<slug:store_slug>/inventory/",
+    views.inventory_list,
+    name="inventory_list"
+),
 
 
 ]

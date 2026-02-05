@@ -1,0 +1,205 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>جرد المنتجات – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        /* ===== INVENTORY TABLE ===== */
+        .qty-pos{ color:#198754; font-weight:bold; }
+        .qty-neg{ color:#dc3545; font-weight:bold; }
+        .qty-zero{ color:#6c757d; font-weight:bold; }
+
+        /* ===== SIDEBAR ARROW ===== */
+        #sidebarArrow{ display:none; }
+
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+
+            .content{
+                margin-right:0;
+                padding:15px;
+            }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+
+            .table-responsive{
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebarArrow">❯</div>
+
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+    <!-- العنوان -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="mb-0">📊 جرد المنتجات</h3>
+    </div>
+
+    <!-- إجمالي قيمة المخزون -->
+    <div class="card p-4 mb-4">
+        <h5 class="mb-2">💰 إجمالي قيمة المنتجات</h5>
+        <h3 class="fw-bold text-success mb-0">
+            {{ total_inventory_value|floatformat:2 }} $
+        </h3>
+    </div>
+
+    <!-- جدول الجرد -->
+    <div class="card p-4 mb-4">
+
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>اسم المنتج</th>
+                        <th class="text-center">الكمية المتبقية</th>
+                        <th class="text-center">آخر سعر شراء</th>
+                        <th class="text-center">قيمة المخزون</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for product in page_obj %}
+                    {% with qty=product.remaining_qty %}
+                    <tr>
+                        <td>{{ product.name }}</td>
+
+                        <td class="text-center
+                            {% if qty > 0 %}qty-pos
+                            {% elif qty < 0 %}qty-neg
+                            {% else %}qty-zero{% endif %}
+                        ">
+                            {{ qty }}
+                        </td>
+
+                        <td class="text-center">
+                            {{ product.last_buy_price|floatformat:2 }} $
+                        </td>
+
+                        <td class="text-center fw-bold text-primary">
+                            {{ product.stock_value|floatformat:2 }} $
+                        </td>
+                    </tr>
+                    {% endwith %}
+                {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">
+                            لا يوجد منتجات
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <nav>
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">السابق</a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}">التالي</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+</div>
+
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
+</script>
+
+</body>
+</html>

@@ -24,6 +24,18 @@ from django.http import JsonResponse
 # أما إذا كنت ناقله كمان لـ accounts، الغي السطر اللي فوق واستخدم هاد:
 from decimal import Decimal, InvalidOperation
 from django.db.models import Sum
+###
+
+from django.db.models import (
+    Sum, F, DecimalField, ExpressionWrapper,
+    OuterRef, Subquery
+)
+
+from stores.models import Store
+from products.models import Product, Category
+from orders.models import OrderItem
+
+
 
 @login_required
 def dashboard_home(request, store_slug):
@@ -1077,3 +1089,97 @@ def cashback_preview(request, store_slug):
     return JsonResponse({
         "cashback": float(total_cashback.quantize(Decimal("0.01")))
     })
+#جرد المنتجات
+from django.db.models import (
+    Sum, F, DecimalField, ExpressionWrapper,
+    OuterRef, Subquery, Value
+)
+from django.db.models.functions import Coalesce
+
+
+
+
+@login_required
+def inventory_list(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+
+    # 🔹 آخر سعر شراء لكل منتج
+    last_buy_price_qs = OrderItem.objects.filter(
+        product=OuterRef("pk"),
+        direction=1
+    ).order_by("-id").values("buy_price")[:1]
+
+    products_qs = (
+        Product.objects
+        .filter(store=store)
+        .annotate(
+            # ✅ الكمية المتبقية (Decimal مضمون)
+            remaining_qty=Coalesce(
+                Sum(
+                    ExpressionWrapper(
+                        F("order_items__quantity") * F("order_items__direction"),
+                        output_field=DecimalField(max_digits=10, decimal_places=2)
+                    )
+                ),
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
+            ),
+
+            # ✅ آخر سعر شراء (Decimal مضمون)
+            last_buy_price=Coalesce(
+                Subquery(
+                    last_buy_price_qs,
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
+                ),
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
+            ),
+        )
+        .annotate(
+            # ✅ قيمة المخزون (Decimal × Decimal)
+            stock_value=ExpressionWrapper(
+                F("remaining_qty") * F("last_buy_price"),
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            )
+        )
+        .order_by("-id")
+    )
+
+    # 🔍 البحث
+    q = request.GET.get("q")
+    if q:
+        products_qs = products_qs.filter(name__icontains=q)
+
+    # 📂 الفئات
+    category_id = request.GET.get("category")
+    if category_id and category_id.isdigit():
+        products_qs = products_qs.filter(category_id=category_id)
+
+    sub_category_id = request.GET.get("category2")
+    if sub_category_id and sub_category_id.isdigit():
+        products_qs = products_qs.filter(category2_id=sub_category_id)
+
+    categories = Category.objects.filter(store=store)
+
+    # 💰 إجمالي قيمة المخزون
+    total_inventory_value = products_qs.aggregate(
+        total=Coalesce(
+            Sum("stock_value"),
+            Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
+        )
+    )["total"]
+
+    # Pagination
+    paginator = Paginator(products_qs, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "store": store,
+        "page_obj": page_obj,
+        "categories": categories,
+        "q": q,
+        "current_category": int(category_id) if category_id and category_id.isdigit() else None,
+        "current_sub_category": int(sub_category_id) if sub_category_id and sub_category_id.isdigit() else None,
+        "total_inventory_value": total_inventory_value,
+    }
+
+    return render(request, "dashboard/inventory_list.html", context)

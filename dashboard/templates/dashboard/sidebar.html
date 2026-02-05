@@ -29,6 +29,9 @@
         <a href="{% url 'dashboard:products_list' store.slug %}">
             📦 المنتجات
         </a>
+<a href="{% url 'dashboard:inventory_list' store.slug %}">
+    📊 جرد المنتجات
+</a>
 
         <a href="{% url 'dashboard:orders_list' store.slug %}" class="position-relative">
             📑 الطلبات
