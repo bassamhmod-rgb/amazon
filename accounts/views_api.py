@@ -365,7 +365,7 @@ from .models import AppUpdate
 def check_update(request):
     app = AppUpdate.objects.get(app_name="alaman")
     return JsonResponse({
-        "version": app.version.isoformat(),
-        "prices_version": app.prices_version.isoformat(),
+        "version": app.version,
+        "prices_version": app.prices_version,
     })
 
