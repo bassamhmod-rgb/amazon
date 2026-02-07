@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -139,16 +139,15 @@
         <div class="table-responsive">
             <table class="table table-striped align-middle mb-0">
                 <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>النوع</th>
-                        <th>الطرف</th>
-                        <th>الإجمالي</th>
-                        <th>المدفوع</th>
-                        <th>التاريخ</th>
-                        <th class="text-center">⚙️</th>
-                    </tr>
-                </thead>
+      <tr>
+          <th>#</th>
+          <th>النوع</th>
+          <th>الطرف</th>
+          <th>مبلغ (صرف)</th>
+          <th>دفعة (قبض)</th>
+          <th>التاريخ</th>
+      </tr>
+  </thead>
 
                 <tbody id="noticesTable">
 
@@ -248,7 +247,7 @@ document.getElementById("filterCustomerSearch").addEventListener("keyup", functi
 });
 </script>
 <script>
-/* ===== 888888 + Enter ===== */
+/* ===== الأسهم + Enter ===== */
 document.getElementById("filterCustomerSearch").addEventListener("keydown", function (e) {
     const items = document.querySelectorAll("#filterCustomerResults .list-group-item");
     if (!items.length) return;
@@ -278,7 +277,6 @@ document.getElementById("filterCustomerSearch").addEventListener("keydown", func
         item.classList.toggle("active", i === filterCustomerIndex);
     });
 });
-</script>
 </script>
 <script>
 document.getElementById("filterSupplierSearch").addEventListener("keyup", function (e) {
@@ -316,7 +314,7 @@ document.getElementById("filterSupplierSearch").addEventListener("keyup", functi
 });
 </script>
 <script>
-/* ===== 888888 + Enter ===== */
+/* ===== الأسهم + Enter ===== */
 document.getElementById("filterSupplierSearch").addEventListener("keydown", function (e) {
     const items = document.querySelectorAll("#filterSupplierResults .list-group-item");
     if (!items.length) return;

@@ -71,6 +71,7 @@ TEMPLATES = [
         "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
+            "file_charset": "utf-8",
             "context_processors": [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
@@ -110,8 +111,9 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+DEFAULT_CHARSET = "utf-8"
+FILE_CHARSET = "utf-8"
 
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "/accounts/redirect/"
 LOGOUT_REDIRECT_URL = "core:index"
-

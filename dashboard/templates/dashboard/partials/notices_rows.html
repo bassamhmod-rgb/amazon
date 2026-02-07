@@ -18,7 +18,7 @@
         {% endif %}
     </td>
 
-    <td>{{ notice.discount|floatformat:2 }} $</td>
+    <td>{{ notice.amount|floatformat:2 }} $</td>
     <td>{{ notice.payment|floatformat:2 }} $</td>
     <td>{{ notice.created_at|date:"Y-m-d H:i" }}</td>
 </tr>

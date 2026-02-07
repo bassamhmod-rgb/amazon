@@ -83,6 +83,12 @@ class Order(models.Model):
         decimal_places=2,
         default=0
     )
+    # مبلغ الإشعار (قبض/صرف) فقط
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
 
     # ================= الدفع =================
 

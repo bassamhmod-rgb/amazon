@@ -1,4 +1,4 @@
-
+﻿
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -6,14 +6,14 @@ from django.http import JsonResponse
 from django.contrib.auth.models import User
 from django.db.models import Sum
 from products.models import ProductDetails ,Product, ProductGallery
-# --- استيراد المودلز من التطبيقات المختلفة ---
+# --- ط§ط³طھظٹط±ط§ط¯ ط§ظ„ظ…ظˆط¯ظ„ط² ظ…ظ† ط§ظ„طھط·ط¨ظٹظ‚ط§طھ ط§ظ„ظ…ط®طھظ„ظپط© ---
 from products.models import Category, Product
 from products.forms import CategoryForm, ProductForm
 from stores.models import Store
 from orders.models import Order, OrderItem
 from accounts.models import PointsTransaction
 
-# 1. الزبون موجود بـ accounts (حسب كلامك)
+# 1. ط§ظ„ط²ط¨ظˆظ† ظ…ظˆط¬ظˆط¯ ط¨ظ€ accounts (ط­ط³ط¨ ظƒظ„ط§ظ…ظƒ)
 from accounts.models import Customer
 from django.contrib import messages
 ###
@@ -21,7 +21,7 @@ from django.contrib.auth.hashers import make_password
 from django.db.models import Q
 from accounts.models import Supplier
 from django.http import JsonResponse
-# أما إذا كنت ناقله كمان لـ accounts، الغي السطر اللي فوق واستخدم هاد:
+# ط£ظ…ط§ ط¥ط°ط§ ظƒظ†طھ ظ†ط§ظ‚ظ„ظ‡ ظƒظ…ط§ظ† ظ„ظ€ accountsطŒ ط§ظ„ط؛ظٹ ط§ظ„ط³ط·ط± ط§ظ„ظ„ظٹ ظپظˆظ‚ ظˆط§ط³طھط®ط¯ظ… ظ‡ط§ط¯:
 from decimal import Decimal, InvalidOperation
 from django.db.models import Sum
 ###
@@ -41,16 +41,16 @@ from orders.models import OrderItem
 def dashboard_home(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
 
-    # 🔴 عدد الطلبات الجديدة (اللي لسا ما شافها صاحب المتجر)
+    # ًں”´ ط¹ط¯ط¯ ط§ظ„ط·ظ„ط¨ط§طھ ط§ظ„ط¬ط¯ظٹط¯ط© (ط§ظ„ظ„ظٹ ظ„ط³ط§ ظ…ط§ ط´ط§ظپظ‡ط§ طµط§ط­ط¨ ط§ظ„ظ…طھط¬ط±)
     new_orders_count = Order.objects.filter(
         store=store,
         is_seen_by_store=False
     ).count()
 
-    # آخر الطلبات (10 فقط)
+    # ط¢ط®ط± ط§ظ„ط·ظ„ط¨ط§طھ (10 ظپظ‚ط·)
     orders = Order.objects.filter(store=store).order_by("-created_at")[:10]
 
-    # عدد أو قائمة المنتجات
+    # ط¹ط¯ط¯ ط£ظˆ ظ‚ط§ط¦ظ…ط© ط§ظ„ظ…ظ†طھط¬ط§طھ
     products = Product.objects.filter(store=store)
 
     return render(request, "dashboard/dashboard_home.html", {
@@ -58,34 +58,34 @@ def dashboard_home(request, store_slug):
         "orders": orders,
         "products": products,
 
-        # 🔥 مهم جداً للـ sidebar 
+        # ًں”¥ ظ…ظ‡ظ… ط¬ط¯ط§ظ‹ ظ„ظ„ظ€ sidebar 
         "new_orders_count": new_orders_count,
     })
 
 
 
-# 🔹 قائمة المنتجات مع بحث + تصفية + Pagination
+# ًں”¹ ظ‚ط§ط¦ظ…ط© ط§ظ„ظ…ظ†طھط¬ط§طھ ظ…ط¹ ط¨ط­ط« + طھطµظپظٹط© + Pagination
 @login_required
 def products_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
     products_qs = Product.objects.filter(store=store).order_by("-id")
 
-    # البحث بالاسم
+    # ط§ظ„ط¨ط­ط« ط¨ط§ظ„ط§ط³ظ…
     q = request.GET.get("q")
     if q:
         products_qs = products_qs.filter(name__icontains=q)
 
-    # التصفية حسب الفئة الأساسية
+    # ط§ظ„طھطµظپظٹط© ط­ط³ط¨ ط§ظ„ظپط¦ط© ط§ظ„ط£ط³ط§ط³ظٹط©
     category_id = request.GET.get("category")
     if category_id and category_id.isdigit():
         products_qs = products_qs.filter(category_id=category_id)
 
-    # التصفية حسب الفئة الفرعية
+    # ط§ظ„طھطµظپظٹط© ط­ط³ط¨ ط§ظ„ظپط¦ط© ط§ظ„ظپط±ط¹ظٹط©
     sub_category_id = request.GET.get("category2")
     if sub_category_id and sub_category_id.isdigit():
         products_qs = products_qs.filter(category2_id=sub_category_id)
 
-    # جلب كل الفئات الخاصة بهذا المتجر
+    # ط¬ظ„ط¨ ظƒظ„ ط§ظ„ظپط¦ط§طھ ط§ظ„ط®ط§طµط© ط¨ظ‡ط°ط§ ط§ظ„ظ…طھط¬ط±
     from products.models import Category
     categories = Category.objects.filter(store=store)
 
@@ -99,7 +99,7 @@ def products_list(request, store_slug):
         "page_obj": page_obj,
         "categories": categories,
 
-        # الحالي المختار
+        # ط§ظ„ط­ط§ظ„ظٹ ط§ظ„ظ…ط®طھط§ط±
         "current_category": int(category_id) if category_id and category_id.isdigit() else None,
         "current_sub_category": int(sub_category_id) if sub_category_id and sub_category_id.isdigit() else None,
 
@@ -107,7 +107,7 @@ def products_list(request, store_slug):
     }
     return render(request, "dashboard/products_list.html", context)
 
-# 🔹 إضافة منتج جديد
+# ًں”¹ ط¥ط¶ط§ظپط© ظ…ظ†طھط¬ ط¬ط¯ظٹط¯
 @login_required
 def product_create(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -119,7 +119,7 @@ def product_create(request, store_slug):
             product.store = store
             product.save()
 
-            # 🔥 إضافة المواصفات (ProductDetails)
+            # ًں”¥ ط¥ط¶ط§ظپط© ط§ظ„ظ…ظˆط§طµظپط§طھ (ProductDetails)
             titles = request.POST.getlist("detail_title")
             values = request.POST.getlist("detail_value")
 
@@ -131,7 +131,7 @@ def product_create(request, store_slug):
                         value=v.strip()
                     )
 
-            # 🖼️ إضافة الصور الفرعية (ProductGallery)
+            # ًں–¼ï¸ڈ ط¥ط¶ط§ظپط© ط§ظ„طµظˆط± ط§ظ„ظپط±ط¹ظٹط© (ProductGallery)
             images = request.FILES.getlist("gallery_images")
             for img in images:
                 ProductGallery.objects.create(
@@ -150,7 +150,7 @@ def product_create(request, store_slug):
         "is_edit": False,
     })
 
-# 🔹 تعديل منتج
+# ًں”¹ طھط¹ط¯ظٹظ„ ظ…ظ†طھط¬
 @login_required
 def product_update(request, store_slug, product_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -161,7 +161,7 @@ def product_update(request, store_slug, product_id):
         if form.is_valid():
             product = form.save()
 
-            # 🔥 تحديث المواصفات (نحذف القديم ونضيف الجديد)
+            # ًں”¥ طھط­ط¯ظٹط« ط§ظ„ظ…ظˆط§طµظپط§طھ (ظ†ط­ط°ظپ ط§ظ„ظ‚ط¯ظٹظ… ظˆظ†ط¶ظٹظپ ط§ظ„ط¬ط¯ظٹط¯)
             ProductDetails.objects.filter(product=product).delete()
 
             titles = request.POST.getlist("detail_title")
@@ -175,7 +175,7 @@ def product_update(request, store_slug, product_id):
                         value=v.strip()
                     )
 
-            # 🖼️ إضافة صور فرعية جديدة (بدون حذف القديمة)
+            # ًں–¼ï¸ڈ ط¥ط¶ط§ظپط© طµظˆط± ظپط±ط¹ظٹط© ط¬ط¯ظٹط¯ط© (ط¨ط¯ظˆظ† ط­ط°ظپ ط§ظ„ظ‚ط¯ظٹظ…ط©)
             images = request.FILES.getlist("gallery_images")
             for img in images:
                 ProductGallery.objects.create(
@@ -194,7 +194,7 @@ def product_update(request, store_slug, product_id):
         "is_edit": True,
         "product": product,
     })
-#حذف صورة من المعرض
+#ط­ط°ظپ طµظˆط±ط© ظ…ظ† ط§ظ„ظ…ط¹ط±ط¶
 from django.http import HttpResponseForbidden
 @login_required
 def delete_gallery_image(request, image_id):
@@ -209,7 +209,7 @@ def delete_gallery_image(request, image_id):
 
     return redirect("dashboard:product_update", store.slug, product_id)
 
-# 🔹 حذف منتج
+# ًں”¹ ط­ط°ظپ ظ…ظ†طھط¬
 @login_required
 def product_delete(request, store_slug, product_id):
     store = get_object_or_404(
@@ -226,7 +226,7 @@ def product_delete(request, store_slug, product_id):
     if not product_qs.exists():
         messages.warning(
             request,
-            "⚠️ المنتج غير موجود أو تم حذفه مسبقاً"
+            "âڑ ï¸ڈ ط§ظ„ظ…ظ†طھط¬ ط؛ظٹط± ظ…ظˆط¬ظˆط¯ ط£ظˆ طھظ… ط­ط°ظپظ‡ ظ…ط³ط¨ظ‚ط§ظ‹"
         )
         return redirect("dashboard:products_list", store_slug=store.slug)
 
@@ -234,12 +234,12 @@ def product_delete(request, store_slug, product_id):
         product_qs.delete()
         messages.success(
             request,
-            "🗑️ تم حذف المنتج بنجاح"
+            "ًں—‘ï¸ڈ طھظ… ط­ط°ظپ ط§ظ„ظ…ظ†طھط¬ ط¨ظ†ط¬ط§ط­"
         )
 
     return redirect("dashboard:products_list", store_slug=store.slug)
 
-#تفاصيل المنتج
+#طھظپط§طµظٹظ„ ط§ظ„ظ…ظ†طھط¬
 def product_detail(request, store_slug, product_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
     product = get_object_or_404(Product, id=product_id, store=store)
@@ -249,18 +249,18 @@ def product_detail(request, store_slug, product_id):
         'product': product,
     })
 
-#ادارة الفئات
-#عرض
+#ط§ط¯ط§ط±ط© ط§ظ„ظپط¦ط§طھ
+#ط¹ط±ط¶
 def categories_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
     categories = Category.objects.filter(store=store)
 
     return render(request, 'dashboard/categories_list.html', {
         'store': store,
-        'categories': categories,   # ← تأكد من هذي
+        'categories': categories,   # â†گ طھط£ظƒط¯ ظ…ظ† ظ‡ط°ظٹ
     })
 
-# اضافة
+# ط§ط¶ط§ظپط©
 @login_required
 def add_category(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -271,10 +271,10 @@ def add_category(request, store_slug):
         if not name:
             return render(request, "dashboard/category_form.html", {
                 "store": store,
-                "error": "الرجاء إدخال اسم الفئة",
+                "error": "ط§ظ„ط±ط¬ط§ط، ط¥ط¯ط®ط§ظ„ ط§ط³ظ… ط§ظ„ظپط¦ط©",
             })
 
-        # إنشاء الفئة وربطها تلقائياً بالمتجر
+        # ط¥ظ†ط´ط§ط، ط§ظ„ظپط¦ط© ظˆط±ط¨ط·ظ‡ط§ طھظ„ظ‚ط§ط¦ظٹط§ظ‹ ط¨ط§ظ„ظ…طھط¬ط±
         Category.objects.create(
             name=name,
             store=store
@@ -286,13 +286,13 @@ def add_category(request, store_slug):
         "store": store
     })
 
-#حذف فئة
+#ط­ط°ظپ ظپط¦ط©
 @login_required
 # def delete_category(request, store_slug, category_id):
 #     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
 #     category = get_object_or_404(Category, id=category_id, store=store)
 
-#     # حذف مباشر بدون صفحة
+#     # ط­ط°ظپ ظ…ط¨ط§ط´ط± ط¨ط¯ظˆظ† طµظپط­ط©
 #     category.delete()
 #     return redirect("dashboard:categories_list", store_slug=store.slug)
 def delete_category(request, store_slug, category_id):
@@ -309,8 +309,8 @@ def delete_category(request, store_slug, category_id):
     })
 
 
-#ادارة الطلبات
-#حذف
+#ط§ط¯ط§ط±ط© ط§ظ„ط·ظ„ط¨ط§طھ
+#ط­ط°ظپ
 @login_required
 def delete_order(request, store_slug, order_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -326,26 +326,26 @@ def delete_order(request, store_slug, order_id):
     })
 
 
-#تفاصيل الطلب
+#طھظپط§طµظٹظ„ ط§ظ„ط·ظ„ط¨
 @login_required
 def order_detail_dashboard(request, store_slug, order_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
     order = get_object_or_404(Order, id=order_id, store=store)
 
-    # ⭐ حساب النسبة والمبلغ المقترَح للدفع المسبق
+    # â­گ ط­ط³ط§ط¨ ط§ظ„ظ†ط³ط¨ط© ظˆط§ظ„ظ…ط¨ظ„ط؛ ط§ظ„ظ…ظ‚طھط±ظژط­ ظ„ظ„ط¯ظپط¹ ط§ظ„ظ…ط³ط¨ظ‚
     required_percent = store.payment_required_percentage or 0
     required_amount = 0
 
     if required_percent > 0:
         required_amount = (order.net_total * required_percent) / 100
 
-    # 👁️ تعليم الطلب كمقروء
+    # ًں‘پï¸ڈ طھط¹ظ„ظٹظ… ط§ظ„ط·ظ„ط¨ ظƒظ…ظ‚ط±ظˆط،
     if not order.is_seen_by_store:
         order.is_seen_by_store = True
         order.save(update_fields=["is_seen_by_store"])
 
     # ===============================
-    # 🎁 حساب الكاش باك (للبيع فقط)
+    # ًںژپ ط­ط³ط§ط¨ ط§ظ„ظƒط§ط´ ط¨ط§ظƒ (ظ„ظ„ط¨ظٹط¹ ظپظ‚ط·)
     # ===============================
     total_profit = 0
     suggested_cashback = 0
@@ -359,45 +359,45 @@ def order_detail_dashboard(request, store_slug, order_id):
         percent = store.cashback_percentage or 0
         suggested_cashback = (total_profit * percent) / 100 if total_profit > 0 else 0
 
-        # 🛡️ هل تم تسجيل كاش باك سابقًا؟
+        # ًں›،ï¸ڈ ظ‡ظ„ طھظ… طھط³ط¬ظٹظ„ ظƒط§ط´ ط¨ط§ظƒ ط³ط§ط¨ظ‚ظ‹ط§طں
         has_cashback = PointsTransaction.objects.filter(
             customer=order.customer,
-            note=f"كاش باك من طلب بيع رقم {order.id}"
+            note=f"ظƒط§ط´ ط¨ط§ظƒ ظ…ظ† ط·ظ„ط¨ ط¨ظٹط¹ ط±ظ‚ظ… {order.id}"
         ).exists()
 
     return render(request, "dashboard/order_detail_dashboard.html", {
         "store": store,
         "order": order,
 
-        # الدفع المسبق
+        # ط§ظ„ط¯ظپط¹ ط§ظ„ظ…ط³ط¨ظ‚
         "required_percent": required_percent,
         "required_amount": required_amount,
 
-        # الكاش باك
+        # ط§ظ„ظƒط§ط´ ط¨ط§ظƒ
         "total_profit": total_profit,
         "suggested_cashback": suggested_cashback,
         "has_cashback": has_cashback,
     })
 
-#تأكيد الطلب
+#طھط£ظƒظٹط¯ ط§ظ„ط·ظ„ط¨
 @login_required
 def confirm_order(request, store_slug, order_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
     order = get_object_or_404(Order, id=order_id, store=store)
 
-    # تأكيد الطلب
+    # طھط£ظƒظٹط¯ ط§ظ„ط·ظ„ط¨
     order.status = "confirmed"
     order.save(update_fields=["status"])
 
     # ===============================
-    # 🎁 حفظ الكاش باك (للبيع فقط)
+    # ًںژپ ط­ظپط¸ ط§ظ„ظƒط§ط´ ط¨ط§ظƒ (ظ„ظ„ط¨ظٹط¹ ظپظ‚ط·)
     # ===============================
     if order.transaction_type == "sale" and order.customer:
 
-        # منع التكرار
+        # ظ…ظ†ط¹ ط§ظ„طھظƒط±ط§ط±
         exists = PointsTransaction.objects.filter(
             customer=order.customer,
-            note=f"كاش باك من طلب بيع رقم {order.id}"
+            note=f"ظƒط§ط´ ط¨ط§ظƒ ظ…ظ† ط·ظ„ط¨ ط¨ظٹط¹ ط±ظ‚ظ… {order.id}"
         ).exists()
 
         if not exists:
@@ -414,12 +414,12 @@ def confirm_order(request, store_slug, order_id):
                     customer_name=str(order.customer),
                     points=cashback_value,
                     transaction_type="add",
-                    note=f"كاش باك من طلب بيع رقم {order.id}",
+                    note=f"ظƒط§ط´ ط¨ط§ظƒ ظ…ظ† ط·ظ„ط¨ ط¨ظٹط¹ ط±ظ‚ظ… {order.id}",
                 )
 
     return redirect("dashboard:order_detail_dashboard", store_slug=store.slug, order_id=order.id)
 
-#اضافة طلب من التاجر بيع او شراء
+#ط§ط¶ط§ظپط© ط·ظ„ط¨ ظ…ظ† ط§ظ„طھط§ط¬ط± ط¨ظٹط¹ ط§ظˆ ط´ط±ط§ط،
 
 
 
@@ -427,19 +427,19 @@ from decimal import Decimal, InvalidOperation
 
 def _to_decimal(val, default="0"):
     try:
-        # إذا القيمة Decimal أصلًا
+        # ط¥ط°ط§ ط§ظ„ظ‚ظٹظ…ط© Decimal ط£طµظ„ظ‹ط§
         if isinstance(val, Decimal):
             return val
 
-        # إذا None
+        # ط¥ط°ط§ None
         if val is None:
             return Decimal(default)
 
-        # إذا رقم (int / float)
+        # ط¥ط°ط§ ط±ظ‚ظ… (int / float)
         if isinstance(val, (int, float)):
             return Decimal(str(val))
 
-        # إذا نص
+        # ط¥ط°ط§ ظ†طµ
         val = str(val).strip()
         if val == "":
             return Decimal(default)
@@ -456,10 +456,10 @@ def order_create(request, store_slug):
 
     if request.method == "POST":
 
-        # 1) نوع العملية
+        # 1) ظ†ظˆط¹ ط§ظ„ط¹ظ…ظ„ظٹط©
         transaction_type = request.POST.get("transaction_type", "sale")
 
-        # 2) جلب الزبون أو المورد
+        # 2) ط¬ظ„ط¨ ط§ظ„ط²ط¨ظˆظ† ط£ظˆ ط§ظ„ظ…ظˆط±ط¯
         customer = None
         supplier = None
 
@@ -474,16 +474,16 @@ def order_create(request, store_slug):
                 supplier = Supplier.objects.filter(id=supplier_id, store=store).first()
 
         if transaction_type == "sale" and not customer:
-            messages.error(request, "يجب اختيار زبون لإتمام عملية البيع.")
+            messages.error(request, "ظٹط¬ط¨ ط§ط®طھظٹط§ط± ط²ط¨ظˆظ† ظ„ط¥طھظ…ط§ظ… ط¹ظ…ظ„ظٹط© ط§ظ„ط¨ظٹط¹.")
             return redirect("dashboard:order_create", store_slug=store.slug)
 
         if transaction_type == "purchase" and not supplier:
-            messages.error(request, "يجب اختيار مورد لإتمام عملية الشراء.")
+            messages.error(request, "ظٹط¬ط¨ ط§ط®طھظٹط§ط± ظ…ظˆط±ط¯ ظ„ط¥طھظ…ط§ظ… ط¹ظ…ظ„ظٹط© ط§ظ„ط´ط±ط§ط،.")
             return redirect("dashboard:order_create", store_slug=store.slug)
 
         status = "confirmed"
 
-        # 3) إنشاء الطلب
+        # 3) ط¥ظ†ط´ط§ط، ط§ظ„ط·ظ„ط¨
         order = Order.objects.create(
             store=store,
             user=request.user,
@@ -495,12 +495,12 @@ def order_create(request, store_slug):
             status=status,
         )
 
-        # 4) عناصر الطلب
+        # 4) ط¹ظ†ط§طµط± ط§ظ„ط·ظ„ط¨
         products = request.POST.getlist("product_id[]")
         prices   = request.POST.getlist("price[]")
         qtys     = request.POST.getlist("quantity[]")
 
-        total_profit = Decimal("0")  # فقط للبيع
+        total_profit = Decimal("0")  # ظپظ‚ط· ظ„ظ„ط¨ظٹط¹
 
         for i in range(len(products)):
             product = Product.objects.filter(id=products[i], store=store).first()
@@ -522,7 +522,7 @@ def order_create(request, store_slug):
                     buy_price=buy_price,
                 )
 
-                # الربح = (سعر البيع - سعر الشراء) * الكمية
+                # ط§ظ„ط±ط¨ط­ = (ط³ط¹ط± ط§ظ„ط¨ظٹط¹ - ط³ط¹ط± ط§ظ„ط´ط±ط§ط،) * ط§ظ„ظƒظ…ظٹط©
                 total_profit += (price - buy_price) * qty
 
             else:  # purchase
@@ -535,7 +535,7 @@ def order_create(request, store_slug):
                     buy_price=price,
                 )
 
-        # 5) ⭐ إضافة النقاط (الكاش باك) — فقط عند البيع
+        # 5) â­گ ط¥ط¶ط§ظپط© ط§ظ„ظ†ظ‚ط§ط· (ط§ظ„ظƒط§ط´ ط¨ط§ظƒ) â€” ظپظ‚ط· ط¹ظ†ط¯ ط§ظ„ط¨ظٹط¹
         if transaction_type == "sale" and customer:
 
             cashback_manual = (request.POST.get("cashback_amount") or "").strip()
@@ -549,7 +549,7 @@ def order_create(request, store_slug):
             except InvalidOperation:
                 points_value = Decimal("0")
 
-            # حماية
+            # ط­ظ…ط§ظٹط©
             if points_value < 0:
                 points_value = Decimal("0")
 
@@ -559,7 +559,7 @@ def order_create(request, store_slug):
                     customer_name=str(customer),
                     points=points_value,
                     transaction_type="add",
-                    note=f"كاش باك من طلب بيع رقم {order.id}",
+                    note=f"ظƒط§ط´ ط¨ط§ظƒ ظ…ظ† ط·ظ„ط¨ ط¨ظٹط¹ ط±ظ‚ظ… {order.id}",
                 )
 
         return redirect("dashboard:orders_list", store_slug=store.slug)
@@ -568,7 +568,7 @@ def order_create(request, store_slug):
         "store": store
     })
 
-# تعديل الطلب (بيع + شراء) — بدون حقول supplier
+# طھط¹ط¯ظٹظ„ ط§ظ„ط·ظ„ط¨ (ط¨ظٹط¹ + ط´ط±ط§ط،) â€” ط¨ط¯ظˆظ† ط­ظ‚ظˆظ„ supplier
 @login_required
 def order_update(request, store_slug, order_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -577,31 +577,31 @@ def order_update(request, store_slug, order_id):
 
     if request.method == "POST":
 
-        # 🟦 1) نوع العملية (بيع / شراء)
+        # ًںں¦ 1) ظ†ظˆط¹ ط§ظ„ط¹ظ…ظ„ظٹط© (ط¨ظٹط¹ / ط´ط±ط§ط،)
         transaction_type = request.POST.get("transaction_type", "sale")
         order.transaction_type = transaction_type
 
-        # 🟦 2) خصم ودفع (❌ بدون total)
+        # ًںں¦ 2) ط®طµظ… ظˆط¯ظپط¹ (â‌Œ ط¨ط¯ظˆظ† total)
         order.discount = request.POST.get("discount", 0)
         order.payment = request.POST.get("payment", 0)
 
-        # 🟦 3) زبون أو مورد (حسب النوع)
+        # ًںں¦ 3) ط²ط¨ظˆظ† ط£ظˆ ظ…ظˆط±ط¯ (ط­ط³ط¨ ط§ظ„ظ†ظˆط¹)
         if transaction_type == "sale":
             customer_id = request.POST.get("customer_id")
             order.customer_id = customer_id if customer_id else None
-            order.supplier = None  # ← مهم جداً
+            order.supplier = None  # â†گ ظ…ظ‡ظ… ط¬ط¯ط§ظ‹
 
         else:  # purchase
             supplier_id = request.POST.get("supplier_id")
             order.supplier_id = supplier_id if supplier_id else None
-            order.customer = None  # ← مهم جداً
+            order.customer = None  # â†گ ظ…ظ‡ظ… ط¬ط¯ط§ظ‹
 
         order.save()
 
-        # 🟦 4) حذف العناصر القديمة
+        # ًںں¦ 4) ط­ط°ظپ ط§ظ„ط¹ظ†ط§طµط± ط§ظ„ظ‚ط¯ظٹظ…ط©
         order.items.all().delete()
 
-        # 🟦 5) إضافة العناصر الجديدة
+        # ًںں¦ 5) ط¥ط¶ط§ظپط© ط§ظ„ط¹ظ†ط§طµط± ط§ظ„ط¬ط¯ظٹط¯ط©
         products = request.POST.getlist("product_id[]")
         prices   = request.POST.getlist("price[]")
         qtys     = request.POST.getlist("quantity[]")
@@ -615,14 +615,14 @@ def order_update(request, store_slug, order_id):
             price = float(prices[i])
             qty = float(qtys[i])
 
-            # بيع أو شراء؟
+            # ط¨ظٹط¹ ط£ظˆ ط´ط±ط§ط،طں
             direction = -1 if transaction_type == "sale" else 1
 
             # snapshot
             if transaction_type == "sale":
-                buy_price = product.buy_price  # snapshot للربح
+                buy_price = product.buy_price  # snapshot ظ„ظ„ط±ط¨ط­
             else:
-                buy_price = price  # snapshot لتكلفة الشراء
+                buy_price = price  # snapshot ظ„طھظƒظ„ظپط© ط§ظ„ط´ط±ط§ط،
 
             OrderItem.objects.create(
                 order=order,
@@ -641,10 +641,10 @@ def order_update(request, store_slug, order_id):
         "new_orders_count": new_orders_count,
     })
 
-#فلترة طلبات
-#بالحالة
-#برقم الطلب
-# قائمة الطلبات
+#ظپظ„طھط±ط© ط·ظ„ط¨ط§طھ
+#ط¨ط§ظ„ط­ط§ظ„ط©
+#ط¨ط±ظ‚ظ… ط§ظ„ط·ظ„ط¨
+# ظ‚ط§ط¦ظ…ط© ط§ظ„ط·ظ„ط¨ط§طھ
 @login_required
 def orders_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -652,21 +652,21 @@ def orders_list(request, store_slug):
     status = request.GET.get("status", "")
     order_id = request.GET.get("order_id", "")
 
-    # كل طلبات المتجر
+    # ظƒظ„ ط·ظ„ط¨ط§طھ ط§ظ„ظ…طھط¬ط±
     orders = Order.objects.filter(store=store)
 
-    # فلترة حسب الحالة
+    # ظپظ„طھط±ط© ط­ط³ط¨ ط§ظ„ط­ط§ظ„ط©
     if status:
         orders = orders.filter(status=status)
 
-    # فلترة حسب رقم الطلب
+    # ظپظ„طھط±ط© ط­ط³ط¨ ط±ظ‚ظ… ط§ظ„ط·ظ„ط¨
     if order_id:
         orders = orders.filter(id=order_id)
 
-    # ترتيب من الأحدث للأقدم
+    # طھط±طھظٹط¨ ظ…ظ† ط§ظ„ط£ط­ط¯ط« ظ„ظ„ط£ظ‚ط¯ظ…
     orders = orders.order_by("-created_at")
 
-    # 🟢 عدد الطلبات الجديدة (لسّا is_seen_by_store = False)
+    # ًںں¢ ط¹ط¯ط¯ ط§ظ„ط·ظ„ط¨ط§طھ ط§ظ„ط¬ط¯ظٹط¯ط© (ظ„ط³ظ‘ط§ is_seen_by_store = False)
     new_orders_count = Order.objects.filter(
         store=store,
         is_seen_by_store=False
@@ -677,14 +677,14 @@ def orders_list(request, store_slug):
         "orders": orders,
         "current_status": status,
         "current_id": order_id,
-        "new_orders_count": new_orders_count,  # مهم للـ sidebar
+        "new_orders_count": new_orders_count,  # ظ…ظ‡ظ… ظ„ظ„ظ€ sidebar
     }
 
-    # 🔴 انتبه: هون ما عم نغيّر is_seen_by_store
-    # الطلب بيتعلَّم كمقروء لما تفتح صفحة تفاصيل الطلب (منسوّيها بعدين)
+    # ًں”´ ط§ظ†طھط¨ظ‡: ظ‡ظˆظ† ظ…ط§ ط¹ظ… ظ†ط؛ظٹظ‘ط± is_seen_by_store
+    # ط§ظ„ط·ظ„ط¨ ط¨ظٹطھط¹ظ„ظ‘ظژظ… ظƒظ…ظ‚ط±ظˆط، ظ„ظ…ط§ طھظپطھط­ طµظپط­ط© طھظپط§طµظٹظ„ ط§ظ„ط·ظ„ط¨ (ظ…ظ†ط³ظˆظ‘ظٹظ‡ط§ ط¨ط¹ط¯ظٹظ†)
 
     return render(request, "dashboard/orders_list.html", context)
-# البحث باسماء المنتجات
+# ط§ظ„ط¨ط­ط« ط¨ط§ط³ظ…ط§ط، ط§ظ„ظ…ظ†طھط¬ط§طھ
 
 def search_products(request, store_slug):
     q = request.GET.get("q", "")
@@ -696,12 +696,12 @@ def search_products(request, store_slug):
     ]
 
     return JsonResponse({"results": results})
-#البحث باسماء المستخدمين
+#ط§ظ„ط¨ط­ط« ط¨ط§ط³ظ…ط§ط، ط§ظ„ظ…ط³طھط®ط¯ظ…ظٹظ†
 
 def search_customers(request, store_slug):
     q = request.GET.get("q", "")
     
-    # جلب زبائن هذا المتجر فقط
+    # ط¬ظ„ط¨ ط²ط¨ط§ط¦ظ† ظ‡ط°ط§ ط§ظ„ظ…طھط¬ط± ظپظ‚ط·
     customers = Customer.objects.filter(store__slug=store_slug, name__icontains=q) | Customer.objects.filter(
         store__slug=store_slug,
         phone__icontains=q
@@ -713,13 +713,13 @@ def search_customers(request, store_slug):
     ]
 
     return JsonResponse({"results": results})
-# 🔍 بحث الموردين
+# ًں”چ ط¨ط­ط« ط§ظ„ظ…ظˆط±ط¯ظٹظ†
 
 
 def search_suppliers(request, store_slug):
     q = request.GET.get("q", "").strip()
 
-    # جلب الموردين حسب المتجر والكلمة المكتوبة
+    # ط¬ظ„ط¨ ط§ظ„ظ…ظˆط±ط¯ظٹظ† ط­ط³ط¨ ط§ظ„ظ…طھط¬ط± ظˆط§ظ„ظƒظ„ظ…ط© ط§ظ„ظ…ظƒطھظˆط¨ط©
     suppliers = Supplier.objects.filter(
         store__slug=store_slug
     ).filter(
@@ -736,8 +736,8 @@ def search_suppliers(request, store_slug):
     ]
 
     return JsonResponse({"results": results})
-#اشعارات القبض و الصرف
-#العرض
+#ط§ط´ط¹ط§ط±ط§طھ ط§ظ„ظ‚ط¨ط¶ ظˆ ط§ظ„طµط±ظپ
+#ط§ظ„ط¹ط±ط¶
 @login_required
 def notices_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -747,7 +747,7 @@ def notices_list(request, store_slug):
         document_kind=2
     )
 
-    # ===== فلتر النوع (قبض / صرف) =====
+    # ===== ظپظ„طھط± ط§ظ„ظ†ظˆط¹ (ظ‚ط¨ط¶ / طµط±ظپ) =====
     transaction_type = request.GET.get("transaction_type")
     normalized_type = None
     if transaction_type:
@@ -780,7 +780,7 @@ def notices_list(request, store_slug):
         "current_type": transaction_type,
         "current_keyword": keyword,
     })
-#للفلترة
+#ظ„ظ„ظپظ„طھط±ط©
 @login_required
 def notices_filter(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -816,21 +816,19 @@ def notices_filter(request, store_slug):
     })
 
 
-#اضافة اشغار
+#ط§ط¶ط§ظپط© ط§ط´ط؛ط§ط±
 
 
 from decimal import Decimal, InvalidOperation
 
 @login_required
+@login_required
 def notice_create(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
-    
 
     if request.method == "POST":
-        
-        # ===== نوع العملية (مثل الطلبات تمامًا) =====
+        # ===== نوع العملية =====
         transaction_type = request.POST.get("transaction_type")
-        
 
         if transaction_type not in ["sale", "purchase"]:
             messages.error(request, "نوع الإشعار غير صالح.")
@@ -858,27 +856,35 @@ def notice_create(request, store_slug):
                 messages.error(request, "يجب اختيار مورد لإشعار الصرف.")
                 return redirect("dashboard:notice_create", store_slug=store.slug)
 
-        # ===== المبالغ (🔥 السبب الحقيقي للخطأ) =====
+        # ===== المبالغ =====
         try:
-            discount_raw = request.POST.get("discount")
+            amount_raw = request.POST.get("amount")
             payment_raw = request.POST.get("payment")
-
-            discount = Decimal(discount_raw) if discount_raw not in [None, ""] else Decimal("0")
+            amount = Decimal(amount_raw) if amount_raw not in [None, ""] else Decimal("0")
             payment = Decimal(payment_raw) if payment_raw not in [None, ""] else Decimal("0")
-
         except InvalidOperation:
-            messages.error(request, "قيمة المبالغ غير صحيحة.")
+            messages.error(request, "قيمة المبلغ غير صحيحة.")
             return redirect("dashboard:notice_create", store_slug=store.slug)
+
+        if amount < 0 or payment < 0:
+            messages.error(request, "القيم يجب أن تكون موجبة.")
+            return redirect("dashboard:notice_create", store_slug=store.slug)
+
+        if amount == 0 and payment == 0:
+            messages.error(request, "يرجى إدخال دفعة أو مبلغ.")
+            return redirect("dashboard:notice_create", store_slug=store.slug)
+
         # ===== إنشاء الإشعار =====
         Order.objects.create(
             store=store,
             user=request.user,
-            document_kind=2,                 # إشعار
-            transaction_type=transaction_type,  # sale / purchase
+            document_kind=2,
+            transaction_type=transaction_type,
             customer=customer,
             supplier=supplier,
-            discount=discount,               # ✅ Decimal مضمون
-            payment=payment,                 # ✅ Decimal مضمون
+            amount=amount,
+            discount=Decimal("0"),
+            payment=payment,
             status="confirmed",
         )
 
@@ -890,7 +896,6 @@ def notice_create(request, store_slug):
     })
 
 
-#حذف اشعار
 @login_required
 def notice_delete(request, store_slug, notice_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -908,8 +913,18 @@ def notice_delete(request, store_slug, notice_id):
 
     return redirect("dashboard:notices_list", store_slug=store.slug)
 
-# ادارة العملاء
-# عرض العملاء
+
+@login_required
+def suppliers_list(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    suppliers = Supplier.objects.filter(store=store).order_by("-id")
+
+    return render(request, "dashboard/suppliers_list.html", {
+        "store": store,
+        "suppliers": suppliers,
+    })
+
+
 @login_required
 def customers_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -919,10 +934,7 @@ def customers_list(request, store_slug):
         "store": store,
         "customers": customers,
     })
-# إضافة زبون من قبل التاجر
 
-
-from django.db.models import Q
 
 @login_required
 def customer_create(request, store_slug):
@@ -932,16 +944,14 @@ def customer_create(request, store_slug):
         name = request.POST.get("name")
         phone = request.POST.get("phone")
 
-        # 🔥 منع تكرار الاسم أو الرقم عند نفس المتجر
         exists = Customer.objects.filter(store=store).filter(
             Q(name=name) | Q(phone=phone)
         ).exists()
 
         if exists:
-            messages.error(request, "⚠️ هذا العميل مسجّل مسبقاً عندك (اسم أو رقم).")
+            messages.error(request, "هذا العميل مسجّل مسبقًا (اسم أو رقم).")
             return redirect("dashboard:customers_list", store_slug=store.slug)
 
-        # ✔ إنشاء العميل
         Customer.objects.create(
             store=store,
             name=name,
@@ -955,7 +965,6 @@ def customer_create(request, store_slug):
     })
 
 
-# حذف عميل
 @login_required
 def delete_customer(request, store_slug, customer_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -970,18 +979,14 @@ def delete_customer(request, store_slug, customer_id):
         "customer": customer,
     })
 
-# ادارة النقاط
 
 def points_page(request, store_slug):
-
-    # ✅ دائماً نجيب المتجر أول شي
     store = get_object_or_404(Store, slug=store_slug)
 
     customer_id = request.GET.get("customer")
     customer = None
     balance = Decimal("0.0")
 
-    # إذا تم اختيار زبون
     if customer_id:
         customer = get_object_or_404(Customer, id=customer_id, store=store)
 
@@ -992,7 +997,6 @@ def points_page(request, store_slug):
             or Decimal("0.0")
         )
 
-        # إذا في POST (إضافة أو خصم نقاط)
         if request.method == "POST":
             raw_value = request.POST.get("points")
             note = request.POST.get("note", "")
@@ -1000,10 +1004,9 @@ def points_page(request, store_slug):
             try:
                 value = Decimal(raw_value)
             except (TypeError, InvalidOperation):
-                messages.error(request, "❌ قيمة النقاط غير صالحة")
+                messages.error(request, "قيمة النقاط غير صالحة")
                 return redirect(f"/dashboard/{store_slug}/points/?customer={customer.id}")
 
-            # تحديد نوع العملية
             if value > 0:
                 transaction_type = "add"
             elif value < 0:
@@ -1019,11 +1022,10 @@ def points_page(request, store_slug):
                 note=note,
             )
 
-            messages.success(request, "✅ تم تعديل الرصيد بنجاح")
+            messages.success(request, "تم تعديل الرصيد بنجاح")
 
             return redirect(f"/dashboard/{store_slug}/points/?customer={customer.id}")
 
-    # جلب زبائن المتجر
     customers = Customer.objects.filter(store=store)
 
     return render(request, "dashboard/points.html", {
@@ -1039,7 +1041,7 @@ def points_page(request, store_slug):
         ),
     })
 
-#حذف سجل نقاط
+
 @login_required
 def delete_points_transaction(request, store_slug, transaction_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -1051,84 +1053,64 @@ def delete_points_transaction(request, store_slug, transaction_id):
 
     transaction.delete()
 
-    messages.success(request, "🗑 تم حذف سجل النقاط بنجاح.")
+    messages.success(request, "تم حذف سجل النقاط بنجاح.")
 
-    # ✅ رجوع لنفس صفحة الرصيد بدون أسماء مسارات
     return redirect(request.META.get("HTTP_REFERER", "/"))
-
-
-# اعدادات التاجر
-
 
 
 @login_required
 def store_settings(request, store_slug):
-
-    # 🔐 تأكيد إنو المستخدم هو صاحب المتجر
     store = get_object_or_404(Store, slug=store_slug)
 
     if request.user != store.owner:
-        messages.error(request, "🚫 غير مسموح لك بالدخول إلى إعدادات هذا المتجر.")
+        messages.error(request, "غير مسموح لك بالدخول إلى إعدادات هذا المتجر.")
         return redirect("/")
 
     if request.method == "POST":
-
-        # 1) Slug
         new_slug = request.POST.get("slug", "").strip()
 
         if new_slug != store.slug:
             if Store.objects.filter(slug=new_slug).exclude(id=store.id).exists():
-                messages.error(request, "⚠️ هذا الاسم مستخدم مسبقاً.")
+                messages.error(request, "هذا الاسم مستخدم مسبقًا.")
                 return redirect(f"/dashboard/{store.slug}/settings/")
             store.slug = new_slug
 
-        # 2) Descriptions
         store.description = request.POST.get("description", "")
         store.description2 = request.POST.get("description2", "")
         store.description3 = request.POST.get("description3", "")
         store.description4 = request.POST.get("description4", "")
         store.description5 = request.POST.get("description5", "")
 
-        # 3) Theme
         theme_value = request.POST.get("theme")
         if theme_value and theme_value.isdigit():
             store.theme = int(theme_value)
 
-        # 4) Logo
         if "logo" in request.FILES:
             store.logo = request.FILES["logo"]
 
-        # 5) Password
         new_password = request.POST.get("new_password", "").strip()
         if new_password:
             store.owner.password = make_password(new_password)
             store.owner.save()
-            messages.success(request, "🔐 تم تغيير كلمة المرور بنجاح.")
+            messages.success(request, "تم تغيير كلمة المرور بنجاح.")
 
-        # ⭐ 6) نسبة الدفع المطلوبة لكل الطلبات
         percent = request.POST.get("payment_required_percentage", "").strip()
         if percent.isdigit():
             store.payment_required_percentage = int(percent)
 
-        # ⭐ 7) نسبة الكاش باك من ربح الطلب
-        from decimal import Decimal, InvalidOperation
-
         cashback = request.POST.get("cashback_percentage", "").strip()
-
         try:
-           if cashback != "":
-              cashback_value = Decimal(cashback)
-
-              if Decimal("0") <= cashback_value <= Decimal("100"):
-                 store.cashback_percentage = cashback_value
-              else:
-                 messages.error(request, "⚠️ نسبة الكاش باك يجب أن تكون بين 0 و 100.")
-                 return redirect(f"/dashboard/{store.slug}/settings/")
+            if cashback != "":
+                cashback_value = Decimal(cashback)
+                if Decimal("0") <= cashback_value <= Decimal("100"):
+                    store.cashback_percentage = cashback_value
+                else:
+                    messages.error(request, "نسبة الكاش باك يجب أن تكون بين 0 و 100.")
+                    return redirect(f"/dashboard/{store.slug}/settings/")
         except InvalidOperation:
-            messages.error(request, "⚠️ قيمة نسبة الكاش باك غير صحيحة.")
+            messages.error(request, "قيمة نسبة الكاش باك غير صحيحة.")
             return redirect(f"/dashboard/{store.slug}/settings/")
 
-        # 🖼️ 7) إعدادات صورة الهيرو (الجديدة)
         hero_height = request.POST.get("hero_height", "").strip()
         if hero_height.isdigit():
             store.hero_height = int(hero_height)
@@ -1137,56 +1119,76 @@ def store_settings(request, store_slug):
         if hero_fit in ["contain", "cover"]:
             store.hero_fit = hero_fit
 
-        # Save all changes
         store.save()
 
-        messages.success(request, "✅ تم حفظ إعدادات المتجر بنجاح.")
+        messages.success(request, "تم حفظ إعدادات المتجر بنجاح.")
         return redirect(f"/dashboard/{store.slug}/settings/")
 
-    # GET request
     return render(request, "dashboard/store_settings.html", {"store": store})
-#اشعار بعدد الطلبات الجديدة
 
-def merchant_dashboard(request, store_slug):
-
-    store = Store.objects.get(slug=store_slug)
-
-    new_orders_count = Order.objects.filter(
-        store=store,
-        is_seen_by_store=False
-    ).count()
-
-    return render(request, "dashboard/dashboard.html", {
-        "store": store,
-        "new_orders_count": new_orders_count,
-    })
-# ادارة الموردين
-#عرض
-@login_required
-def suppliers_list(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
-    suppliers = Supplier.objects.filter(store=store).order_by("-id")
-
-    return render(request, "dashboard/suppliers_list.html", {
-        "store": store,
-        "suppliers": suppliers,
-    })
-
-@login_required
 def balances_report(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
 
-    customers = Customer.objects.filter(store=store).order_by("name")
-    suppliers = Supplier.objects.filter(store=store).order_by("name")
+    customers = list(Customer.objects.filter(store=store).order_by("name"))
+    suppliers = list(Supplier.objects.filter(store=store).order_by("name"))
 
-    customer_total = (
-        customers.aggregate(total=Sum("balance"))["total"]
-        or Decimal("0.0")
+    # ط§ط­ط³ط¨ ط§ظ„ط±طµظٹط¯ ظ…ظ† ط§ظ„ط·ظ„ط¨ط§طھ: طµط§ظپظٹ ط§ظ„ط·ظ„ط¨ - ط§ظ„ط¯ظپط¹ط§طھ
+    orders_qs = (
+        Order.objects
+        .filter(store=store, document_kind__in=[1, 2], status="confirmed")
+        .select_related("customer", "supplier")
+        .prefetch_related("items")
     )
-    supplier_total = (
-        suppliers.aggregate(total=Sum("balance"))["total"]
-        or Decimal("0.0")
-    )
+
+    customer_balances = {}
+    supplier_balances = {}
+
+    for order in orders_qs:
+        if order.document_kind == 1:
+            amount = order.net_total
+            payment = order.payment
+        else:
+            amount = order.amount or Decimal("0")
+            payment = order.payment
+
+        balance_delta = amount - payment
+
+        if order.customer_id:
+            customer_balances[order.customer_id] = customer_balances.get(order.customer_id, Decimal("0")) + balance_delta
+        elif order.supplier_id:
+            supplier_balances[order.supplier_id] = supplier_balances.get(order.supplier_id, Decimal("0")) + balance_delta
+
+    customer_total = Decimal("0.0")
+    supplier_total = Decimal("0.0")
+
+    for customer in customers:
+        bal = customer_balances.get(customer.id, Decimal("0"))
+        customer_total += bal
+        customer.calc_balance = bal
+        customer.calc_balance_abs = abs(bal)
+        if bal > 0:
+            customer.calc_balance_label = "ظ…ط¯ظٹظ†"
+        elif bal < 0:
+            customer.calc_balance_label = "ط¯ط§ط¦ظ†"
+        else:
+            customer.calc_balance_label = "ظ…طھظˆط§ط²ظ†"
+
+    for supplier in suppliers:
+        bal = supplier_balances.get(supplier.id, Decimal("0"))
+        supplier_total += bal
+        supplier.calc_balance = bal
+        supplier.calc_balance_abs = abs(bal)
+        if bal > 0:
+            supplier.calc_balance_label = "ظ…ط¯ظٹظ†"
+        elif bal < 0:
+            supplier.calc_balance_label = "ط¯ط§ط¦ظ†"
+        else:
+            supplier.calc_balance_label = "ظ…طھظˆط§ط²ظ†"
+
+    customer_total_abs = abs(customer_total)
+    supplier_total_abs = abs(supplier_total)
+    customer_total_label = "ظ…ط¯ظٹظ†" if customer_total > 0 else "ط¯ط§ط¦ظ†" if customer_total < 0 else "ظ…طھظˆط§ط²ظ†"
+    supplier_total_label = "ظ…ط¯ظٹظ†" if supplier_total > 0 else "ط¯ط§ط¦ظ†" if supplier_total < 0 else "ظ…طھظˆط§ط²ظ†"
 
     return render(request, "dashboard/balances_report.html", {
         "store": store,
@@ -1194,8 +1196,12 @@ def balances_report(request, store_slug):
         "suppliers": suppliers,
         "customer_total": customer_total,
         "supplier_total": supplier_total,
+        "customer_total_abs": customer_total_abs,
+        "supplier_total_abs": supplier_total_abs,
+        "customer_total_label": customer_total_label,
+        "supplier_total_label": supplier_total_label,
     })
-#اضافة 
+#ط§ط¶ط§ظپط© 
 
 
 @login_required
@@ -1209,7 +1215,7 @@ def supplier_create(request, store_slug):
         email = request.POST.get("email")
         opening_balance = request.POST.get("opening_balance") or 0
 
-        # ✅ منع التكرار فقط إذا القيم موجودة
+        # âœ… ظ…ظ†ط¹ ط§ظ„طھظƒط±ط§ط± ظپظ‚ط· ط¥ط°ط§ ط§ظ„ظ‚ظٹظ… ظ…ظˆط¬ظˆط¯ط©
         exists_qs = Supplier.objects.filter(store=store)
 
         if name:
@@ -1219,7 +1225,7 @@ def supplier_create(request, store_slug):
             exists_qs = exists_qs.filter(phone=phone)
 
         if exists_qs.exists():
-            messages.error(request, "⚠️ هذا المورد مسجّل مسبقاً (اسم أو رقم).")
+            messages.error(request, "âڑ ï¸ڈ ظ‡ط°ط§ ط§ظ„ظ…ظˆط±ط¯ ظ…ط³ط¬ظ‘ظ„ ظ…ط³ط¨ظ‚ط§ظ‹ (ط§ط³ظ… ط£ظˆ ط±ظ‚ظ…).")
             return redirect("dashboard:suppliers_list", store_slug=store.slug)
 
         Supplier.objects.create(
@@ -1236,7 +1242,7 @@ def supplier_create(request, store_slug):
     return render(request, "dashboard/supplier_create.html", {
         "store": store
     })
-#حذف مورد
+#ط­ط°ظپ ظ…ظˆط±ط¯
 @login_required
 def delete_supplier(request, store_slug, supplier_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
@@ -1250,7 +1256,7 @@ def delete_supplier(request, store_slug, supplier_id):
         "store": store,
         "supplier": supplier,
     })
-# اظهار قيمة الكاش باك بالطلب و تعديلو و تفاصيلو
+# ط§ط¸ظ‡ط§ط± ظ‚ظٹظ…ط© ط§ظ„ظƒط§ط´ ط¨ط§ظƒ ط¨ط§ظ„ط·ظ„ط¨ ظˆ طھط¹ط¯ظٹظ„ظˆ ظˆ طھظپط§طµظٹظ„ظˆ
 # dashboard/views.py
 
 import json
@@ -1262,7 +1268,7 @@ def cashback_preview(request, store_slug):
     total_cashback = Decimal("0")
 
     for item in data.get("items", []):
-        # ⛑️ حماية
+        # â›‘ï¸ڈ ط­ظ…ط§ظٹط©
         if not item.get("product_id"):
             continue
 
@@ -1284,7 +1290,7 @@ def cashback_preview(request, store_slug):
     return JsonResponse({
         "cashback": float(total_cashback.quantize(Decimal("0.01")))
     })
-#جرد المنتجات
+#ط¬ط±ط¯ ط§ظ„ظ…ظ†طھط¬ط§طھ
 from django.db.models import (
     Sum, F, DecimalField, ExpressionWrapper,
     OuterRef, Subquery, Value
@@ -1298,7 +1304,7 @@ from django.db.models.functions import Coalesce
 def inventory_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
 
-    # 🔹 آخر سعر شراء لكل منتج
+    # ًں”¹ ط¢ط®ط± ط³ط¹ط± ط´ط±ط§ط، ظ„ظƒظ„ ظ…ظ†طھط¬
     last_buy_price_qs = OrderItem.objects.filter(
         product=OuterRef("pk"),
         direction=1
@@ -1308,7 +1314,7 @@ def inventory_list(request, store_slug):
         Product.objects
         .filter(store=store)
         .annotate(
-            # ✅ الكمية المتبقية (Decimal مضمون)
+            # âœ… ط§ظ„ظƒظ…ظٹط© ط§ظ„ظ…طھط¨ظ‚ظٹط© (Decimal ظ…ط¶ظ…ظˆظ†)
             remaining_qty=Coalesce(
                 Sum(
                     ExpressionWrapper(
@@ -1319,7 +1325,7 @@ def inventory_list(request, store_slug):
                 Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
             ),
 
-            # ✅ آخر سعر شراء (Decimal مضمون)
+            # âœ… ط¢ط®ط± ط³ط¹ط± ط´ط±ط§ط، (Decimal ظ…ط¶ظ…ظˆظ†)
             last_buy_price=Coalesce(
                 Subquery(
                     last_buy_price_qs,
@@ -1329,7 +1335,7 @@ def inventory_list(request, store_slug):
             ),
         )
         .annotate(
-            # ✅ قيمة المخزون (Decimal × Decimal)
+            # âœ… ظ‚ظٹظ…ط© ط§ظ„ظ…ط®ط²ظˆظ† (Decimal أ— Decimal)
             stock_value=ExpressionWrapper(
                 F("remaining_qty") * F("last_buy_price"),
                 output_field=DecimalField(max_digits=14, decimal_places=2)
@@ -1338,12 +1344,12 @@ def inventory_list(request, store_slug):
         .order_by("-id")
     )
 
-    # 🔍 البحث
+    # ًں”چ ط§ظ„ط¨ط­ط«
     q = request.GET.get("q")
     if q:
         products_qs = products_qs.filter(name__icontains=q)
 
-    # 📂 الفئات
+    # ًں“‚ ط§ظ„ظپط¦ط§طھ
     category_id = request.GET.get("category")
     if category_id and category_id.isdigit():
         products_qs = products_qs.filter(category_id=category_id)
@@ -1354,7 +1360,7 @@ def inventory_list(request, store_slug):
 
     categories = Category.objects.filter(store=store)
 
-    # 💰 إجمالي قيمة المخزون
+    # ًں’° ط¥ط¬ظ…ط§ظ„ظٹ ظ‚ظٹظ…ط© ط§ظ„ظ…ط®ط²ظˆظ†
     total_inventory_value = products_qs.aggregate(
         total=Coalesce(
             Sum("stock_value"),
@@ -1378,3 +1384,6 @@ def inventory_list(request, store_slug):
     }
 
     return render(request, "dashboard/inventory_list.html", context)
+
+
+
