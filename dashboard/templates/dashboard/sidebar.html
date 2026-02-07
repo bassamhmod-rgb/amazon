@@ -1,6 +1,51 @@
-{% load static %}
+﻿{% load static %}
 
-<div class="sidebar" id="sidebar">
+<style>
+    .sidebar-group {
+        margin-bottom: 8px;
+    }
+    .sidebar-summary {
+        display: block;
+        padding: 10px 12px;
+        padding-left: 28px;
+        margin-bottom: 4px;
+        color: #1A2A4A !important;
+        font-weight: 700;
+        border-radius: 8px;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+    }
+    .sidebar-summary:hover {
+        background: #e9f2ff;
+        color: #0d6efd;
+    }
+    .sidebar-submenu a {
+        padding: 8px 12px;
+        margin-bottom: 6px;
+        font-size: 0.95rem;
+    }
+    .sidebar-summary::-webkit-details-marker {
+        display: none;
+    }
+    .sidebar-summary::marker {
+        content: "";
+    }
+    .sidebar-summary::after {
+        content: "◂";
+        position: absolute;
+        left: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        transition: transform .2s ease;
+        color: #1A2A4A;
+    }
+    details[open] > .sidebar-summary::after {
+        transform: translateY(-50%) rotate(-90deg);
+    }
+</style>
+
+<div class="sidebar" id="sidebar" style="overflow-y:auto;">
 
     <!-- اسم المتجر -->
     <h5 class="mb-3 text-center fw-bold">
@@ -10,7 +55,7 @@
     <!-- زر العودة -->
     <a href="/store/{{ store.slug }}/"
        class="back-to-store-btn mb-3 d-block text-center">
-        ← العودة إلى صفحة العرض
+        → العودة إلى صفحة العرض
     </a>
 
     <hr class="my-3">
@@ -22,38 +67,56 @@
             🏠 لوحة التحكم
         </a>
 
-        <a href="{% url 'dashboard:categories_list' store.slug %}">
-            📂 الفئات
-        </a>
+        <details class="sidebar-group">
+            <summary class="sidebar-summary">🛍 المنتجات</summary>
+            <div class="sidebar-submenu">
+                <a href="{% url 'dashboard:products_list' store.slug %}">قائمة المنتجات</a>
+                <a href="{% url 'dashboard:product_create' store.slug %}">إضافة منتج</a>
+                <a href="{% url 'dashboard:categories_list' store.slug %}">الفئات</a>
+                <a href="{% url 'dashboard:inventory_list' store.slug %}">جرد المنتجات</a>
+            </div>
+        </details>
 
-        <a href="{% url 'dashboard:products_list' store.slug %}">
-            📦 المنتجات
-        </a>
-<a href="{% url 'dashboard:inventory_list' store.slug %}">
-    📊 جرد المنتجات
-</a>
+        <details class="sidebar-group">
+            <summary class="sidebar-summary">📝 الطلبات</summary>
+            <div class="sidebar-submenu">
+                <a href="{% url 'dashboard:orders_list' store.slug %}" class="position-relative">
+                    قائمة الطلبات
+                    {% if new_orders_count > 0 %}
+                    <span class="badge bg-danger position-absolute top-50 start-0 translate-middle-y"
+                          style="font-size:0.7rem;">
+                        {{ new_orders_count }}
+                    </span>
+                    {% endif %}
+                </a>
+                <a href="{% url 'dashboard:order_create' store.slug %}">إنشاء طلب</a>
+            </div>
+        </details>
 
-        <a href="{% url 'dashboard:orders_list' store.slug %}" class="position-relative">
-            📑 الطلبات
-            {% if new_orders_count > 0 %}
-            <span class="badge bg-danger position-absolute top-50 start-0 translate-middle-y"
-                  style="font-size:0.7rem;">
-                {{ new_orders_count }}
-            </span>
-            {% endif %}
-        </a>
+        <details class="sidebar-group">
+            <summary class="sidebar-summary">👥 العملاء</summary>
+            <div class="sidebar-submenu">
+                <a href="{% url 'dashboard:customers_list' store.slug %}">قائمة العملاء</a>
+                <a href="{% url 'dashboard:customer_create' store.slug %}">إضافة عميل</a>
+            </div>
+        </details>
 
-        <a href="{% url 'dashboard:customers_list' store.slug %}">
-            👥 العملاء
-        </a>
+        <details class="sidebar-group">
+            <summary class="sidebar-summary">🏭 الموردين</summary>
+            <div class="sidebar-submenu">
+                <a href="{% url 'dashboard:suppliers_list' store.slug %}">قائمة الموردين</a>
+                <a href="{% url 'dashboard:supplier_create' store.slug %}">إضافة مورد</a>
+            </div>
+        </details>
 
-        <a href="{% url 'dashboard:suppliers_list' store.slug %}">
-            🏭 الموردين
-        </a>
-
-        <a href="{% url 'dashboard:points_page' store.slug %}">
-            ⭐ النقاط
-        </a>
+        <details class="sidebar-group">
+            <summary class="sidebar-summary">💼 التقارير</summary>
+            <div class="sidebar-submenu">
+                <a href="{% url 'dashboard:balances_report' store.slug %}">أرصدة العملاء والموردين</a>
+                <a href="{% url 'dashboard:notices_list' store.slug %}">إشعارات القبض والصرف</a>
+                <a href="{% url 'dashboard:points_page' store.slug %}">النقاط</a>
+            </div>
+        </details>
 
         <a href="{% url 'dashboard:store_settings' store.slug %}">
             ⚙ إعدادات المتجر

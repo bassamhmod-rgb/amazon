@@ -141,6 +141,16 @@ class Order(models.Model):
         blank=True,
         null=True
     )
+    DOCUMENT_KINDS = (
+    (1, "Invoice"),   # فاتورة
+    (2, "Notice"),    # إشعار (قبض / صرف)
+)
+
+    document_kind = models.SmallIntegerField(
+    choices=DOCUMENT_KINDS,
+    default=1,
+    help_text="1 = فاتورة, 2 = إشعار قبض/صرف"
+)
 
     def __str__(self):
         return f"Order #{self.id} – {self.store.name}"

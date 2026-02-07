@@ -736,6 +736,177 @@ def search_suppliers(request, store_slug):
     ]
 
     return JsonResponse({"results": results})
+#اشعارات القبض و الصرف
+#العرض
+@login_required
+def notices_list(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+
+    notices = Order.objects.filter(
+        store=store,
+        document_kind=2
+    )
+
+    # ===== فلتر النوع (قبض / صرف) =====
+    transaction_type = request.GET.get("transaction_type")
+    normalized_type = None
+    if transaction_type:
+        if transaction_type in ["in", "sale", "-1"]:
+            normalized_type = "sale"
+        elif transaction_type in ["out", "purchase", "1"]:
+            normalized_type = "purchase"
+        else:
+            normalized_type = transaction_type
+
+    if normalized_type:
+        notices = notices.filter(transaction_type=normalized_type)
+
+    # ===== ???????? ?????????? ???? ?????????? =====
+    keyword = (request.GET.get("keyword") or "").strip()
+
+    if keyword:
+        if normalized_type == "sale":
+            # ?????? ??? ??????????
+            notices = notices.filter(customer__name__icontains=keyword)
+        elif normalized_type == "purchase":
+            # ?????? ??? ????????????
+            notices = notices.filter(supplier__name__icontains=keyword)
+
+    notices = notices.order_by("-created_at")
+
+    return render(request, "dashboard/notices_list.html", {
+        "store": store,
+        "notices": notices,
+        "current_type": transaction_type,
+        "current_keyword": keyword,
+    })
+#للفلترة
+@login_required
+def notices_filter(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+
+    notices = Order.objects.filter(
+        store=store,
+        document_kind=2
+    )
+
+    transaction_type = request.GET.get("transaction_type")
+    customer_id = request.GET.get("customer_id")
+    supplier_id = request.GET.get("supplier_id")
+
+    if transaction_type:
+        if transaction_type == "in":
+            notices = notices.filter(transaction_type="sale")
+        elif transaction_type == "out":
+            notices = notices.filter(transaction_type="purchase")
+        else:
+            notices = notices.filter(transaction_type=transaction_type)
+
+
+    if customer_id and customer_id.isdigit():
+        notices = notices.filter(customer_id=customer_id)
+
+    if supplier_id and supplier_id.isdigit():
+        notices = notices.filter(supplier_id=supplier_id)
+
+    notices = notices.order_by("-created_at")
+
+    return render(request, "dashboard/partials/notices_rows.html", {
+        "notices": notices
+    })
+
+
+#اضافة اشغار
+
+
+from decimal import Decimal, InvalidOperation
+
+@login_required
+def notice_create(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    
+
+    if request.method == "POST":
+        
+        # ===== نوع العملية (مثل الطلبات تمامًا) =====
+        transaction_type = request.POST.get("transaction_type")
+        
+
+        if transaction_type not in ["sale", "purchase"]:
+            messages.error(request, "نوع الإشعار غير صالح.")
+            return redirect("dashboard:notice_create", store_slug=store.slug)
+
+        # ===== الطرف =====
+        customer = None
+        supplier = None
+
+        if transaction_type == "sale":
+            customer_id = request.POST.get("customer_id")
+            if customer_id and customer_id.isdigit():
+                customer = Customer.objects.filter(id=customer_id, store=store).first()
+
+            if not customer:
+                messages.error(request, "يجب اختيار زبون لإشعار القبض.")
+                return redirect("dashboard:notice_create", store_slug=store.slug)
+
+        if transaction_type == "purchase":
+            supplier_id = request.POST.get("supplier_id")
+            if supplier_id and supplier_id.isdigit():
+                supplier = Supplier.objects.filter(id=supplier_id, store=store).first()
+
+            if not supplier:
+                messages.error(request, "يجب اختيار مورد لإشعار الصرف.")
+                return redirect("dashboard:notice_create", store_slug=store.slug)
+
+        # ===== المبالغ (🔥 السبب الحقيقي للخطأ) =====
+        try:
+            discount_raw = request.POST.get("discount")
+            payment_raw = request.POST.get("payment")
+
+            discount = Decimal(discount_raw) if discount_raw not in [None, ""] else Decimal("0")
+            payment = Decimal(payment_raw) if payment_raw not in [None, ""] else Decimal("0")
+
+        except InvalidOperation:
+            messages.error(request, "قيمة المبالغ غير صحيحة.")
+            return redirect("dashboard:notice_create", store_slug=store.slug)
+        # ===== إنشاء الإشعار =====
+        Order.objects.create(
+            store=store,
+            user=request.user,
+            document_kind=2,                 # إشعار
+            transaction_type=transaction_type,  # sale / purchase
+            customer=customer,
+            supplier=supplier,
+            discount=discount,               # ✅ Decimal مضمون
+            payment=payment,                 # ✅ Decimal مضمون
+            status="confirmed",
+        )
+
+        messages.success(request, "تم إنشاء الإشعار بنجاح.")
+        return redirect("dashboard:notices_list", store_slug=store.slug)
+
+    return render(request, "dashboard/notice_create.html", {
+        "store": store
+    })
+
+
+#حذف اشعار
+@login_required
+def notice_delete(request, store_slug, notice_id):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+
+    notice = get_object_or_404(
+        Order,
+        id=notice_id,
+        store=store,
+        document_kind=2
+    )
+
+    if request.method == "POST":
+        notice.delete()
+        messages.success(request, "تم حذف الإشعار.")
+
+    return redirect("dashboard:notices_list", store_slug=store.slug)
 
 # ادارة العملاء
 # عرض العملاء
@@ -999,6 +1170,30 @@ def suppliers_list(request, store_slug):
     return render(request, "dashboard/suppliers_list.html", {
         "store": store,
         "suppliers": suppliers,
+    })
+
+@login_required
+def balances_report(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+
+    customers = Customer.objects.filter(store=store).order_by("name")
+    suppliers = Supplier.objects.filter(store=store).order_by("name")
+
+    customer_total = (
+        customers.aggregate(total=Sum("balance"))["total"]
+        or Decimal("0.0")
+    )
+    supplier_total = (
+        suppliers.aggregate(total=Sum("balance"))["total"]
+        or Decimal("0.0")
+    )
+
+    return render(request, "dashboard/balances_report.html", {
+        "store": store,
+        "customers": customers,
+        "suppliers": suppliers,
+        "customer_total": customer_total,
+        "supplier_total": supplier_total,
     })
 #اضافة 
 

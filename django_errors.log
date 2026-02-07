@@ -94,3 +94,909 @@ Traceback (most recent call last):
     raise FieldError(
 django.core.exceptions.FieldError: Expression contains mixed types: DecimalField, IntegerField. You must set output_field.
 "GET /dashboard/Alaman/inventory/ HTTP/1.1" 500 111618
+Internal Server Error: /dashboard/store/Alaman/notices/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "E:\my\amazon_syria\src\dashboard\views.py", line 750, in notices_list
+    return render(request, "dashboard/notices_list.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: dashboard/notices_list.html
+"GET /dashboard/store/Alaman/notices/ HTTP/1.1" 500 88204
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "E:\my\amazon_syria\src\dashboard\views.py", line 793, in notices_filter
+    notices = notices.filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1436, in filter
+    return self._filter_or_exclude(False, args, kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1454, in _filter_or_exclude
+    clone._filter_or_exclude_inplace(negate, args, kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1461, in _filter_or_exclude_inplace
+    self._query.add_q(Q(*args, **kwargs))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1546, in add_q
+    clause, _ = self._add_q(q_object, self.used_aliases)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1577, in _add_q
+    child_clause, needed_inner = self.build_filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1405, in build_filter
+    return self._add_q(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1577, in _add_q
+    child_clause, needed_inner = self.build_filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1492, in build_filter
+    condition = self.build_lookup(lookups, col, value)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1306, in build_lookup
+    lhs = self.try_transform(lhs, name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1357, in try_transform
+    raise FieldError(
+django.core.exceptions.FieldError: Unsupported lookup 'mobile' for ForeignKey or join on the field not permitted.
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=-1&keyword=%D8%A7 HTTP/1.1" 500 126338
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "E:\my\amazon_syria\src\dashboard\views.py", line 793, in notices_filter
+    notices = notices.filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1436, in filter
+    return self._filter_or_exclude(False, args, kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1454, in _filter_or_exclude
+    clone._filter_or_exclude_inplace(negate, args, kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1461, in _filter_or_exclude_inplace
+    self._query.add_q(Q(*args, **kwargs))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1546, in add_q
+    clause, _ = self._add_q(q_object, self.used_aliases)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1577, in _add_q
+    child_clause, needed_inner = self.build_filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1405, in build_filter
+    return self._add_q(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1577, in _add_q
+    child_clause, needed_inner = self.build_filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1492, in build_filter
+    condition = self.build_lookup(lookups, col, value)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1306, in build_lookup
+    lhs = self.try_transform(lhs, name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1357, in try_transform
+    raise FieldError(
+django.core.exceptions.FieldError: Unsupported lookup 'mobile' for ForeignKey or join on the field not permitted.
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=&keyword=%D8%A7 HTTP/1.1" 500 126320
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "E:\my\amazon_syria\src\dashboard\views.py", line 793, in notices_filter
+    notices = notices.filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1436, in filter
+    return self._filter_or_exclude(False, args, kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1454, in _filter_or_exclude
+    clone._filter_or_exclude_inplace(negate, args, kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1461, in _filter_or_exclude_inplace
+    self._query.add_q(Q(*args, **kwargs))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1546, in add_q
+    clause, _ = self._add_q(q_object, self.used_aliases)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1577, in _add_q
+    child_clause, needed_inner = self.build_filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1405, in build_filter
+    return self._add_q(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1577, in _add_q
+    child_clause, needed_inner = self.build_filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1492, in build_filter
+    condition = self.build_lookup(lookups, col, value)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1306, in build_lookup
+    lhs = self.try_transform(lhs, name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1357, in try_transform
+    raise FieldError(
+django.core.exceptions.FieldError: Unsupported lookup 'mobile' for ForeignKey or join on the field not permitted.
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=&keyword=%D9%8A HTTP/1.1" 500 126320
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "E:\my\amazon_syria\src\dashboard\views.py", line 863, in notice_create
+    return render(request, "dashboard/notice_create.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: dashboard/notice_create.html
+"GET /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 88096
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "E:\my\amazon_syria\src\dashboard\views.py", line 874, in notice_create
+    return render(request, "dashboard/notice_create.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: dashboard/notice_create.html
+"GET /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 88275
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 2053, in get_prep_value
+    return int(value)
+ValueError: invalid literal for int() with base 10: ''
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "E:\my\amazon_syria\src\dashboard\views.py", line 826, in notice_create
+    customer = Customer.objects.filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1436, in filter
+    return self._filter_or_exclude(False, args, kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1454, in _filter_or_exclude
+    clone._filter_or_exclude_inplace(negate, args, kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1461, in _filter_or_exclude_inplace
+    self._query.add_q(Q(*args, **kwargs))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1546, in add_q
+    clause, _ = self._add_q(q_object, self.used_aliases)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1577, in _add_q
+    child_clause, needed_inner = self.build_filter(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1492, in build_filter
+    condition = self.build_lookup(lookups, col, value)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\query.py", line 1319, in build_lookup
+    lookup = lookup_class(lhs, rhs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\lookups.py", line 27, in __init__
+    self.rhs = self.get_prep_lookup()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\lookups.py", line 341, in get_prep_lookup
+    return super().get_prep_lookup()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\lookups.py", line 85, in get_prep_lookup
+    return self.lhs.output_field.get_prep_value(self.rhs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 2055, in get_prep_value
+    raise e.__class__(
+ValueError: Field 'id' expected a number but got ''.
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 136682
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in& HTTP/1.1" 500 70198
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1741, in to_python
+    decimal_value = decimal.Decimal(value)
+decimal.InvalidOperation: [<class 'decimal.ConversionSyntax'>]
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 841, in notice_create
+    order = Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 658, in create
+    obj.save(force_insert=True, using=self.db)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 814, in save
+    self.save_base(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 877, in save_base
+    updated = self._save_table(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 1020, in _save_table
+    results = self._do_insert(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 1061, in _do_insert
+    return manager._insert(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1805, in _insert
+    return query.get_compiler(using=using).execute_sql(returning_fields)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1821, in execute_sql
+    for sql, params in self.as_sql():
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1745, in as_sql
+    value_rows = [
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1746, in <listcomp>
+    [
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1747, in <listcomp>
+    self.prepare_value(field, self.pre_save_val(field, obj))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1686, in prepare_value
+    return field.get_db_prep_save(value, connection=self.connection)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1760, in get_db_prep_save
+    self.to_python(value), self.max_digits, self.decimal_places
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1743, in to_python
+    raise exceptions.ValidationError(
+django.core.exceptions.ValidationError: ['“” value must be a decimal number.']
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 155337
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1741, in to_python
+    decimal_value = decimal.Decimal(value)
+decimal.InvalidOperation: [<class 'decimal.ConversionSyntax'>]
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 848, in notice_create
+    Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 658, in create
+    obj.save(force_insert=True, using=self.db)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 814, in save
+    self.save_base(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 877, in save_base
+    updated = self._save_table(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 1020, in _save_table
+    results = self._do_insert(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 1061, in _do_insert
+    return manager._insert(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1805, in _insert
+    return query.get_compiler(using=using).execute_sql(returning_fields)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1821, in execute_sql
+    for sql, params in self.as_sql():
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1745, in as_sql
+    value_rows = [
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1746, in <listcomp>
+    [
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1747, in <listcomp>
+    self.prepare_value(field, self.pre_save_val(field, obj))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1686, in prepare_value
+    return field.get_db_prep_save(value, connection=self.connection)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1760, in get_db_prep_save
+    self.to_python(value), self.max_digits, self.decimal_places
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1743, in to_python
+    raise exceptions.ValidationError(
+django.core.exceptions.ValidationError: ['“” value must be a decimal number.']
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 160557
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 814, in notice_create
+    print("TRANSACTION TYPE =", transaction_type)
+UnboundLocalError: local variable 'transaction_type' referenced before assignment
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 71250
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 814, in notice_create
+    print("TRANSACTION TYPE =", transaction_type)
+UnboundLocalError: local variable 'transaction_type' referenced before assignment
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 71248
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1741, in to_python
+    decimal_value = decimal.Decimal(value)
+decimal.InvalidOperation: [<class 'decimal.ConversionSyntax'>]
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 849, in notice_create
+    Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 658, in create
+    obj.save(force_insert=True, using=self.db)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 814, in save
+    self.save_base(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 877, in save_base
+    updated = self._save_table(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 1020, in _save_table
+    results = self._do_insert(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 1061, in _do_insert
+    return manager._insert(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1805, in _insert
+    return query.get_compiler(using=using).execute_sql(returning_fields)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1821, in execute_sql
+    for sql, params in self.as_sql():
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1745, in as_sql
+    value_rows = [
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1746, in <listcomp>
+    [
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1747, in <listcomp>
+    self.prepare_value(field, self.pre_save_val(field, obj))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1686, in prepare_value
+    return field.get_db_prep_save(value, connection=self.connection)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1760, in get_db_prep_save
+    self.to_python(value), self.max_digits, self.decimal_places
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1743, in to_python
+    raise exceptions.ValidationError(
+django.core.exceptions.ValidationError: ['“” value must be a decimal number.']
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 155645
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1741, in to_python
+    decimal_value = decimal.Decimal(value)
+decimal.InvalidOperation: [<class 'decimal.ConversionSyntax'>]
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 855, in notice_create
+    Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 658, in create
+    obj.save(force_insert=True, using=self.db)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 814, in save
+    self.save_base(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 877, in save_base
+    updated = self._save_table(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 1020, in _save_table
+    results = self._do_insert(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 1061, in _do_insert
+    return manager._insert(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1805, in _insert
+    return query.get_compiler(using=using).execute_sql(returning_fields)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1821, in execute_sql
+    for sql, params in self.as_sql():
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1745, in as_sql
+    value_rows = [
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1746, in <listcomp>
+    [
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1747, in <listcomp>
+    self.prepare_value(field, self.pre_save_val(field, obj))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1686, in prepare_value
+    return field.get_db_prep_save(value, connection=self.connection)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1760, in get_db_prep_save
+    self.to_python(value), self.max_digits, self.decimal_places
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1743, in to_python
+    raise exceptions.ValidationError(
+django.core.exceptions.ValidationError: ['“” value must be a decimal number.']
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 156122
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1741, in to_python
+    decimal_value = decimal.Decimal(value)
+decimal.InvalidOperation: [<class 'decimal.ConversionSyntax'>]
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 855, in notice_create
+    Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 658, in create
+    obj.save(force_insert=True, using=self.db)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 814, in save
+    self.save_base(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 877, in save_base
+    updated = self._save_table(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 1020, in _save_table
+    results = self._do_insert(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 1061, in _do_insert
+    return manager._insert(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1805, in _insert
+    return query.get_compiler(using=using).execute_sql(returning_fields)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1821, in execute_sql
+    for sql, params in self.as_sql():
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1745, in as_sql
+    value_rows = [
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1746, in <listcomp>
+    [
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1747, in <listcomp>
+    self.prepare_value(field, self.pre_save_val(field, obj))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1686, in prepare_value
+    return field.get_db_prep_save(value, connection=self.connection)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1760, in get_db_prep_save
+    self.to_python(value), self.max_digits, self.decimal_places
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\fields\__init__.py", line 1743, in to_python
+    raise exceptions.ValidationError(
+django.core.exceptions.ValidationError: ['“” value must be a decimal number.']
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 156117
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in& HTTP/1.1" 500 70678
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in&customer_id=84& HTTP/1.1" 500 70954
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in& HTTP/1.1" 500 70678
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in& HTTP/1.1" 500 70678
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in&customer_id=84& HTTP/1.1" 500 70954
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in& HTTP/1.1" 500 70678
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in& HTTP/1.1" 500 70236
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=out& HTTP/1.1" 500 70245
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in& HTTP/1.1" 500 70236
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in& HTTP/1.1" 500 70573
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in&customer_id=84& HTTP/1.1" 500 70849
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in& HTTP/1.1" 500 70573
+Internal Server Error: /dashboard/store/Alaman/notices/filter/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 789, in notices_filter
+    qs = qs.filter(transaction_type=transaction_type)
+UnboundLocalError: local variable 'qs' referenced before assignment
+"GET /dashboard/store/Alaman/notices/filter/?transaction_type=in&customer_id=84& HTTP/1.1" 500 70849
+Internal Server Error: /dashboard/Alaman/balances/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1191, in balances_report
+    return render(request, "dashboard/balances_report.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: dashboard/balances_report.html
+"GET /dashboard/Alaman/balances/ HTTP/1.1" 500 91901
+Internal Server Error: /dashboard/Alaman/balances/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1191, in balances_report
+    return render(request, "dashboard/balances_report.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: dashboard/balances_report.html
+"GET /dashboard/Alaman/balances/ HTTP/1.1" 500 91901
+Internal Server Error: /dashboard/Alaman/balances/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1191, in balances_report
+    return render(request, "dashboard/balances_report.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc3 in position 106: invalid continuation byte
+"GET /dashboard/Alaman/balances/ HTTP/1.1" 500 140366
+Internal Server Error: /dashboard/Alaman/balances/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1191, in balances_report
+    return render(request, "dashboard/balances_report.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc3 in position 106: invalid continuation byte
+"GET /dashboard/Alaman/balances/ HTTP/1.1" 500 140503
+Internal Server Error: /dashboard/Alaman/balances/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1191, in balances_report
+    return render(request, "dashboard/balances_report.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc3 in position 106: invalid continuation byte
+"GET /dashboard/Alaman/balances/ HTTP/1.1" 500 140362
+Internal Server Error: /dashboard/Alaman/balances/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1191, in balances_report
+    return render(request, "dashboard/balances_report.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc3 in position 106: invalid continuation byte
+"GET /dashboard/Alaman/balances/ HTTP/1.1" 500 140366
+Internal Server Error: /dashboard/Alaman/balances/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1191, in balances_report
+    return render(request, "dashboard/balances_report.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc3 in position 106: invalid continuation byte
+"GET /dashboard/Alaman/balances/ HTTP/1.1" 500 140366
+Internal Server Error: /dashboard/Alaman/balances/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1191, in balances_report
+    return render(request, "dashboard/balances_report.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc3 in position 106: invalid continuation byte
+"GET /dashboard/Alaman/balances/ HTTP/1.1" 500 140366
+Internal Server Error: /dashboard/Alaman/balances/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1191, in balances_report
+    return render(request, "dashboard/balances_report.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc3 in position 106: invalid continuation byte
+"GET /dashboard/Alaman/balances/ HTTP/1.1" 500 140503

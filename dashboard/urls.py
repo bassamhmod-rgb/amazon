@@ -39,6 +39,7 @@ path(
 path("<slug:store_slug>/suppliers/", views.suppliers_list, name="suppliers_list"),
 path("<slug:store_slug>/suppliers/create/", views.supplier_create, name="supplier_create"),
 path("<slug:store_slug>/suppliers/<int:supplier_id>/delete/", views.delete_supplier, name="delete_supplier"),
+path("<slug:store_slug>/balances/", views.balances_report, name="balances_report"),
 
 # للبحث
 path("<slug:store_slug>/search-suppliers/", views.search_suppliers),
@@ -63,7 +64,28 @@ path(
     views.inventory_list,
     name="inventory_list"
 ),
-
-
+#عرض اشعارات القبض و الصرف
+path(
+    "store/<slug:store_slug>/notices/",
+    views.notices_list,
+    name="notices_list"
+),
+#اضافة اشعار قبض او صرف
+path(
+        "store/<slug:store_slug>/notices/create/",
+        views.notice_create,
+        name="notice_create"
+    ),
+# للفلترة داخل الاشعارات
+path(
+    "store/<slug:store_slug>/notices/filter/",
+    views.notices_filter,
+    name="notices_filter"
+),
+#حذف اشعار
+path(
+    "store/<slug:store_slug>/notices/<int:notice_id>/delete/",
+    views.notice_delete,
+    name="notice_delete"
+)
 ]
-
