@@ -93,11 +93,12 @@ class Product(models.Model):
             qty = Decimal(item.quantity or 0)
 
             # ⛑️ حماية من None بالبيانات القديمة
-            buy_price = (
-                Decimal(item.buy_price)
-                if item.buy_price is not None
-                else Decimal("0")
-            )
+            if item.buy_price is not None:
+                buy_price = Decimal(item.buy_price)
+            elif item.direction == 1 and item.price is not None:
+                buy_price = Decimal(item.price)
+            else:
+                buy_price = Decimal("0")
 
             cost = buy_price * qty
 
@@ -106,6 +107,9 @@ class Product(models.Model):
                 total_cost += cost
 
             elif item.direction == -1:  # بيع
+                if item.buy_price is None:
+                    current_avg = (total_cost / total_qty) if total_qty > 0 else Decimal("0")
+                    cost = current_avg * qty
                 total_qty -= qty
                 total_cost -= cost
 
@@ -134,3 +138,19 @@ class ProductGallery(models.Model):
 
     def __str__(self):
         return f"Image for {self.product.name}"
+
+
+class ProductBarcode(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="barcodes")
+    value = models.CharField(max_length=120)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "value"],
+                name="unique_product_barcode_value"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.product.name} - {self.value}"

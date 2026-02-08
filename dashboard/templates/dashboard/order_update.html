@@ -183,6 +183,15 @@
                 <input type="text" id="productSearch" class="form-control" placeholder="اكتب اسم المنتج..." autocomplete="off">
                 <div id="searchResults" class="list-group mt-1"></div>
             </div>
+
+<div class="card p-3 mb-3">
+    <label class="fw-bold">&#1576;&#1575;&#1585;&#1603;&#1608;&#1583; &#1575;&#1604;&#1605;&#1606;&#1578;&#1580;</label>
+    <div class="position-relative">
+        <input type="text" id="barcodeSearch" class="form-control"
+               placeholder="&#1575;&#1587;&#1581;&#1576; &#1575;&#1604;&#1576;&#1575;&#1585;&#1603;&#1608;&#1583; &#1607;&#1606;&#1575..." autocomplete="off">
+        <div class="invalid-feedback">Barcode not found</div>
+    </div>
+</div>
         </div>
 
         <!-- جدول المنتجات -->
@@ -338,6 +347,33 @@ productSearchEl.addEventListener("keydown", function(e){
 
     items.forEach((el,i)=>el.classList.toggle("active", i===productIndex));
 });
+
+
+const barcodeSearchEl = document.getElementById("barcodeSearch");
+if (barcodeSearchEl){
+    barcodeSearchEl.addEventListener("keydown", function(e){
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+
+        const code = this.value.trim();
+        if (!code) return;
+
+        fetch(`/dashboard/{{ store.slug }}/search-products-by-barcode/?barcode=` + encodeURIComponent(code))
+            .then(r => r.json())
+            .then(data => {
+                if (data.results && data.results.length){
+                    selectProduct(data.results[0]);
+                    barcodeSearchEl.value = "";
+                } else {
+                    barcodeSearchEl.classList.add("is-invalid");
+                }
+            });
+    });
+
+    barcodeSearchEl.addEventListener("input", function(){
+        barcodeSearchEl.classList.remove("is-invalid");
+    });
+}
 
 function selectProduct(item){
     const row = document.createElement("tr");

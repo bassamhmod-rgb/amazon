@@ -145,14 +145,13 @@
                 <div class="col-md-4">
                     <label class="form-label fw-bold">تعديل الرصيد (إضافة أو سحب)</label>
                     <input
-    type="number"
-    name="points"
-    class="form-control"
-    step="0.01"
-    inputmode="decimal"
-    required
-    placeholder="مثلاً: 6.20 أو -1.50">
-
+                        type="number"
+                        name="points"
+                        class="form-control"
+                        step="0.01"
+                        inputmode="decimal"
+                        required
+                        placeholder="مثلاً: 6.20 أو -1.50">
                 </div>
 
                 <div class="col-md-4">
@@ -161,7 +160,7 @@
                 </div>
             </div>
 
-            <button class="btn btn-primary mt-3 px-4">💾 حفظ التعديل</button>
+            <button class="btn btn-primary mt-3 px-4">حفظ التعديل</button>
         </form>
     </div>
 
@@ -186,9 +185,9 @@
                             {{ item.points }}
                         </td>
                         <td>
-                            {% if item.transaction_type == "add" %}➕ إضافة{% endif %}
-                            {% if item.transaction_type == "subtract" %}➖ سحب{% endif %}
-                            {% if item.transaction_type == "adjust" %}⚙️ تعديل{% endif %}
+                            {% if item.transaction_type == "add" %}إضافة{% endif %}
+                            {% if item.transaction_type == "subtract" %}سحب{% endif %}
+                            {% if item.transaction_type == "adjust" %}تعديل{% endif %}
                         </td>
                         <td>{{ item.note|default:"—" }}</td>
                         <td>{{ item.created_at|date:"Y/m/d H:i" }}</td>
@@ -197,7 +196,7 @@
                                   action="{% url 'dashboard:delete_points_transaction' store.slug item.id %}"
                                   onsubmit="return confirm('هل أنت متأكد من حذف هذا السجل؟');">
                                 {% csrf_token %}
-                                <button class="btn btn-sm btn-danger">🗑</button>
+                                <button class="btn btn-sm btn-danger">×</button>
                             </form>
                         </td>
                     </tr>

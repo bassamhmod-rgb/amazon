@@ -93,6 +93,10 @@
             </div>
         </details>
 
+        <a href="{% url 'dashboard:expenses_list' store.slug %}">
+            💸 الصرفيات
+        </a>
+
         <details class="sidebar-group">
             <summary class="sidebar-summary">👥 العملاء</summary>
             <div class="sidebar-submenu">
@@ -112,8 +116,9 @@
         <details class="sidebar-group">
             <summary class="sidebar-summary">💼 التقارير</summary>
             <div class="sidebar-submenu">
+                <a href="{% url 'dashboard:profits_report' store.slug %}">الأرباح</a>
                 <a href="{% url 'dashboard:balances_report' store.slug %}">أرصدة العملاء والموردين</a>
-                <a href="{% url 'dashboard:notices_list' store.slug %}">إشعارات القبض والصرف</a>
+                <a href="{% url 'dashboard:notices_list' store.slug %}">إشعارات العملاء و الموردين</a>
                 <a href="{% url 'dashboard:points_page' store.slug %}">النقاط</a>
             </div>
         </details>

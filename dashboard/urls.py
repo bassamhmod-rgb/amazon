@@ -25,6 +25,7 @@ path('<slug:store_slug>/orders/<int:order_id>/delete/', views.delete_order, name
 path('<slug:store_slug>/orders/<int:order_id>/confirm/', views.confirm_order, name='confirm_order'),
 path("<slug:store_slug>/orders/add/", views.order_create, name="order_create"),
 path("<slug:store_slug>/search-products/", views.search_products, name="search_products"),
+path("<slug:store_slug>/search-products-by-barcode/", views.search_products_by_barcode, name="search_products_by_barcode"),
 path("<slug:store_slug>/search-customers/", views.search_customers, name="search_customers"),
 path("<slug:store_slug>/orders/<int:order_id>/edit/", views.order_update, name="order_update"),
 path("<slug:store_slug>/dashboard/order/<int:order_id>/",views.order_detail_dashboard,name="order_detail_dashboard"),
@@ -40,6 +41,7 @@ path("<slug:store_slug>/suppliers/", views.suppliers_list, name="suppliers_list"
 path("<slug:store_slug>/suppliers/create/", views.supplier_create, name="supplier_create"),
 path("<slug:store_slug>/suppliers/<int:supplier_id>/delete/", views.delete_supplier, name="delete_supplier"),
 path("<slug:store_slug>/balances/", views.balances_report, name="balances_report"),
+path("<slug:store_slug>/profits/", views.profits_report, name="profits_report"),
 
 # للبحث
 path("<slug:store_slug>/search-suppliers/", views.search_suppliers),
@@ -87,5 +89,11 @@ path(
     "store/<slug:store_slug>/notices/<int:notice_id>/delete/",
     views.notice_delete,
     name="notice_delete"
-)
+),
+
+# الصرفيات
+path("<slug:store_slug>/expenses/", views.expenses_list, name="expenses_list"),
+path("<slug:store_slug>/expenses/<int:expense_id>/edit/", views.expense_edit, name="expense_edit"),
+path("<slug:store_slug>/expenses/<int:expense_id>/delete/", views.expense_delete, name="expense_delete"),
+path("<slug:store_slug>/expenses/settings/", views.expense_settings, name="expense_settings"),
 ]

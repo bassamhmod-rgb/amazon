@@ -192,9 +192,41 @@
             </div>
             {% endif %}
 
-            <!-- 🔹 المواصفات -->
+            <!-- Barcodes -->
             <hr class="my-4">
-            <h5>🧾 مواصفات المنتج</h5>
+            <h5>&#1576;&#1575;&#1585;&#1603;&#1608;&#1583;&#1575;&#1578; &#1575;&#1604;&#1605;&#1606;&#1578;&#1580;</h5>
+
+            <div id="barcodes-container">
+                {% if is_edit and product.barcodes.all %}
+                    {% for b in product.barcodes.all %}
+                    <div class="row g-2 mb-2 barcode-row">
+                        <div class="col-md-10">
+                            <input type="text" name="barcode_value" class="form-control"
+                                   value="{{ b.value }}" placeholder="&#1576;&#1575;&#1585;&#1603;&#1608;&#1583; &#1575;&#1604;&#1605;&#1606;&#1578;&#1580;">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-danger w-100 remove-barcode">&times;</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="row g-2 mb-2 barcode-row">
+                        <div class="col-md-10">
+                            <input type="text" name="barcode_value" class="form-control" placeholder="&#1576;&#1575;&#1585;&#1603;&#1608;&#1583; &#1575;&#1604;&#1605;&#1606;&#1578;&#1580;">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-danger w-100 remove-barcode">&times;</button>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            <button type="button" class="btn btn-outline-secondary my-2" id="add-barcode">
+                + &#1573;&#1590;&#1575;&#1601;&#1577; &#1576;&#1575;&#1585;&#1603;&#1608;&#1583;
+            </button>
+
+            <!-- Product Details -->
+            <hr class="my-4">
+            <h5>&#1605;&#1608;&#1575;&#1589;&#1601;&#1575;&#1578; &#1575;&#1604;&#1605;&#1606;&#1578;&#1580;</h5>
 
             <div id="details-container">
                 {% if is_edit and product.details.all %}
@@ -277,6 +309,29 @@ addBtn.onclick = () => {
 document.addEventListener("click", e => {
     if(e.target.classList.contains("remove-detail")){
         e.target.closest(".detail-row")?.remove();
+    }
+});
+
+const addBarcodeBtn = document.getElementById("add-barcode");
+const barcodeContainer = document.getElementById("barcodes-container");
+
+addBarcodeBtn.onclick = () => {
+    const row = document.createElement("div");
+    row.className = "row g-2 mb-2 barcode-row";
+    row.innerHTML = `
+        <div class="col-md-10">
+            <input type="text" name="barcode_value" class="form-control" placeholder="&#1576;&#1575;&#1585;&#1603;&#1608;&#1583; &#1575;&#1604;&#1605;&#1606;&#1578;&#1580;">
+        </div>
+        <div class="col-md-2">
+            <button type="button" class="btn btn-danger w-100 remove-barcode">&times;</button>
+        </div>
+    `;
+    barcodeContainer.appendChild(row);
+};
+
+document.addEventListener("click", e => {
+    if(e.target.classList.contains("remove-barcode")){
+        e.target.closest(".barcode-row")?.remove();
     }
 });
 </script>
