@@ -2,7 +2,8 @@ from django.shortcuts import render, get_object_or_404, redirect
 from .models import Store
 from products.models import Product
 from accounts.models import Customer
-from django.db.models import Sum
+from django.db.models import Sum, F, Value, DecimalField, ExpressionWrapper
+from django.db.models.functions import Coalesce, Cast
 from accounts.models import PointsTransaction
 from products.models import Category
 from django.db.models import Q, Exists, OuterRef
@@ -35,7 +36,20 @@ def store_front(request, slug):
             )["total"] or 0
 
     # ============ 🔥 المنتجات ============
-    products = Product.objects.filter(store=store, active=True)
+    movements = Coalesce(
+        Sum(F("order_items__quantity") * F("order_items__direction")),
+        Value(0)
+    )
+    real_stock_calc = ExpressionWrapper(
+        Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2)) + movements,
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
+    products = (
+        Product.objects
+        .filter(store=store, active=True)
+        .annotate(real_stock_calc=real_stock_calc)
+        .filter(real_stock_calc__gt=0)
+    )
 
     # ============ 🔎 البحث ============
     q = request.GET.get("q")

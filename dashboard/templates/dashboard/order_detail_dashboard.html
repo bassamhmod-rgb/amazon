@@ -207,6 +207,29 @@
         </div>
     </div>
 
+    <!-- ملاحظة الدفع للتاجر -->
+    <div class="card p-3 mb-4 shadow-sm border-0">
+        <h5 class="mb-2">💰 ملاحظة الدفع</h5>
+        {% if required_payment_text %}
+            <p class="mb-1"><strong>المطلوب:</strong> {{ required_payment_text }}</p>
+        {% else %}
+            <p class="mb-1 text-muted">لا توجد معلومات دفع.</p>
+        {% endif %}
+
+        {% if order.payment_transaction_id %}
+            <p class="mb-1"><strong>رقم العملية:</strong> {{ order.payment_transaction_id }}</p>
+        {% endif %}
+
+        {% if order.payment_proof_image %}
+            <div class="mt-2">
+                <strong>إشعار الدفع:</strong><br>
+                <a href="{{ order.payment_proof_image.url }}" target="_blank">
+                    عرض صورة الإشعار
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
     <!-- 🎁 الكاش باك -->
     {% if order.transaction_type == "sale" and not has_cashback %}
     <form method="post" action="{% url 'dashboard:confirm_order' store.slug order.id %}">

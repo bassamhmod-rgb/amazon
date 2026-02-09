@@ -372,6 +372,15 @@ def order_detail_dashboard(request, store_slug, order_id):
     if required_percent > 0:
         required_amount = (order.net_total * required_percent) / 100
 
+    # ✅ تحديد نص المبلغ المطلوب حسب طريقة الدفع
+    required_payment_text = ""
+    if order.payment_type == "full":
+        required_payment_text = f"المبلغ الكامل: {order.net_total:.2f} $"
+    elif order.payment_type == "partial":
+        required_payment_text = f"الحد الأدنى للدفع المسبق ({required_percent}%): {required_amount:.2f} $"
+    elif order.payment_type == "cod":
+        required_payment_text = "الدفع عند الاستلام"
+
     # 👁️ تعليم الطلب كمقروء
     if not order.is_seen_by_store:
         order.is_seen_by_store = True
@@ -405,6 +414,7 @@ def order_detail_dashboard(request, store_slug, order_id):
         # الدفع المسبق
         "required_percent": required_percent,
         "required_amount": required_amount,
+        "required_payment_text": required_payment_text,
 
         # الكاش باك
         "total_profit": total_profit,
