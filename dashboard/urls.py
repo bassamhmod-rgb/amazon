@@ -60,6 +60,7 @@ path(
 
 #اعدادات
 path("<slug:store_slug>/settings/", views.store_settings, name="store_settings"),
+path("<slug:store_slug>/settings/reset-data/", views.reset_store_data, name="reset_store_data"),
 #الجرد
 path(
     "<slug:store_slug>/inventory/",

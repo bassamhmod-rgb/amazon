@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 from products.models import ProductDetails ,Product, ProductGallery, ProductBarcode
@@ -11,15 +12,17 @@ from products.utils import fix_missing_buy_price_for_product, apply_purchase_pri
 # --- استيراد المودلز من التطبيقات المختلفة ---
 from products.models import Category, Product
 from products.forms import CategoryForm, ProductForm
-from stores.models import Store
+from stores.models import Store, StorePaymentMethod
 from orders.models import Order, OrderItem
-from accounts.models import PointsTransaction
+from accounts.models import PointsTransaction, AccountingClient, SystemNotification
+from cart.models import Cart
+from loyalty.models import LoyaltyPoints
 
 # 1. الزبون موجود بـ accounts (حسب كلامك)
 from accounts.models import Customer
 from django.contrib import messages
 ###
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 from django.db.models import Q
 from accounts.models import Supplier
 from django.http import JsonResponse
@@ -1393,6 +1396,9 @@ def store_settings(request, store_slug):
         return redirect("/")
 
     if request.method == "POST":
+        if request.POST.get("reset_action") == "1":
+            return _perform_store_reset(request, store)
+
         new_slug = request.POST.get("slug", "").strip()
 
         if new_slug != store.slug:
@@ -1450,7 +1456,50 @@ def store_settings(request, store_slug):
         messages.success(request, "تم حفظ إعدادات المتجر بنجاح.")
         return redirect(f"/dashboard/{store.slug}/settings/")
 
-    return render(request, "dashboard/store_settings.html", {"store": store})
+    products_count = Product.objects.filter(store=store).count()
+    return render(request, "dashboard/store_settings.html", {"store": store, "products_count": products_count})
+
+
+@login_required
+def reset_store_data(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+
+    if request.method != "POST":
+        return redirect(f"/dashboard/{store.slug}/settings/")
+
+    return _perform_store_reset(request, store)
+
+
+def _perform_store_reset(request, store):
+    products_count = Product.objects.filter(store=store).count()
+
+    password = (request.POST.get("reset_password") or "").strip()
+    if not password or not check_password(password, request.user.password):
+        messages.error(request, "كلمة المرور غير صحيحة.")
+        return redirect(f"/dashboard/{store.slug}/settings/")
+
+    with transaction.atomic():
+        Order.objects.filter(store=store).delete()
+        Cart.objects.filter(store=store).delete()
+
+        Product.objects.filter(store=store).delete()
+        Category.objects.filter(store=store).delete()
+
+        Customer.objects.filter(store=store).delete()
+        Supplier.objects.filter(store=store).delete()
+        LoyaltyPoints.objects.filter(store=store).delete()
+
+        StorePaymentMethod.objects.filter(store=store).delete()
+
+        Expense.objects.filter(store=store).delete()
+        ExpenseReason.objects.filter(store=store).delete()
+        ExpenseType.objects.filter(store=store).delete()
+
+        AccountingClient.objects.filter(store=store).delete()
+        SystemNotification.objects.filter(target_store=store).delete()
+
+    messages.success(request, "تم تفريغ بيانات المتجر بنجاح (مع الاحتفاظ ببيانات المتجر).")
+    return redirect(f"/dashboard/{store.slug}/settings/")
 
 def balances_report(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)

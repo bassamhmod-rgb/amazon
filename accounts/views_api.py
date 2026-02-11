@@ -139,7 +139,7 @@ def create_customer_from_access(request):
         ).exists():
             return JsonResponse({
                 "status": "exists",
-                "message": "الزبون موجود مسبقًا"
+                "message": "الزبون أو رقم الموبايل موجود مسبقًا"
             })
 
         Customer.objects.create(

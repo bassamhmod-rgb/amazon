@@ -131,6 +131,11 @@
 <body>
 
 <div class="container mt-4">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} mb-3">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
 
     <h2 class="mb-2">⚙️ إعدادات المتجر – <span class="text-primary">{{ store.slug }}</span></h2>
 
@@ -377,12 +382,34 @@
                     <input type="password" class="form-control" name="new_password">
                 </div>
 
+                <div class="settings-card border border-danger">
+                    <h4 class="mb-3 text-danger"> تفريغ بيانات المتجر</h4>
+                    <p class="text-muted mb-2">
+                        هذا الإجراء يحذف كل بيانات المتجر الحالية (المنتجات، الطلبات، الزبائن، الموردين،
+                        الصرفيات، طرق الدفع، الكاش باك، السلات...) مع الاحتفاظ ببيانات المتجر نفسه.
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label">تأكيد كلمة المرور</label>
+                        <input type="password" class="form-control" name="reset_password" form="reset-form" placeholder="كلمة مرور التاجر">
+                    </div>
+                    <button
+                        type="submit"
+                        class="btn btn-danger" form="reset-form"
+                    >
+                        تفريغ البيانات الآن
+                    </button>
+                </div>
+
             </div>
 
         </div>
 
         <button class="btn btn-primary px-4 mt-3">💾 حفظ التعديلات</button>
 
+    </form>
+
+    <form id="reset-form" method="post" action="{% url 'dashboard:reset_store_data' store.slug %}">
+        {% csrf_token %}
     </form>
 
 </div>
