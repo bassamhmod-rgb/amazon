@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 
 from stores.models import Store, StorePaymentMethod
 from accounts.models import Customer
+from django.utils import timezone
 
 
 STATUS_CHOICES = [
@@ -25,12 +26,7 @@ PAYMENT_TYPES = [
 class Order(models.Model):
     is_seen_by_store = models.BooleanField(default=False)
 
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="orders"
-    )
-
+    
     customer = models.ForeignKey(
         Customer,
         on_delete=models.SET_NULL,
@@ -58,7 +54,10 @@ class Order(models.Model):
         help_text="رقم الفاتورة في برنامج المحاسبة"
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    
+    created_at = models.DateTimeField(
+    default=timezone.now
+    )
 
     status = models.CharField(
         max_length=20,

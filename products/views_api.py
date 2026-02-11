@@ -8,7 +8,7 @@ from django.db.models import F
 #تصدير
 @csrf_exempt
 def merchant_categories_api(request, merchant_id):
-    store = Store.objects.filter(owner_id=merchant_id).first()
+    store = Store.objects.filter(id=merchant_id).first()
     
     if not store:
         return JsonResponse([], safe=False)
@@ -24,7 +24,7 @@ def merchant_categories_api(request, merchant_id):
 
 @csrf_exempt
 def merchant_products_api(request, merchant_id):
-    store = Store.objects.filter(owner_id=merchant_id).first()
+    store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return JsonResponse([], safe=False)
 
@@ -52,7 +52,7 @@ def create_category_from_access(request):
         if not merchant_id or not name:
             return JsonResponse({"error": "بيانات ناقصة"}, status=400)
 
-        store = Store.objects.filter(owner_id=merchant_id).first()
+        store = Store.objects.filter(id=merchant_id).first()
         if not store:
             return JsonResponse({"error": "Merchant not found"}, status=404)
 
@@ -87,7 +87,7 @@ def create_product_from_access(request):
         if not merchant_id or not name:
             return JsonResponse({"error": "بيانات ناقصة"}, status=400)
 
-        store = Store.objects.filter(owner_id=merchant_id).first()
+        store = Store.objects.filter(id=merchant_id).first()
         if not store:
             return JsonResponse({"error": "Merchant not found"}, status=404)
 

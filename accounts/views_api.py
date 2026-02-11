@@ -15,7 +15,7 @@ def merchant_customers_api(request, merchant_id):
     API: جلب عملاء تاجر معين (قراءة فقط)
     """
 
-    store = Store.objects.filter(owner_id=merchant_id).first()
+    store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return JsonResponse({"error": "Merchant not found"}, status=404)
 
@@ -37,7 +37,7 @@ def merchant_suppliers_api(request, merchant_id):
     API: جلب موردي تاجر معين (قراءة فقط)
     """
 
-    store = Store.objects.filter(owner_id=merchant_id).first()
+    store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return JsonResponse({"error": "Merchant not found"}, status=404)
 
@@ -54,7 +54,7 @@ def merchant_suppliers_api(request, merchant_id):
 #نقل الكاش باك
 @csrf_exempt
 def merchant_points_export_api(request, merchant_id):
-    store = Store.objects.filter(owner_id=merchant_id).first()
+    store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return JsonResponse({"error": "Merchant not found"}, status=404)
 
@@ -128,7 +128,7 @@ def create_customer_from_access(request):
             return JsonResponse({"error": "بيانات ناقصة"}, status=400)
 
         # 🔑 نفس منطق merchant_customers_api
-        store = Store.objects.filter(owner_id=merchant_id).first()
+        store = Store.objects.filter(id=merchant_id).first()
         if not store:
             return JsonResponse({"error": "Merchant not found"}, status=404)
 
@@ -187,7 +187,7 @@ def create_supplier_from_access(request):
         if not merchant_id or not name:
             return JsonResponse({"error": "بيانات ناقصة"}, status=400)
 
-        store = Store.objects.filter(owner_id=merchant_id).first()
+        store = Store.objects.filter(id=merchant_id).first()
         if not store:
             return JsonResponse({"error": "Merchant not found"}, status=404)
 
@@ -227,7 +227,7 @@ def create_cashback_from_access(request, merchant_id):
         if not customer_name or amount is None or not trans_date:
             return JsonResponse({"error": "بيانات ناقصة"}, status=400)
 
-        store = Store.objects.filter(owner_id=merchant_id).first()
+        store = Store.objects.filter(id=merchant_id).first()
         if not store:
             return JsonResponse({"error": "Merchant not found"}, status=404)
 

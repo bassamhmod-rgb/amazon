@@ -13,4 +13,14 @@ urlpatterns = [
   # ⭐ API مباشر بدون include
     path("api/orders/<int:merchant_id>/", views_api.merchant_orders_api),
     path("api/set-invoice-number/", views_api.set_invoice_number),
+    path(
+        "api/create_order_from_access/",
+        views_api.create_order_from_access,
+        name="create_order_from_access"
+    ),
+    path(
+        "api/create_order_item_from_access/",
+        views_api.create_order_item_from_access,
+        name="create_order_item_from_access"
+    ),
 ]
