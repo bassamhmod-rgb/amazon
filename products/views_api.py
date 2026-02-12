@@ -47,8 +47,7 @@ def create_category_from_access(request):
 
         merchant_id = data.get("store")
         name = data.get("name", "").strip()
-        if name == "بدون":
-            return JsonResponse({"status": "ignored"})
+        
         if not merchant_id or not name:
             return JsonResponse({"error": "بيانات ناقصة"}, status=400)
 

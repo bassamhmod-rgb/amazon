@@ -106,6 +106,8 @@ import json
 from stores.models import Store
 from accounts.models import Customer
 
+from django.db.models import Q
+
 @csrf_exempt
 def create_customer_from_access(request):
     if request.method != "POST":
@@ -113,35 +115,41 @@ def create_customer_from_access(request):
 
     try:
         data = json.loads(request.body.decode("utf-8"))
-        
-        merchant_id = data.get("store")   # ← نفس منطق التصدير
+
+        merchant_id = data.get("store")
         name = data.get("name", "").strip()
         phone = data.get("phone", "").strip()
-        if name == "أخطاء التسجيل":
-            return JsonResponse({"status": "ignored"})
-        if name == "مرتجع إلى مورد":
-            return JsonResponse({"status": "ignored"})
-        if name == "اتلاف":
-            return JsonResponse({"status": "ignored"})
-        
+
         if not merchant_id or not name:
             return JsonResponse({"error": "بيانات ناقصة"}, status=400)
 
-        # 🔑 نفس منطق merchant_customers_api
+        # 🔑 جلب المتجر
         store = Store.objects.filter(id=merchant_id).first()
         if not store:
             return JsonResponse({"error": "Merchant not found"}, status=404)
 
-        if Customer.objects.filter(
+        # 🔍 استعلام واحد فقط
+        existing = Customer.objects.filter(
             store=store
         ).filter(
             Q(name=name) | Q(phone=phone)
-        ).exists():
+        ).only("name", "phone").first()
+
+        if existing:
+            # 🔴 نفس الرقم واسم مختلف → نظهر رسالة
+            if existing.phone == phone and existing.name != name:
+                return JsonResponse({
+                    "status": "exists",
+                    "message": "رقم الموبايل مسجل باسم آخر لن يتم إكمال مزامنة الفواتير الا بعد حل المشكلة . يفضل التأكد من نقل العملاء من فورم العملاء اولا",
+                    "existing_name": existing.name
+                })
+
+            # 🔴 باقي الحالات → منع بدون رسالة
             return JsonResponse({
-                "status": "exists",
-                "message": "الزبون أو رقم الموبايل موجود مسبقًا"
+                "status": "exists"
             })
 
+        # ✅ إنشاء الزبون
         Customer.objects.create(
             store=store,
             name=name,
@@ -172,12 +180,6 @@ def create_supplier_from_access(request):
         merchant_id = data.get("store")
         name = (data.get("name") or "").strip()
         phone = data.get("phone")
-        if name == "أخطاء التسجيل":
-            return JsonResponse({"status": "ignored"})
-        if name == "فاتورة بدء":
-            return JsonResponse({"status": "ignored"})
-        if name == "مرتجع من زبون":
-            return JsonResponse({"status": "ignored"})
         # توحيد phone
         if phone in ("", None):
             phone = None
