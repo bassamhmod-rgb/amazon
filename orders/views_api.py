@@ -187,9 +187,9 @@ def create_order_item_from_access(request):
         if not order:
             return JsonResponse({"error": "order not found"})
 
-        product = Product.objects.filter(name=product_name).first()
+        product = Product.objects.filter(store=order.store, name=product_name).first()
         if not product:
-            return JsonResponse({"error": "product not found"})
+            return JsonResponse({"error": "product not found for store"})
 
         quantity = data.get("quantity", 1)
         direction = data.get("noaf")

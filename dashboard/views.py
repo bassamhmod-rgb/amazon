@@ -532,7 +532,6 @@ def order_create(request, store_slug):
         # 3) إنشاء الطلب
         order = Order.objects.create(
             store=store,
-            user=request.user,
             transaction_type=transaction_type,
             customer=customer if transaction_type == "sale" else None,
             supplier=supplier if transaction_type == "purchase" else None,
@@ -713,8 +712,8 @@ def orders_list(request, store_slug):
     status = request.GET.get("status", "")
     order_id = request.GET.get("order_id", "")
 
-    # كل طلبات المتجر
-    orders = Order.objects.filter(store=store)
+    # كل طلبات المتجر (الطلبات فقط بدون إشعارات القبض/الصرف)
+    orders = Order.objects.filter(store=store, document_kind=1)
 
     # فلترة حسب الحالة
     if status:
