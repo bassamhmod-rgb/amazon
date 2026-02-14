@@ -962,7 +962,6 @@ def notice_create(request, store_slug):
         # ===== إنشاء الإشعار =====
         Order.objects.create(
             store=store,
-            user=request.user,
             document_kind=2,
             transaction_type=transaction_type,
             customer=customer,
@@ -1272,12 +1271,16 @@ def customer_create(request, store_slug):
         name = request.POST.get("name")
         phone = request.POST.get("phone")
 
-        exists = Customer.objects.filter(store=store).filter(
-            Q(name=name) | Q(phone=phone)
-        ).exists()
+        duplicate_name = Customer.objects.filter(store=store, name=name).exists()
+        duplicate_phone = Customer.objects.filter(store=store, phone=phone).exists()
 
-        if exists:
-            messages.error(request, "هذا العميل مسجّل مسبقًا (اسم أو رقم).")
+        if duplicate_name or duplicate_phone:
+            if duplicate_name and duplicate_phone:
+                messages.error(request, "لم تتم الإضافة: الاسم ورقم الموبايل مسجلان مسبقًا.")
+            elif duplicate_name:
+                messages.error(request, "لم تتم الإضافة: الاسم مسجل مسبقًا.")
+            else:
+                messages.error(request, "لم تتم الإضافة: رقم الموبايل مسجل مسبقًا.")
             return redirect("dashboard:customers_list", store_slug=store.slug)
 
         Customer.objects.create(
@@ -1559,6 +1562,9 @@ def balances_report(request, store_slug):
         else:
             supplier.calc_balance_label = "ظ…طھظˆط§ط²ظ†"
 
+    customers = [customer for customer in customers if customer.calc_balance != 0]
+    suppliers = [supplier for supplier in suppliers if supplier.calc_balance != 0]
+
     customer_total_abs = abs(customer_total)
     supplier_total_abs = abs(supplier_total)
     customer_total_label = "ظ…ط¯ظٹظ†" if customer_total > 0 else "ط¯ط§ط¦ظ†" if customer_total < 0 else "ظ…طھظˆط§ط²ظ†"
@@ -1705,17 +1711,16 @@ def supplier_create(request, store_slug):
         email = request.POST.get("email")
         opening_balance = request.POST.get("opening_balance") or 0
 
-        # ✅ منع التكرار فقط إذا القيم موجودة
-        exists_qs = Supplier.objects.filter(store=store)
+        duplicate_name = bool(name) and Supplier.objects.filter(store=store, name=name).exists()
+        duplicate_phone = bool(phone) and Supplier.objects.filter(store=store, phone=phone).exists()
 
-        if name:
-            exists_qs = exists_qs.filter(name=name)
-
-        if phone:
-            exists_qs = exists_qs.filter(phone=phone)
-
-        if exists_qs.exists():
-            messages.error(request, "âڑ ï¸ڈ ظ‡ط°ط§ ط§ظ„ظ…ظˆط±ط¯ ظ…ط³ط¬ظ‘ظ„ ظ…ط³ط¨ظ‚ط§ظ‹ (ط§ط³ظ… ط£ظˆ ط±ظ‚ظ…).")
+        if duplicate_name or duplicate_phone:
+            if duplicate_name and duplicate_phone:
+                messages.error(request, "لم تتم الإضافة: الاسم ورقم الموبايل مسجلان مسبقًا.")
+            elif duplicate_name:
+                messages.error(request, "لم تتم الإضافة: الاسم مسجل مسبقًا.")
+            else:
+                messages.error(request, "لم تتم الإضافة: رقم الموبايل مسجل مسبقًا.")
             return redirect("dashboard:suppliers_list", store_slug=store.slug)
 
         Supplier.objects.create(
@@ -1820,6 +1825,8 @@ def inventory_list(request, store_slug):
     if sub_category_id and sub_category_id.isdigit():
         base_qs = base_qs.filter(category2_id=sub_category_id)
 
+    qty_filter = (request.GET.get("qty_filter") or "").strip()
+
     products_qs = (
         base_qs
         .annotate(
@@ -1853,6 +1860,13 @@ def inventory_list(request, store_slug):
         .order_by("-id")
     )
 
+    if qty_filter == "gt0":
+        products_qs = products_qs.filter(remaining_qty__gt=0)
+    elif qty_filter == "eq0":
+        products_qs = products_qs.filter(remaining_qty=0)
+    elif qty_filter == "lt0":
+        products_qs = products_qs.filter(remaining_qty__lt=0)
+
     categories = Category.objects.filter(store=store)
 
     # 💰 إجمالي قيمة المخزون
@@ -1878,6 +1892,7 @@ def inventory_list(request, store_slug):
         "categories": categories,
         "q": q,
         "barcode": barcode,
+        "current_qty_filter": qty_filter,
         "current_category": int(category_id) if category_id and category_id.isdigit() else None,
         "current_sub_category": int(sub_category_id) if sub_category_id and sub_category_id.isdigit() else None,
         "total_inventory_value": total_inventory_value,

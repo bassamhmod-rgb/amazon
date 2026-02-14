@@ -241,7 +241,6 @@ def confirm_order(request, store_slug):
     order = Order.objects.create(
         store=store,
         customer=customer,
-        user=store.owner,
         status="pending",
         shipping_address=data.get("customer_address", ""),
         payment_type=data.get("payment_type"),
@@ -263,11 +262,14 @@ def confirm_order(request, store_slug):
         order.save()
 
     for item in cart.items.all():
+        buy_price = item.product.get_avg_buy_price()
         OrderItem.objects.create(
             order=order,
             product=item.product,
             quantity=item.quantity,
             price=item.product.price,
+            direction=-1,
+            buy_price=buy_price,
             item_note=item.item_note,
         )
 
@@ -287,3 +289,4 @@ def order_success(request, store_slug, order_id):
         "store": store,
         "order": order,
     })
+

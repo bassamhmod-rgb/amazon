@@ -143,6 +143,14 @@
                     {% endfor %}
                 </select>
             </div>
+            <div class="col-md-3">
+                <select name="qty_filter" id="inventoryQtyFilter" class="form-select">
+                    <option value="" {% if not current_qty_filter %}selected{% endif %}>كل الكميات</option>
+                    <option value="gt0" {% if current_qty_filter == "gt0" %}selected{% endif %}>أكبر من الصفر</option>
+                    <option value="eq0" {% if current_qty_filter == "eq0" %}selected{% endif %}>يساوي الصفر</option>
+                    <option value="lt0" {% if current_qty_filter == "lt0" %}selected{% endif %}>أصغر من الصفر</option>
+                </select>
+            </div>
             <div class="col-12 d-flex gap-2">
                 <a class="btn btn-outline-secondary" href="?">&#1573;&#1604;&#1594;&#1575;&#1569;</a>
             </div>
@@ -245,6 +253,7 @@
     const barcodeInput = document.getElementById("inventoryBarcodeSearch");
     const categorySelect = document.getElementById("inventoryCategory");
     const category2Select = document.getElementById("inventoryCategory2");
+    const qtyFilterSelect = document.getElementById("inventoryQtyFilter");
     const list = document.getElementById("inventorySearchResults");
     const form = input ? input.closest("form") : null;
     let idx = -1;
@@ -343,6 +352,12 @@
 
     if (category2Select){
         category2Select.addEventListener("change", function(){
+            form.submit();
+        });
+    }
+
+    if (qtyFilterSelect){
+        qtyFilterSelect.addEventListener("change", function(){
             form.submit();
         });
     }

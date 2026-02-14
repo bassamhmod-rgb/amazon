@@ -1850,3 +1850,111 @@ TypeError: Order() got unexpected keyword arguments: 'user'
 "POST /dashboard/SAMO_STOR/orders/add/ HTTP/1.1" 500 88377
 Internal Server Error: /accounts/api/create_supplier_from_access/
 "POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /orders/Alaman/confirm/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "e:\my\amazon_syria\src\orders\views.py", line 241, in confirm_order
+    order = Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 656, in create
+    obj = self.model(**kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 567, in __init__
+    raise TypeError(
+TypeError: Order() got unexpected keyword arguments: 'user'
+"POST /orders/Alaman/confirm/ HTTP/1.1" 500 83155
+Internal Server Error: /orders/Alaman/confirm/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "e:\my\amazon_syria\src\orders\views.py", line 241, in confirm_order
+    order = Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 656, in create
+    obj = self.model(**kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 567, in __init__
+    raise TypeError(
+TypeError: Order() got unexpected keyword arguments: 'user'
+"POST /orders/Alaman/confirm/ HTTP/1.1" 500 83415
+Internal Server Error: /orders/Alaman/confirm/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "e:\my\amazon_syria\src\orders\views.py", line 241, in confirm_order
+    order = Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 656, in create
+    obj = self.model(**kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 567, in __init__
+    raise TypeError(
+TypeError: Order() got unexpected keyword arguments: 'user'
+"POST /orders/Alaman/confirm/ HTTP/1.1" 500 83415
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 963, in notice_create
+    Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 656, in create
+    obj = self.model(**kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 567, in __init__
+    raise TypeError(
+TypeError: Order() got unexpected keyword arguments: 'user'
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 93661
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 963, in notice_create
+    Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 656, in create
+    obj = self.model(**kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 567, in __init__
+    raise TypeError(
+TypeError: Order() got unexpected keyword arguments: 'user'
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 93661
+Internal Server Error: /dashboard/store/Alaman/notices/create/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 963, in notice_create
+    Order.objects.create(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 656, in create
+    obj = self.model(**kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\base.py", line 567, in __init__
+    raise TypeError(
+TypeError: Order() got unexpected keyword arguments: 'user'
+"POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 93661

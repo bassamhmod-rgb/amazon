@@ -124,6 +124,12 @@
         </a>
     </div>
 
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} mb-3">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
     <div class="card p-3 shadow-sm">
         <div class="table-responsive">
             <table class="table table-striped align-middle mb-0">
