@@ -1,5 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.db.models import Sum
+from django.http import JsonResponse
 from stores.models import Store
 from products.models import Product
 from .models import Cart, CartItem
@@ -51,6 +53,13 @@ def add_to_cart(request, store_slug, product_id):
             item.item_note = note
 
         item.save()
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            cart_count = cart.items.count()
+            return JsonResponse({
+                "cart_count": cart_count,
+                "item_quantity": item.quantity,
+            })
 
     return redirect("cart:cart_detail", store_slug=store.slug)
 
@@ -106,5 +115,24 @@ def remove_from_cart(request, store_slug, item_id):
     # --- حذف العنصر ---
     item = get_object_or_404(CartItem, id=item_id, cart=cart)
     item.delete()
+
+    return redirect("cart:cart_detail", store_slug=store.slug)
+
+
+def update_cart_item_quantity(request, store_slug, item_id, action):
+    if request.method != "POST":
+        return redirect("cart:cart_detail", store_slug=store_slug)
+
+    store = get_object_or_404(Store, slug=store_slug, is_active=True)
+    cart = get_cart(request, store)
+    item = get_object_or_404(CartItem, id=item_id, cart=cart)
+
+    if action == "inc":
+        item.quantity += 1
+        item.save()
+    elif action == "dec":
+        if item.quantity > 1:
+            item.quantity -= 1
+            item.save()
 
     return redirect("cart:cart_detail", store_slug=store.slug)

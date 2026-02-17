@@ -9,6 +9,7 @@ from products.models import Category
 from django.db.models import Q, Exists, OuterRef
 from django.contrib.auth.decorators import login_required
 from stores.models import Store, StorePaymentMethod
+from cart.models import Cart
 
 def store_list(request):
     stores = Store.objects.filter(is_active=True)
@@ -34,6 +35,21 @@ def store_front(request, slug):
             balance = PointsTransaction.objects.filter(customer=customer).aggregate(
                 total=Sum("points")
             )["total"] or 0
+
+    # ============ 🛒 سلة الزبون ============
+    session_key = request.session.session_key
+    if not session_key:
+        request.session.create()
+        session_key = request.session.session_key
+
+    if request.user.is_authenticated:
+        cart = Cart.objects.filter(user=request.user, store=store).first()
+    else:
+        cart = Cart.objects.filter(session_key=session_key, store=store).first()
+
+    cart_count = 0
+    if cart:
+        cart_count = cart.items.count()
 
     # ============ 🔥 المنتجات ============
     movements = Coalesce(
@@ -79,6 +95,7 @@ def store_front(request, slug):
         "is_owner": is_owner,
         "customer": customer,
         "balance": balance,
+        "cart_count": cart_count,
 
         # مهم جداً للواجهة
         "categories": categories,
@@ -206,11 +223,6 @@ def payment_methods_edit(request, store_slug, method_id):
         method.additional_info = request.POST.get("additional_info")
         method.order = request.POST.get("order") or 0
         method.is_active = "is_active" in request.POST
-##
-        store.allow_full_payment = bool(request.POST.get("allow_full_payment"))
-        store.allow_partial_payment = bool(request.POST.get("allow_partial_payment"))
-        store.allow_cash_on_delivery = bool(request.POST.get("allow_cash_on_delivery"))
-        store.save()
 ##
         if request.FILES.get("icon"):
             method.icon = request.FILES.get("icon")

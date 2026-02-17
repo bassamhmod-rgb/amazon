@@ -96,50 +96,28 @@
 <div class="container mt-4">
 
     <h3 class="mb-3">
-        ✏️ تعديل طريقة الدفع – <span class="text-primary">{{ store.slug }}</span>
+        ✏️ تعديل وسيلة الدفع – <span class="text-primary">{{ store.slug }}</span>
     </h3>
 
     <a href="{% url 'stores:payment_methods' store.slug %}" class="btn btn-secondary mb-3">
-        ← الرجوع لقائمة طرق الدفع
+        ← الرجوع لقائمة وسائل الدفع
     </a>
 
     <div class="page-box">
 
-        <h5 class="mb-3">تعديل بيانات الطريقة</h5>
+        <h5 class="mb-3">تعديل بيانات الوسيلة</h5>
 
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
 
             <div class="mb-3">
-                <label class="form-label">خيارات الدفع المسموحة</label>
-
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="allow_full_payment"
-                           {% if store.allow_full_payment %}checked{% endif %}>
-                    <label class="form-check-label">تحويل كامل المبلغ</label>
-                </div>
-
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="allow_partial_payment"
-                           {% if store.allow_partial_payment %}checked{% endif %}>
-                    <label class="form-check-label">دفع جزء من المبلغ + باقي عند التسليم</label>
-                </div>
-
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="allow_cash_on_delivery"
-                           {% if store.allow_cash_on_delivery %}checked{% endif %}>
-                    <label class="form-check-label">الدفع عند الاستلام</label>
-                </div>
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">اسم الطريقة</label>
+                <label class="form-label">اسم الوسيلة</label>
                 <input type="text" name="name" class="form-control"
                        value="{{ method.name }}" required>
             </div>
 
             <div class="mb-3">
-                <label class="form-label">نوع الطريقة</label>
+                <label class="form-label">نوع الوسيلة</label>
                 <select name="type" class="form-control">
                     <option value="other"  {% if method.type == "other" %}selected{% endif %}>أخرى</option>
                     <option value="cash"   {% if method.type == "cash" %}selected{% endif %}>كاش</option>

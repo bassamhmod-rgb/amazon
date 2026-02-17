@@ -111,10 +111,10 @@
         </p>
 
         <!-- ================= طريقة الدفع ================ -->
-        <h5 class="section-title">💳 طريقة الدفع</h5>
+        <h5 class="section-title">💳 وسيلة الدفع</h5>
 
         {% if payment_method %}
-            <p class="info-row"><strong>الطريقة:</strong> {{ payment_method.name }}</p>
+            <p class="info-row"><strong>الوسيلة:</strong> {{ payment_method.name }}</p>
 
             {% if payment_method.recipient_name %}
                 <p class="info-row"><strong>اسم المستلم:</strong> {{ payment_method.recipient_name }}</p>
@@ -132,7 +132,7 @@
                 <p class="info-row"><strong>معلومات إضافية:</strong> {{ payment_method.additional_info }}</p>
             {% endif %}
         {% else %}
-            <p class="text-danger">لم يتم اختيار أي طريقة دفع.</p>
+            <p class="text-danger">لم يتم اختيار أي وسيلة دفع.</p>
         {% endif %}
 
         <div class="divider"></div>

@@ -82,14 +82,14 @@
             <p><strong>رقم الطلب:</strong> #{{ order.id }}</p>
             <p><strong>الزبون:</strong> {{ order.customer.name }}</p>
             <p><strong>رقم الهاتف:</strong> {{ order.customer.phone }}</p>
-            <p><strong>إجمالي المبلغ:</strong> {{ order.total|floatformat:2 }} $</p>
+            <p><strong>إجمالي المبلغ:</strong> {{ order.net_total|floatformat:2 }} $</p>
 
             <hr>
 
-            <h6 class="mb-2" style="color: var(--primary-color); font-weight:700;">💳 طريقة الدفع</h6>
+            <h6 class="mb-2" style="color: var(--primary-color); font-weight:700;">💳 وسيلة الدفع</h6>
 
             {% if order.payment_method_name %}
-                <p><strong>الطريقة:</strong> {{ order.payment_method_name }}</p>
+                <p><strong></strong> {{ order.payment_method_name }}</p>
             {% endif %}
 
             {% if order.payment_recipient_name %}

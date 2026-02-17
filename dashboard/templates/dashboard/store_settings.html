@@ -209,6 +209,28 @@
                                  min="0" max="100"
                                  class="form-control">
                         </div>
+                        <!-- طرق الدفع المسموحة -->
+                        <div class="mb-3">
+                            <label class="form-label">طرق الدفع المسموحة</label>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="allow_full_payment"
+                                       {% if store.allow_full_payment %}checked{% endif %}>
+                                <label class="form-check-label">تحويل كامل المبلغ</label>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="allow_partial_payment"
+                                       {% if store.allow_partial_payment %}checked{% endif %}>
+                                <label class="form-check-label">دفع جزء من المبلغ + باقي عند التسليم</label>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="allow_cash_on_delivery"
+                                       {% if store.allow_cash_on_delivery %}checked{% endif %}>
+                                <label class="form-check-label">الدفع عند الاستلام</label>
+                            </div>
+                        </div>
                         <!-- ⭐ نسبة الكاش باك من ربح الطلب -->
 <div class="mb-3">
   <label class="form-label">
@@ -297,15 +319,15 @@
                     <div class="mt-4 p-3"
                          style="background:#fdfdfd; border:1px solid #e5e7eb; border-radius:12px;">
 
-                        <h5 class="mb-2">💳 طرق الدفع الخاصة بالمتجر</h5>
+                        <h5 class="mb-2">💳 وسائل الدفع الخاصة بالمتجر</h5>
 
                         <p class="text-muted mb-3">
-                            قم بإدارة طرق الدفع التي يستطيع الزبائن استخدامها عند الشراء.
+                            قم بإدارة وسائل الدفع التي يستطيع الزبائن استخدامها عند الشراء.
                         </p>
 
                         <a href="{% url 'stores:payment_methods' store.slug %}"
                            class="btn btn-outline-primary">
-                            إدارة طرق الدفع
+                            إدارة وسائل الدفع
                         </a>
 
                     </div>
@@ -386,7 +408,7 @@
                     <h4 class="mb-3 text-danger"> تفريغ بيانات المتجر</h4>
                     <p class="text-muted mb-2">
                         هذا الإجراء يحذف كل بيانات المتجر الحالية (المنتجات، الطلبات، الزبائن، الموردين،
-                        الصرفيات، طرق الدفع، الكاش باك، السلات...) مع الاحتفاظ ببيانات المتجر نفسه.
+                        الصرفيات، وسائل الدفع، الكاش باك، السلات...) مع الاحتفاظ ببيانات المتجر نفسه.
                     </p>
                     <div class="mb-2">
                         <label class="form-label">تأكيد كلمة المرور</label>

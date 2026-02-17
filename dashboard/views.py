@@ -1432,6 +1432,10 @@ def store_settings(request, store_slug):
         if percent.isdigit():
             store.payment_required_percentage = int(percent)
 
+        store.allow_full_payment = "allow_full_payment" in request.POST
+        store.allow_partial_payment = "allow_partial_payment" in request.POST
+        store.allow_cash_on_delivery = "allow_cash_on_delivery" in request.POST
+
         cashback = request.POST.get("cashback_percentage", "").strip()
         try:
             if cashback != "":

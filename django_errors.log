@@ -1958,3 +1958,129 @@ Traceback (most recent call last):
     raise TypeError(
 TypeError: Order() got unexpected keyword arguments: 'user'
 "POST /dashboard/store/Alaman/notices/create/ HTTP/1.1" 500 93661
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /accounts/api/create_supplier_from_access/
+"POST /accounts/api/create_supplier_from_access/ HTTP/1.1" 500 90
+Internal Server Error: /store/LAPTOP_LAND/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "e:\my\amazon_syria\src\stores\views.py", line 76, in store_front
+    return render(request, "stores/store_front.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe1 in position 11291: invalid continuation byte
+"GET /store/LAPTOP_LAND/ HTTP/1.1" 500 131895
+Internal Server Error: /cart/Alaman/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "e:\my\amazon_syria\src\cart\views.py", line 86, in cart_detail
+    return render(request, "cart/cart_detail.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc7 in position 5527: invalid continuation byte
+"GET /cart/Alaman/ HTTP/1.1" 500 129882
+Internal Server Error: /cart/Alaman/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "e:\my\amazon_syria\src\cart\views.py", line 86, in cart_detail
+    return render(request, "cart/cart_detail.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc7 in position 5527: invalid continuation byte
+"GET /cart/Alaman/ HTTP/1.1" 500 129745

@@ -8,7 +8,7 @@
     <!-- مهم للريسبونسيف -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>طرق الدفع – {{ store.slug }}</title>
+    <title>وسائل الدفع – {{ store.slug }}</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
@@ -97,7 +97,7 @@
 <div class="container mt-4">
 
     <h2 class="mb-2">
-        💳 طرق الدفع – <span class="text-primary">{{ store.slug }}</span>
+        💳 وسائل الدفع – <span class="text-primary">{{ store.slug }}</span>
     </h2>
 
     <a href="/dashboard/{{ store.slug }}/settings/" class="btn btn-secondary mb-3">
@@ -123,13 +123,32 @@
             </a>
         </div>
 
+        <!-- طرق الدفع المسموحة -->
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4"
+             style="background:#f7f7f9; border-radius:12px; padding:12px 16px; border-right:4px solid #6c757d;">
+
+            <div>
+                <strong>طرق الدفع المسموحة:</strong>
+                <span class="text-muted">
+                    {% if store.allow_full_payment %}تحويل كامل المبلغ{% else %}—{% endif %}
+                    {% if store.allow_partial_payment %}{% if store.allow_full_payment %}، {% endif %}دفع جزء من المبلغ{% endif %}
+                    {% if store.allow_cash_on_delivery %}{% if store.allow_full_payment or store.allow_partial_payment %}، {% endif %}الدفع عند الاستلام{% endif %}
+                </span>
+            </div>
+
+            <a href="/dashboard/{{ store.slug }}/settings/"
+               class="btn btn-sm btn-outline-secondary">
+                تعديل الخيارات
+            </a>
+        </div>
+
         <!-- العنوان + زر الإضافة -->
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-            <h5 class="m-0">قائمة طرق الدفع</h5>
+            <h5 class="m-0">قائمة وسائل الدفع</h5>
 
             <a href="{% url 'stores:payment_methods_add' store.slug %}"
                class="btn btn-primary">
-                + إضافة طريقة جديدة
+                + إضافة وسيلة جديدة
             </a>
         </div>
 
@@ -200,7 +219,7 @@
         </div>
         {% else %}
             <p class="text-muted text-center mt-3">
-                لا توجد طرق دفع بعد.
+                لا توجد وسائل دفع بعد.
             </p>
         {% endif %}
 

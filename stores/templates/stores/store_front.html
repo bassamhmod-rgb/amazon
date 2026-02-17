@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -110,6 +110,77 @@ button.btn-primary {
     margin:0 auto 0.7rem;
 }
 
+.product-image-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+
+.product-name {
+    font-weight: 700;
+    margin-top: 0.2rem;
+}
+
+.product-price {
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.6rem;
+}
+
+.qty-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.qty-input {
+    width: 52px;
+    text-align: center;
+    border-radius: 10px;
+    border: 1px solid var(--soft-border);
+    padding: 0.2rem 0.4rem;
+}
+
+.qty-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    border: 1px solid var(--soft-border);
+    background: #fff;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.qty-btn:active {
+    transform: translateY(1px);
+}
+
+.cart-btn {
+    position: relative;
+}
+
+.cart-badge {
+    position: absolute;
+    top: -6px;
+    inset-inline-start: -6px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cart-badge.is-hidden {
+    display: none;
+}
+
 /* ================= OTHER ================= */
 .notice-box {
     border-radius:12px;
@@ -162,13 +233,16 @@ button.btn-primary {
                 Amazon Syria
             </a><br>
             <span class="brand-title-ar">أمازون سوريا</span><br>
-            <span class="brand-subtitle">منصة المتاجر الإلكترونية</span>
+            <span class="brand-subtitle">منصة التجارة الإلكترونية</span>
         </div>
 
         <div class="d-flex align-items-center gap-3">
 
-            <a href="{% url 'cart:cart_detail' store.slug %}" class="btn btn-outline-primary">
+            <a href="{% url 'cart:cart_detail' store.slug %}" class="btn btn-outline-primary cart-btn">
                 🛒
+                <span id="cart-count" class="cart-badge{% if not cart_count %} is-hidden{% endif %}">
+                    {{ cart_count|default:0 }}
+                </span>
             </a>
 
             <a href="{% url 'accounts:customer_points' store.slug %}" class="btn btn-outline-primary">
@@ -217,7 +291,7 @@ button.btn-primary {
                     <li>
                         <a class="dropdown-item text-danger"
                            href="{% url 'accounts:customer_logout' %}?next={{ request.path }}">
-                            🚪 تسجيل خروج
+                            🚪 تسجيل الخروج
                         </a>
                     </li>
                     {% endif %}
@@ -227,7 +301,7 @@ button.btn-primary {
             {% if customer %}
                 <a href="{% url 'accounts:customer_logout' %}?next={{ request.path }}"
                    class="btn btn-outline-danger d-none d-md-inline">
-                    🚪 تسجيل خروج
+                    🚪 تسجيل الخروج
                 </a>
             {% endif %}
             
@@ -278,7 +352,7 @@ button.btn-primary {
 
                         <div class="col-6">
                             <select name="category2" class="form-select">
-                                <option value="">— الفئة الثانية —</option>
+                                <option value="">— الفئة الفرعية —</option>
                                 {% for c in categories %}
                                     <option value="{{ c.id }}"
                                         {% if c.id|stringformat:"s" == current_category2 %}selected{% endif %}>
@@ -319,26 +393,34 @@ button.btn-primary {
             {% for p in products %}
             <div class="col-6 col-md-3">
                 <div class="store-card">
-
-                    {% if p.main_image %}
-                        <div class="product-image-square">
-                            <img src="{{ p.main_image.url }}" alt="{{ p.name }}">
-                        </div>
-                    {% else %}
-                        <div class="store-logo-circle">
-                            {{ p.name|slice:":2" }}
-                        </div>
-                    {% endif %}
-
-                    <div class="store-name">{{ p.name }}</div>
-<a href="{% url 'stores:product_public' store.slug p.id %}"
-                       class="btn btn-outline-primary mt-2">
-                        عرض المنتج
+                    <a href="{% url 'stores:product_public' store.slug p.id %}" class="product-image-link" aria-label="{{ p.name }}">
+                        {% if p.main_image %}
+                            <div class="product-image-square">
+                                <img src="{{ p.main_image.url }}" alt="{{ p.name }}">
+                            </div>
+                        {% else %}
+                            <div class="store-logo-circle">
+                                {{ p.name|slice:":2" }}
+                            </div>
+                        {% endif %}
                     </a>
+
+                    <div class="product-name">{{ p.name }}</div>
+                    <div class="product-price">{{ p.price }} ل.س</div>
+
+                    <form method="POST" action="{% url 'cart:add_to_cart' store.slug p.id %}" class="add-to-cart-form">
+                        {% csrf_token %}
+                        <div class="qty-control" data-qty>
+                            <button type="button" class="qty-btn" data-qty-dec aria-label="نقص الكمية">-</button>
+                            <input type="number" name="quantity" value="1" min="1" class="qty-input" inputmode="numeric">
+                            <button type="button" class="qty-btn" data-qty-inc aria-label="زيادة الكمية">+</button>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 mt-2">أضف إلى السلة</button>
+                    </form>
                 </div>
             </div>
             {% empty %}
-                <p class="text-muted mt-3">لا يوجد منتجات حالياً.</p>
+                <p class="text-muted mt-3">لا توجد منتجات متاحة.</p>
             {% endfor %}
         </div>
 
@@ -357,8 +439,76 @@ button.btn-primary {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     document.getElementById("year").textContent = new Date().getFullYear();
+
+    document.querySelectorAll("[data-qty]").forEach(function (wrapper) {
+        var input = wrapper.querySelector("input[type='number']");
+        var dec = wrapper.querySelector("[data-qty-dec]");
+        var inc = wrapper.querySelector("[data-qty-inc]");
+        var min = parseInt(input.min || "1", 10);
+
+        dec.addEventListener("click", function () {
+            var value = parseInt(input.value, 10);
+            if (isNaN(value)) value = min;
+            input.value = Math.max(min, value - 1);
+        });
+
+        inc.addEventListener("click", function () {
+            var value = parseInt(input.value, 10);
+            if (isNaN(value)) value = min;
+            input.value = value + 1;
+        });
+    });
+
+    function updateCartBadge(count) {
+        var badge = document.getElementById("cart-count");
+        if (!badge) return;
+        var value = parseInt(count, 10) || 0;
+        badge.textContent = value;
+        if (value > 0) {
+            badge.classList.remove("is-hidden");
+        } else {
+            badge.classList.add("is-hidden");
+        }
+    }
+
+    document.querySelectorAll(".add-to-cart-form").forEach(function (form) {
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            var submitBtn = form.querySelector("button[type='submit']");
+            if (submitBtn) submitBtn.disabled = true;
+
+            var csrfInput = form.querySelector("input[name='csrfmiddlewaretoken']");
+            var headers = { "X-Requested-With": "XMLHttpRequest" };
+            if (csrfInput) headers["X-CSRFToken"] = csrfInput.value;
+
+            fetch(form.action, {
+                method: "POST",
+                headers: headers,
+                credentials: "same-origin",
+                body: new FormData(form)
+            })
+            .then(function (res) {
+                if (!res.ok) throw res;
+                return res.json();
+            })
+            .then(function (data) {
+                updateCartBadge(data.cart_count);
+            })
+            .catch(function () {
+                form.submit();
+            })
+            .finally(function () {
+                if (submitBtn) submitBtn.disabled = false;
+            });
+        });
+    });
 </script>
 
 </body>
 </html>
+
+
+
+
 

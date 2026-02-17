@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>سلة المشتريات – {{ store.name }}</title>
+    <title>??? ????????? - {{ store.name }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
@@ -82,6 +82,35 @@
             font-weight: 700;
         }
 
+        .qty-control-form {
+            display: inline-flex;
+            margin: 0;
+        }
+
+        .qty-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1px solid #d8c8ff;
+            background: #f6f0ff;
+            color: var(--primary-color);
+            font-weight: 700;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .qty-btn:hover {
+            background: #eadcff;
+        }
+
+        .qty-value {
+            min-width: 28px;
+            text-align: center;
+            display: inline-block;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
         .total-section {
             background: var(--white);
             border-radius: 16px;
@@ -135,7 +164,7 @@
 
 <div class="cart-container">
     
-    <h2 class="cart-header">سلة مشترياتك 🛒</h2>
+    <h2 class="cart-header">سلة المشتريات</h2>
 
     {% if cart.items.all %}
         
@@ -160,13 +189,34 @@
                         {% endif %}
 
                         <div class="d-flex justify-content-between align-items-center mt-2">
-                            <span class="text-muted small">العدد: <strong>{{ item.quantity }}</strong></span>
-                            
+                            <div class="text-muted small d-flex align-items-center gap-2">
+
+                                <span>العدد:</span>
+
+                                <form method="post" action="{% url 'cart:update_cart_item_quantity' store.slug item.id 'inc' %}" class="qty-control-form">
+
+                                    {% csrf_token %}
+
+                                    <button type="submit" class="qty-btn" aria-label="زيادة الكمية">+</button>
+
+                                </form>
+
+                                <span class="qty-value">{{ item.quantity }}</span>
+
+                                <form method="post" action="{% url 'cart:update_cart_item_quantity' store.slug item.id 'dec' %}" class="qty-control-form">
+
+                                    {% csrf_token %}
+
+                                    <button type="submit" class="qty-btn" aria-label="إنقاص الكمية">-</button>
+
+                                </form>
+
+                            </div>                            
                             <span class="item-price">{{ item.subtotal|floatformat:2 }} $</span> 
-                               <a href="{% url 'cart:remove_from_cart' store.slug item.id %}" 
+                               <a href="{% url 'cart:remove_from_cart' store.slug item.id %}"
                                  class="btn btn-danger btn-sm"
                                  style="border-radius:8px;">
-                                        🗑 حذف
+                                        حذف
                                </a>
 
                         </div>
@@ -178,19 +228,19 @@
 
         <div class="total-section">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="h5 mb-0">المجموع الكلي:</span>
+                <span class="h5 mb-0">الإجمالي:</span>
                 
                 <span class="total-price">{{ cart.total|floatformat:2 }} $</span>
             </div>
 
             <a href="{% url 'orders:checkout' store.slug %}" class="btn-checkout">
-    ✅ إتمام الطلب
+    إتمام الطلب
 </a>
 
 
             <div class="text-center mt-3">
                 <a href="{% url 'stores:store_front' store.slug %}" class="btn-back">
-                    ← متابعة التسوق
+                    متابعة التسوق
                 </a>
             </div>
         </div>
@@ -198,11 +248,11 @@
     {% else %}
         
         <div class="cart-item empty-cart">
-            <h1 style="font-size: 4rem;">🛒</h1>
-            <h3>السلة فارغة حالياً</h3>
-            <p>لم تقم بإضافة أي منتجات بعد.</p>
+            <h1 style="font-size: 4rem;">??</h1>
+            <h3>????? ????? ??????</h3>
+            <p>?? ??? ?????? ?? ?????? ???.</p>
             <a href="{% url 'stores:store_front' store.slug %}" class="btn-checkout mt-3" style="max-width: 200px; margin: 0 auto;">
-                تصفح المنتجات
+                ???? ????????
             </a>
         </div>
 
@@ -212,3 +262,5 @@
 
 </body>
 </html>
+
+

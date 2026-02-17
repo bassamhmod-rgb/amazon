@@ -178,7 +178,7 @@
 
             {% if order.payment_type %}
                 <p>
-                    <strong>نوع الدفع:</strong>
+                    <strong>طريقة الدفع:</strong>
                     {% if order.payment_type == "full" %}
                         تحويل كامل
                     {% elif order.payment_type == "partial" %}
@@ -190,7 +190,7 @@
             {% endif %}
 
             {% if order.payment_method_name %}
-                <p><strong>طريقة الدفع:</strong> {{ order.payment_method_name }}</p>
+                <p><strong>وسيلة الدفع:</strong> {{ order.payment_method_name }}</p>
             {% endif %}
 
             {% if order.payment_recipient_name %}
