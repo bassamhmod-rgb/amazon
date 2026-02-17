@@ -57,6 +57,35 @@
             border-radius:6px;
         }
 
+        .search-wrap{
+            position: relative;
+        }
+
+        .search-suggestions{
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #d8deea;
+            border-radius: 8px;
+            box-shadow: 0 8px 20px rgba(0,0,0,.08);
+            max-height: 260px;
+            overflow-y: auto;
+            z-index: 20;
+            display: none;
+        }
+
+        .search-suggestion-item{
+            padding: 8px 10px;
+            cursor: pointer;
+        }
+
+        .search-suggestion-item:hover,
+        .search-suggestion-item.active{
+            background: #e9f2ff;
+        }
+
         /* ===== ARROW ===== */
         #sidebarArrow{
             display:none;
@@ -154,17 +183,22 @@
     </div>
 
     <!-- فلترة -->
-    <form method="get" class="row g-2 mb-3">
+    <form method="get" class="row g-2 mb-3" id="productsFilterForm">
         <div class="col-12 col-md-4">
+            <div class="search-wrap">
             <input type="text"
                    name="q"
+                   id="productSearchInput"
                    class="form-control"
-                   placeholder="بحث بالاسم..."
+                   autocomplete="off"
+                   placeholder="كل المنتجات..."
                    value="{{ q }}">
+            <div id="productSearchSuggestions" class="search-suggestions"></div>
+        </div>
         </div>
 
         <div class="col-12 col-md-3">
-            <select name="category" class="form-select">
+            <select name="category" id="categoryFilter" class="form-select">
                 <option value="">كل الفئات</option>
                 {% for cat in categories %}
                     <option value="{{ cat.id }}" {% if cat.id == current_category %}selected{% endif %}>
@@ -175,7 +209,7 @@
         </div>
 
         <div class="col-12 col-md-3">
-            <select name="category2" class="form-select">
+            <select name="category2" id="subCategoryFilter" class="form-select">
                 <option value="">كل الفئات الفرعية</option>
                 {% for cat in categories %}
                     <option value="{{ cat.id }}" {% if cat.id == current_sub_category %}selected{% endif %}>
@@ -261,6 +295,128 @@
     };
 </script>
 <script src="{% static 'js/confirm_delete.js' %}"></script>
+
+<script>
+(() => {
+    const form = document.getElementById("productsFilterForm");
+    const input = document.getElementById("productSearchInput");
+    const suggestionsBox = document.getElementById("productSearchSuggestions");
+    const categoryFilter = document.getElementById("categoryFilter");
+    const subCategoryFilter = document.getElementById("subCategoryFilter");
+    if (!form || !input || !suggestionsBox) return;
+
+    let activeIndex = -1;
+    let results = [];
+
+    function hideSuggestions() {
+        suggestionsBox.style.display = "none";
+        suggestionsBox.innerHTML = "";
+        results = [];
+        activeIndex = -1;
+    }
+
+    function submitFilter() {
+        form.submit();
+    }
+
+    function buildSuggestions(items) {
+        suggestionsBox.innerHTML = "";
+        if (!items.length) {
+            hideSuggestions();
+            return;
+        }
+
+        items.forEach((item, index) => {
+            const el = document.createElement("div");
+            el.className = "search-suggestion-item";
+            el.textContent = item.name;
+            el.dataset.index = index;
+            el.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                input.value = item.name;
+                hideSuggestions();
+                submitFilter();
+            });
+            suggestionsBox.appendChild(el);
+        });
+        suggestionsBox.style.display = "block";
+    }
+
+    function highlightActive() {
+        const nodes = suggestionsBox.querySelectorAll(".search-suggestion-item");
+        nodes.forEach((node, index) => {
+            node.classList.toggle("active", index === activeIndex);
+        });
+    }
+
+    function fetchSuggestions() {
+        const q = input.value.trim();
+        if (!q) {
+            hideSuggestions();
+            return;
+        }
+
+        fetch(`/dashboard/{{ current_store.slug }}/search-products/?q=${encodeURIComponent(q)}`)
+            .then((r) => r.json())
+            .then((data) => {
+                results = (data.results || []).slice(0, 12);
+                activeIndex = -1;
+                buildSuggestions(results);
+            })
+            .catch(() => hideSuggestions());
+    }
+
+    input.addEventListener("input", () => {
+        fetchSuggestions();
+    });
+
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown") {
+            if (!results.length) return;
+            e.preventDefault();
+            activeIndex = (activeIndex + 1) % results.length;
+            highlightActive();
+            return;
+        }
+
+        if (e.key === "ArrowUp") {
+            if (!results.length) return;
+            e.preventDefault();
+            activeIndex = activeIndex <= 0 ? results.length - 1 : activeIndex - 1;
+            highlightActive();
+            return;
+        }
+
+        if (e.key === "Enter") {
+            if (activeIndex >= 0 && results[activeIndex]) {
+                e.preventDefault();
+                input.value = results[activeIndex].name;
+                hideSuggestions();
+                submitFilter();
+                return;
+            }
+            e.preventDefault();
+            hideSuggestions();
+            submitFilter();
+        }
+
+        if (e.key === "Escape") {
+            hideSuggestions();
+        }
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!suggestionsBox.contains(e.target) && e.target !== input) {
+            hideSuggestions();
+        }
+    });
+
+    [categoryFilter, subCategoryFilter].forEach((el) => {
+        if (!el) return;
+        el.addEventListener("change", submitFilter);
+    });
+})();
+</script>
 
 </body>
 </html>

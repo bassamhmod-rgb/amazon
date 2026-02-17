@@ -109,6 +109,7 @@ def products_list(request, store_slug):
         "store": store,
         "page_obj": page_obj,
         "categories": categories,
+        "q": q or "",
 
         # الحالي المختار
         "current_category": int(category_id) if category_id and category_id.isdigit() else None,
