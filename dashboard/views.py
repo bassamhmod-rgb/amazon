@@ -38,9 +38,9 @@ from django.db.models import Sum
 
 from django.db.models import (
     Sum, F, DecimalField, ExpressionWrapper,
-    OuterRef, Subquery, Value
+    OuterRef, Subquery, Value, Case, When
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Cast
 
 from stores.models import Store
 from products.models import Product, Category
@@ -79,7 +79,34 @@ def dashboard_home(request, store_slug):
 @login_required
 def products_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
-    products_qs = Product.objects.filter(store=store).order_by("-id")
+    movement_expr = ExpressionWrapper(
+        F("order_items__quantity") * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
+    movements = Coalesce(
+        Sum(movement_expr),
+        Value(0),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
+    real_stock_calc = ExpressionWrapper(
+        Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2)) + movements,
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
+    sold_qty = Coalesce(
+        Sum(Case(
+            When(order_items__direction=-1, then=F("order_items__quantity")),
+            default=Value(0),
+            output_field=DecimalField(max_digits=12, decimal_places=2)
+        )),
+        Value(0),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
+    products_qs = (
+        Product.objects
+        .filter(store=store)
+        .annotate(real_stock_calc=real_stock_calc, sold_qty=sold_qty)
+        .order_by("-sold_qty", "-id")
+    )
 
     # البحث بالاسم
     q = request.GET.get("q")
@@ -95,6 +122,11 @@ def products_list(request, store_slug):
     sub_category_id = request.GET.get("category2")
     if sub_category_id and sub_category_id.isdigit():
         products_qs = products_qs.filter(category2_id=sub_category_id)
+
+    # التصفية حسب توفر المخزون
+    stock_filter = request.GET.get("stock")
+    if stock_filter == "positive":
+        products_qs = products_qs.filter(real_stock_calc__gt=0)
 
     # جلب كل الفئات الخاصة بهذا المتجر
     from products.models import Category
@@ -114,6 +146,7 @@ def products_list(request, store_slug):
         # الحالي المختار
         "current_category": int(category_id) if category_id and category_id.isdigit() else None,
         "current_sub_category": int(sub_category_id) if sub_category_id and sub_category_id.isdigit() else None,
+        "current_stock_filter": stock_filter or "all",
 
         "products_qs": products_qs,
     }
@@ -1796,7 +1829,7 @@ from django.db.models import (
     Sum, F, DecimalField, ExpressionWrapper,
     OuterRef, Subquery, Value
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Cast
 
 
 

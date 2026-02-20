@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from .models import Store
 from products.models import Product
 from accounts.models import Customer
-from django.db.models import Sum, F, Value, DecimalField, ExpressionWrapper
+from django.db.models import Sum, F, Value, DecimalField, ExpressionWrapper, Case, When
 from django.db.models.functions import Coalesce, Cast
 from accounts.models import PointsTransaction
 from products.models import Category
@@ -52,19 +52,34 @@ def store_front(request, slug):
         cart_count = cart.items.count()
 
     # ============ 🔥 المنتجات ============
+    movement_expr = ExpressionWrapper(
+        F("order_items__quantity") * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
     movements = Coalesce(
-        Sum(F("order_items__quantity") * F("order_items__direction")),
-        Value(0)
+        Sum(movement_expr),
+        Value(0),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     real_stock_calc = ExpressionWrapper(
         Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2)) + movements,
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
+    sold_qty = Coalesce(
+        Sum(Case(
+            When(order_items__direction=-1, then=F("order_items__quantity")),
+            default=Value(0),
+            output_field=DecimalField(max_digits=12, decimal_places=2)
+        )),
+        Value(0),
+        output_field=DecimalField(max_digits=12, decimal_places=2)
+    )
     products = (
         Product.objects
         .filter(store=store, active=True)
-        .annotate(real_stock_calc=real_stock_calc)
+        .annotate(real_stock_calc=real_stock_calc, sold_qty=sold_qty)
         .filter(real_stock_calc__gt=0)
+        .order_by("-sold_qty", "-id")
     )
 
     # ============ 🔎 البحث ============

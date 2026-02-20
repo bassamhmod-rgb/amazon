@@ -197,33 +197,40 @@
         </div>
         </div>
 
-        <div class="col-12 col-md-3">
-            <select name="category" id="categoryFilter" class="form-select">
-                <option value="">كل الفئات</option>
-                {% for cat in categories %}
-                    <option value="{{ cat.id }}" {% if cat.id == current_category %}selected{% endif %}>
-                        {{ cat.name }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="col-12 col-md-3">
-            <select name="category2" id="subCategoryFilter" class="form-select">
-                <option value="">كل الفئات الفرعية</option>
-                {% for cat in categories %}
-                    <option value="{{ cat.id }}" {% if cat.id == current_sub_category %}selected{% endif %}>
-                        {{ cat.name }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
         <div class="col-12 col-md-2">
-            <button class="btn btn-secondary w-100">
-                فلترة
-            </button>
-        </div>
+    <select name="category" id="categoryFilter" class="form-select">
+        <option value="">كل الفئات</option>
+        {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if cat.id == current_category %}selected{% endif %}>
+                {{ cat.name }}
+            </option>
+        {% endfor %}
+    </select>
+</div>
+
+<div class="col-12 col-md-2">
+    <select name="category2" id="subCategoryFilter" class="form-select">
+        <option value="">كل الفئات الفرعية</option>
+        {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if cat.id == current_sub_category %}selected{% endif %}>
+                {{ cat.name }}
+            </option>
+        {% endfor %}
+    </select>
+</div>
+
+<div class="col-12 col-md-2">
+    <select name="stock" id="stockFilter" class="form-select">
+        <option value="all" {% if current_stock_filter == "all" %}selected{% endif %}>كل المنتجات</option>
+        <option value="positive" {% if current_stock_filter == "positive" %}selected{% endif %}>المتوفر بالمستودع فقط</option>
+    </select>
+</div>
+
+<div class="col-12 col-md-2">
+    <button class="btn btn-secondary w-100">
+        فلترة
+    </button>
+</div>
     </form>
 
     <!-- جدول المنتجات -->
@@ -303,6 +310,7 @@
     const suggestionsBox = document.getElementById("productSearchSuggestions");
     const categoryFilter = document.getElementById("categoryFilter");
     const subCategoryFilter = document.getElementById("subCategoryFilter");
+    const stockFilter = document.getElementById("stockFilter");
     if (!form || !input || !suggestionsBox) return;
 
     let activeIndex = -1;
@@ -411,7 +419,7 @@
         }
     });
 
-    [categoryFilter, subCategoryFilter].forEach((el) => {
+    [categoryFilter, subCategoryFilter, stockFilter].forEach((el) => {
         if (!el) return;
         el.addEventListener("change", submitFilter);
     });
@@ -420,3 +428,7 @@
 
 </body>
 </html>
+
+
+
+
