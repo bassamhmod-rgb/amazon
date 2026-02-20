@@ -21,10 +21,16 @@
     <td>{{ notice.amount|floatformat:2 }} $</td>
     <td>{{ notice.payment|floatformat:2 }} $</td>
     <td>{{ notice.created_at|date:"Y-m-d H:i" }}</td>
+    <td>
+        <form method="post" action="{% url 'dashboard:notice_delete' store.slug notice.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('هل تريد حذف الإشعار؟');">حذف</button>
+        </form>
+    </td>
 </tr>
 {% empty %}
 <tr>
-    <td colspan="6" class="text-center text-muted">
+    <td colspan="7" class="text-center text-muted">
         لا يوجد نتائج
     </td>
 </tr>

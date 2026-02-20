@@ -898,7 +898,8 @@ def notices_filter(request, store_slug):
     notices = notices.order_by("-created_at")
 
     return render(request, "dashboard/partials/notices_rows.html", {
-        "notices": notices
+        "notices": notices,
+        "store": store,
     })
 
 
