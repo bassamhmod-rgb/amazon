@@ -124,7 +124,7 @@ def products_list(request, store_slug):
         products_qs = products_qs.filter(category2_id=sub_category_id)
 
     # التصفية حسب توفر المخزون
-    stock_filter = request.GET.get("stock")
+    stock_filter = request.GET.get("stock") or "positive"
     if stock_filter == "positive":
         products_qs = products_qs.filter(real_stock_calc__gt=0)
 
@@ -146,7 +146,7 @@ def products_list(request, store_slug):
         # الحالي المختار
         "current_category": int(category_id) if category_id and category_id.isdigit() else None,
         "current_sub_category": int(sub_category_id) if sub_category_id and sub_category_id.isdigit() else None,
-        "current_stock_filter": stock_filter or "all",
+        "current_stock_filter": stock_filter,
 
         "products_qs": products_qs,
     }
