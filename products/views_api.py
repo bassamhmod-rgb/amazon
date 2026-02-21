@@ -97,10 +97,14 @@ def create_product_from_access(request):
                 name=category_name
             )
 
-        if Product.objects.filter(store=store, name=name).exists():
-            return JsonResponse({"status": "exists"})
+        existing = Product.objects.filter(store=store, name=name).first()
+        if existing:
+           return JsonResponse({
+        "status": "exists",
+        "id": existing.id
+           })
 
-        Product.objects.create(
+        product = Product.objects.create(
             store=store,
             name=name,
             price=float(price) if price else 0,
@@ -111,7 +115,10 @@ def create_product_from_access(request):
             active=True
         )
 
-        return JsonResponse({"status": "created"})
+        return JsonResponse({
+            "status": "created",
+            "id": product.id
+        })
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
