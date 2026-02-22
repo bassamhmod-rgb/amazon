@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -98,7 +98,7 @@
 <body>
 
 <!-- سهم السايدبار -->
-<div id="sidebarArrow">❯</div>
+<div id="sidebarArrow">❮</div>
 
 <!-- السايدبار -->
 {% include "dashboard/sidebar.html" %}
@@ -133,6 +133,18 @@
             </select>
         </div>
 
+        <div class="col-12 col-md-3">
+            <select name="transaction_type" class="form-select">
+                <option value="">كل المعاملات</option>
+                <option value="sale" {% if current_transaction_type == 'sale' %}selected{% endif %}>
+                    بيع
+                </option>
+                <option value="purchase" {% if current_transaction_type == 'purchase' %}selected{% endif %}>
+                    شراء
+                </option>
+            </select>
+        </div>
+
         <div class="col-12 col-md-2">
             <button class="btn btn-secondary w-100">فلترة</button>
         </div>
@@ -151,7 +163,7 @@
                         <th>الخصم</th>
                         <th>المدفوع</th>
                         <th>نوع المعاملة</th>
-                        <th class="text-center">⚙️</th>
+                        <th class="text-center">الإجراءات</th>
                     </tr>
                 </thead>
 
@@ -169,9 +181,9 @@
 
                         <td>
                             {% if order.status == "pending" %}
-                                <span class="status-pending">Pending</span>
+                                <span class="status-pending">قيد الانتظار</span>
                             {% elif order.status == "confirmed" %}
-                                <span class="status-confirmed">Confirmed</span>
+                                <span class="status-confirmed">مؤكد</span>
                             {% else %}
                                 {{ order.status }}
                             {% endif %}
@@ -186,12 +198,12 @@
 
                             <a href="{% url 'dashboard:order_detail_dashboard' store.slug order.id %}"
                                class="btn btn-info btn-sm" title="تفاصيل">
-                                🔍
+                                تفاصيل
                             </a>
 
                             <a href="{% url 'dashboard:order_update' store.slug order.id %}"
                                class="btn btn-primary btn-sm" title="تعديل">
-                                ✏️
+                                تعديل
                             </a>
 
                             <form method="post"
@@ -200,7 +212,7 @@
                                   onsubmit="return confirm('هل أنت متأكد من حذف الطلب؟');">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-danger js-confirm-delete">
-                                    🗑️
+                                    حذف
                                 </button>
                             </form>
 
@@ -226,9 +238,12 @@
 
     arrow.onclick = () => {
         sidebar.classList.toggle("active");
-        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❯" : "❮";
     };
 </script>
 <script src="{% static 'js/confirm_delete.js' %}"></script>
 </body>
 </html>
+
+
+

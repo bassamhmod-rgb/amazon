@@ -2892,3 +2892,71 @@ Traceback (most recent call last):
     raise FieldError(
 django.core.exceptions.FieldError: Expression contains mixed types: DecimalField, IntegerField. You must set output_field.
 "GET /dashboard/Alaman/products/ HTTP/1.1" 500 228177
+Internal Server Error: /dashboard/Alaman/orders/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "E:\my\amazon_syria\src\dashboard\views.py", line 786, in orders_list
+    return render(request, "dashboard/orders_list.html", context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc1 in position 4174: invalid start byte
+"GET /dashboard/Alaman/orders/ HTTP/1.1" 500 145
+Internal Server Error: /dashboard/Alaman/orders/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "E:\my\amazon_syria\src\dashboard\views.py", line 786, in orders_list
+    return render(request, "dashboard/orders_list.html", context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc1 in position 4174: invalid start byte
+"GET /dashboard/Alaman/orders/ HTTP/1.1" 500 139287

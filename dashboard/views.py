@@ -745,6 +745,7 @@ def orders_list(request, store_slug):
 
     status = request.GET.get("status", "")
     order_id = request.GET.get("order_id", "")
+    transaction_type = request.GET.get("transaction_type", "")
 
     # كل طلبات المتجر (الطلبات فقط بدون إشعارات القبض/الصرف)
     orders = Order.objects.filter(store=store, document_kind=1)
@@ -757,8 +758,12 @@ def orders_list(request, store_slug):
     if order_id:
         orders = orders.filter(id=order_id)
 
-    # ترتيب من الأحدث للأقدم
-    orders = orders.order_by("-created_at")
+    # فلترة حسب نوع المعاملة (بيع / شراء)
+    if transaction_type:
+        orders = orders.filter(transaction_type=transaction_type)
+
+    # ترتيب حسب رقم الطلب (الأحدث أولاً)
+    orders = orders.order_by("-id")
 
     # 🟢 عدد الطلبات الجديدة (لسّا is_seen_by_store = False)
     new_orders_count = Order.objects.filter(
@@ -771,6 +776,7 @@ def orders_list(request, store_slug):
         "orders": orders,
         "current_status": status,
         "current_id": order_id,
+        "current_transaction_type": transaction_type,
         "new_orders_count": new_orders_count,  # ظ…ظ‡ظ… ظ„ظ„ظ€ sidebar
     }
 
