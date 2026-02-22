@@ -98,7 +98,7 @@
 
 <body>
 
-<div id="sidebarArrow">❯</div>
+<div id="sidebarArrow">&#8249;</div>
 
 {% include "dashboard/sidebar.html" %}
 
@@ -106,7 +106,11 @@
 
     <!-- العنوان -->
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h3 class="mb-0">📊 جرد المنتجات</h3>
+        <h3 class="mb-0">جرد المنتجات</h3>
+        <a class="btn btn-outline-success"
+           href="?export=excel{% if querystring %}&{{ querystring }}{% endif %}">
+            تصدير إكسل
+        </a>
     </div>
 
     <!-- إجمالي قيمة المخزون -->
@@ -125,7 +129,7 @@
             </div>
             <div class="col-md-3">
                 <select name="category" id="inventoryCategory" class="form-select">
-                    <option value="">&#1575;&#1604;&#1601;&#1574;&#1577; &#1575;&#1604;&#1571;&#1587;&#1575;&#1587;&#1610;&#1577;</option>
+                    <option value="">كل الكميات</option>
                     {% for cat in categories %}
                         <option value="{{ cat.id }}" {% if current_category == cat.id %}selected{% endif %}>
                             {{ cat.name }}
@@ -156,7 +160,7 @@
             </div>
         </form>
 
-        <h5 class="mb-2">💰 إجمالي قيمة المنتجات</h5>
+        <h5 class="mb-2">إجمالي قيمة المنتجات</h5>
         <h3 class="fw-bold text-success mb-0">
             {{ total_inventory_value|floatformat:2 }} $
         </h3>
@@ -200,9 +204,7 @@
                     {% endwith %}
                 {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center text-muted">
-                            لا يوجد منتجات
-                        </td>
+                        <td colspan="4" class="text-center text-muted">لا يوجد منتجات</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -242,7 +244,7 @@
 
     arrow.onclick = () => {
         sidebar.classList.toggle("active");
-        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+        arrow.innerHTML = sidebar.classList.contains("active") ? "\u203A" : "\u2039";
     };
 </script>
 

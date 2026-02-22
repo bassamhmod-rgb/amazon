@@ -2,7 +2,13 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+import csv
+import codecs
+import io
+import html
+import zipfile
+from io import BytesIO
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Sum
@@ -1911,6 +1917,100 @@ def inventory_list(request, store_slug):
         products_qs = products_qs.filter(remaining_qty=0)
     elif qty_filter == "lt0":
         products_qs = products_qs.filter(remaining_qty__lt=0)
+
+    # تصدير الجرد إلى CSV (يفتح في Excel)
+    if (request.GET.get("export") or "").lower() == "excel":
+        rows = [
+            ["اسم المنتج", "الكمية المتبقية", "آخر سعر شراء", "قيمة المخزون"],
+        ]
+        for p in products_qs:
+            rows.append([
+                p.name,
+                str(p.remaining_qty),
+                f"{p.last_buy_price:.2f}",
+                f"{p.stock_value:.2f}",
+            ])
+
+        # Build a minimal XLSX to avoid Excel warning dialogs
+        def cell_ref(col_idx, row_idx):
+            col = ""
+            x = col_idx
+            while x:
+                x, rem = divmod(x - 1, 26)
+                col = chr(65 + rem) + col
+            return f"{col}{row_idx}"
+
+        sheet_rows = []
+        for r_idx, row in enumerate(rows, start=1):
+            cells = []
+            for c_idx, val in enumerate(row, start=1):
+                ref = cell_ref(c_idx, r_idx)
+                escaped = html.escape(str(val))
+                cells.append(
+                    f'<c r="{ref}" t="inlineStr"><is><t>{escaped}</t></is></c>'
+                )
+            sheet_rows.append(f'<row r="{r_idx}">' + "".join(cells) + "</row>")
+
+        sheet_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            "<sheetData>"
+            + "".join(sheet_rows) +
+            "</sheetData></worksheet>"
+        )
+
+        workbook_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            '<sheets><sheet name="Inventory" sheetId="1" r:id="rId1"/></sheets>'
+            "</workbook>"
+        )
+
+        rels_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            'Target="xl/workbook.xml"/>'
+            "</Relationships>"
+        )
+
+        workbook_rels_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            'Target="worksheets/sheet1.xml"/>'
+            "</Relationships>"
+        )
+
+        content_types_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            '<Override PartName="/xl/worksheets/sheet1.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            "</Types>"
+        )
+
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("[Content_Types].xml", content_types_xml)
+            zf.writestr("_rels/.rels", rels_xml)
+            zf.writestr("xl/workbook.xml", workbook_xml)
+            zf.writestr("xl/_rels/workbook.xml.rels", workbook_rels_xml)
+            zf.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+
+        response = HttpResponse(
+            output.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="inventory_{store.slug}.xlsx"'
+        return response
 
     categories = Category.objects.filter(store=store)
 
