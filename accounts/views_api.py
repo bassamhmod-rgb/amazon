@@ -6,6 +6,7 @@ from accounts.models import Supplier
 from .models import PointsTransaction
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
+from django.db.models import Q
 
 #تصدير
 # تصدير العملاء من المتجر إلى الأكسس
@@ -19,7 +20,9 @@ def merchant_customers_api(request, merchant_id):
     if not store:
         return JsonResponse({"error": "Merchant not found"}, status=404)
 
-    customers = Customer.objects.filter(store=store).values(
+    customers = Customer.objects.filter(store=store).filter(
+        Q(access_id__isnull=True) | Q(access_id=0)
+    ).values(
         "id",        # ← هذا هو المفتاح الذهبي
         "name",
         "phone",
@@ -41,7 +44,10 @@ def merchant_suppliers_api(request, merchant_id):
     if not store:
         return JsonResponse({"error": "Merchant not found"}, status=404)
 
-    suppliers = Supplier.objects.filter(store=store).values(
+    suppliers = Supplier.objects.filter(store=store).filter(
+        Q(access_id__isnull=True) | Q(access_id=0)
+    ).values(
+        "id",
         "name",
         "phone",
     )
@@ -58,9 +64,8 @@ def merchant_points_export_api(request, merchant_id):
     if not store:
         return JsonResponse({"error": "Merchant not found"}, status=404)
 
-    points = PointsTransaction.objects.filter(
-        customer__store=store,
-        access_id__isnull=True
+    points = PointsTransaction.objects.filter(customer__store=store).filter(
+        Q(access_id__isnull=True) | Q(access_id=0)
     ).select_related("customer")
 
     data = []
@@ -93,7 +98,36 @@ def merchant_points_confirm_api(request):
         )
 
     return JsonResponse({"status": "ok"})
+@csrf_exempt
+def merchant_customers_confirm_api(request):
+    import json
 
+    data = json.loads(request.body)
+
+    for item in data:
+        Customer.objects.filter(
+            id=int(item["customer_id"])
+        ).update(
+            access_id=int(item["access_id"])
+        )
+
+    return JsonResponse({"status": "ok"})
+
+
+@csrf_exempt
+def merchant_suppliers_confirm_api(request):
+    import json
+
+    data = json.loads(request.body)
+
+    for item in data:
+        Supplier.objects.filter(
+            id=int(item["supplier_id"])
+        ).update(
+            access_id=int(item["access_id"])
+        )
+
+    return JsonResponse({"status": "ok"})
 
 ## استيراد من البرنامج
 
@@ -117,6 +151,7 @@ def create_customer_from_access(request):
         data = json.loads(request.body.decode("utf-8"))
 
         merchant_id = data.get("store")
+        access_id = data.get("access_id")
         name = data.get("name", "").strip()
         phone = data.get("phone", "").strip()
 
@@ -141,24 +176,36 @@ def create_customer_from_access(request):
                 return JsonResponse({
                     "status": "exists",
                     "message": "رقم الموبايل مسجل باسم آخر لن يتم إكمال مزامنة الفواتير الا بعد حل المشكلة . يفضل التأكد من نقل العملاء من فورم العملاء اولا",
-                    "existing_name": existing.name
+                    "existing_name": existing.name,
+                    "id": existing.id,
+                    "customer_id": existing.id,
                 })
 
             # 🔴 باقي الحالات → منع بدون رسالة
             return JsonResponse({
-                "status": "exists"
+                "status": "exists",
+                "id": existing.id,
+                "customer_id": existing.id,
             })
 
         # ✅ إنشاء الزبون
-        Customer.objects.create(
+        if access_id in ("", None):
+            access_id = None
+        else:
+            access_id = int(access_id)
+
+        customer = Customer.objects.create(
             store=store,
+            access_id=access_id,
             name=name,
             phone=phone,
         )
 
         return JsonResponse({
             "status": "created",
-            "message": "تم إنشاء الزبون بنجاح"
+            "message": "تم إنشاء الزبون بنجاح",
+            "customer_id": customer.id,
+            "id": customer.id,
         })
 
     except Exception as e:
@@ -178,6 +225,7 @@ def create_supplier_from_access(request):
         data = json.loads(request.body.decode("utf-8"))
 
         merchant_id = data.get("store")
+        access_id = data.get("access_id")
         name = (data.get("name") or "").strip()
         phone = data.get("phone")
         # توحيد phone
@@ -194,17 +242,28 @@ def create_supplier_from_access(request):
             return JsonResponse({"error": "Merchant not found"}, status=404)
 
         # منع التكرار بالاسم فقط
-        if Supplier.objects.filter(store=store, name=name).exists():
-            return JsonResponse({"status": "exists"})
-
-        Supplier.objects.create(
+        existing = Supplier.objects.filter(store=store, name=name).first()
+        if existing:
+            return JsonResponse({
+                "status": "exists",
+                "id": existing.id,
+                "supplier_id": existing.id,
+            })
+        if access_id in ("", None):
+            access_id = None
+        else:
+            access_id = int(access_id)
+        supplier = Supplier.objects.create(
             store=store,
+            access_id=access_id,
             name=name,
             phone=phone,
         )
-
-        return JsonResponse({"status": "created"})
-
+        return JsonResponse({
+            "status": "created",
+            "supplier_id": supplier.id,
+            "id": supplier.id,
+        })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 # استيراد الكاش باك
@@ -221,6 +280,7 @@ def create_cashback_from_access(request, merchant_id):
         data = json.loads(request.body.decode("utf-8"))
 
         rkmamel = data.get("rkmamel")  # رقم العميل بالبرنامج
+        access_id = data.get("access_id")  # ID ��� ������
         customer_name = (data.get("customer_name") or "").strip()
         amount = data.get("amount")
         trans_date = data.get("trans_date")
@@ -249,10 +309,13 @@ def create_cashback_from_access(request, merchant_id):
             return JsonResponse({"error": "Invalid trans_date"}, status=400)
 
         created_at = datetime.combine(date_only, datetime.min.time())
+        # ��� ����: ��� �� ��� access_id ������ rkmamel
+        if access_id in ("", None):
+            access_id = rkmamel
 
         pt = PointsTransaction.objects.create(
             customer=customer,
-            access_id=rkmamel,
+            access_id=int(access_id) if access_id not in ("", None) else None,
             points=int(amount),
             created_at=created_at,
             note=note
@@ -261,7 +324,8 @@ def create_cashback_from_access(request, merchant_id):
         # 🔑 نرجّع ID سجل النقاط
         return JsonResponse({
             "status": "created",
-            "points_id": pt.id
+            "points_id": pt.id,
+            "id": pt.id,
         })
 
     except Exception as e:
@@ -370,4 +434,12 @@ def check_update(request):
         "version": app.version,
         "prices_version": app.prices_version,
     })
+
+
+
+
+
+
+
+
 

@@ -1,6 +1,7 @@
 
 from django.urls import path
 from . import views
+from . import views_api
 app_name = "dashboard"
 urlpatterns = [
     path("<slug:store_slug>/", views.dashboard_home, name="home"),
@@ -97,4 +98,21 @@ path("<slug:store_slug>/expenses/", views.expenses_list, name="expenses_list"),
 path("<slug:store_slug>/expenses/<int:expense_id>/edit/", views.expense_edit, name="expense_edit"),
 path("<slug:store_slug>/expenses/<int:expense_id>/delete/", views.expense_delete, name="expense_delete"),
 path("<slug:store_slug>/expenses/settings/", views.expense_settings, name="expense_settings"),
+
+# ---------------- API (Access) ----------------
+path(
+    "api/merchant-expenses/<int:merchant_id>/",
+    views_api.merchant_expenses_export_api,
+    name="merchant_expenses_export_api"
+),
+path(
+    "api/merchant-expenses-confirm/",
+    views_api.merchant_expenses_confirm_api,
+    name="merchant_expenses_confirm_api"
+),
+path(
+    "api/create-expense-from-access/<int:merchant_id>/",
+    views_api.create_expense_from_access,
+    name="create_expense_from_access"
+),
 ]

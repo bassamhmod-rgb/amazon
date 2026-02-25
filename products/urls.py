@@ -4,6 +4,8 @@ from . import views_api
 urlpatterns = [
     path("api/categories/<int:merchant_id>/", views_api.merchant_categories_api),
     path("api/products/<int:merchant_id>/", views_api.merchant_products_api),
+    path("api/categories/confirm/", views_api.merchant_categories_confirm_api),
+    path("api/products/confirm/", views_api.merchant_products_confirm_api),
     
  path(
     "api/create_category_from_access/",

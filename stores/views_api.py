@@ -14,7 +14,8 @@ def update_store_codes_from_access(request):
 
         mobile = (data.get("mobile") or "").strip()
         number = (data.get("number") or "").strip()
-        sna = (data.get("sna") or "").strip()
+        sna = (data.get("sna") or "" ).strip()
+        access_id = data.get("access_id")
 
         if not mobile:
             return JsonResponse({"error": "mobile required"}, status=400)
@@ -38,8 +39,17 @@ def update_store_codes_from_access(request):
             store.rkmdb = number
         if sna:
             store.rkmtb = sna
+        if access_id in ("", None):
+            access_id = None
+        else:
+            access_id = int(access_id)
 
-        store.save(update_fields=["rkmdb", "rkmtb"])
+        update_fields = ["rkmdb", "rkmtb"]
+        if access_id is not None:
+            store.access_id = access_id
+            update_fields.append("access_id")
+
+        store.save(update_fields=update_fields)
 
         return JsonResponse({
             "status": "updated",

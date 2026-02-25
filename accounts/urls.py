@@ -22,6 +22,8 @@ urlpatterns = [
 #لل api
     path("api/customers/<int:merchant_id>/", views_api.merchant_customers_api),
     path("api/suppliers/<int:merchant_id>/", views_api.merchant_suppliers_api),
+    path("api/customers/confirm/", views_api.merchant_customers_confirm_api),
+    path("api/suppliers/confirm/", views_api.merchant_suppliers_confirm_api),
     path(
         "api/create_customer_from_access/",
         views_api.create_customer_from_access,
@@ -78,4 +80,3 @@ path(
 path("api/check-update/", views_api.check_update)
    
     ]
-

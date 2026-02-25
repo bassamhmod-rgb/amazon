@@ -6,6 +6,8 @@ from django.utils import timezone
 
 class Customer(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
 
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=20)
@@ -63,13 +65,14 @@ class PointsTransaction(models.Model):
         ("adjust", "تعديل الرصيد"),
     ]
 
+    update_time = models.BigIntegerField(blank=True, null=True)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="points")
     customer_name = models.CharField(max_length=150)
     points = models.DecimalField(max_digits=10, decimal_places=2)
     transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
     note = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    access_id = models.IntegerField(
+    access_id = models.BigIntegerField(
         blank=True,
         null=True,
         help_text="رقم السجل في جدول الكاش باك ببرنامج المحاسبة"
@@ -84,6 +87,8 @@ class Supplier(models.Model):
         on_delete=models.CASCADE,
         related_name="suppliers"
     )
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
 
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, blank=True, null=True)
@@ -127,6 +132,8 @@ class Supplier(models.Model):
 #رسائل للبرامج و المتاجر
 
 class SystemNotification(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     # ===== المحتوى =====
     title = models.CharField(max_length=200)
     message = models.TextField()
@@ -226,7 +233,8 @@ class AccountingClient(models.Model):
         on_delete=models.CASCADE,
         related_name="accounting_clients"
     )
-    access_id = models.CharField(max_length=64, unique=True)
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(unique=True)
 
     last_notification_id = models.PositiveIntegerField(default=0)
 
@@ -238,6 +246,8 @@ class AccountingClient(models.Model):
 #للتحديث
 
 class AppUpdate(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     app_name = models.CharField(max_length=50, unique=True)
     version = models.PositiveIntegerField()
     prices_version = models.PositiveIntegerField()

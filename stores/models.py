@@ -7,6 +7,8 @@ from PIL import Image, ImageOps
 from decimal import Decimal
 
 class Store(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="stores")
     name = models.CharField(max_length=200)
     rkmdb = models.CharField(max_length=100, blank=True, null=True)
@@ -91,6 +93,8 @@ class Store(models.Model):
         return self.name
 #طرق الدفع
 class StorePaymentMethod(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
 
     PAYMENT_TYPES = [
         ("cash", "Cash"),

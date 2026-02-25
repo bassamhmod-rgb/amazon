@@ -6,6 +6,8 @@ from orders.models import OrderItem
 
 
 class Category(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey("stores.Store", on_delete=models.CASCADE, related_name="categories")
     name = models.CharField(max_length=255)
 
@@ -24,6 +26,8 @@ class Category(models.Model):
 
 
 class Product(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey(
         Store,
         on_delete=models.CASCADE,
@@ -124,6 +128,8 @@ class Product(models.Model):
         return Decimal("0")
 
 class ProductDetails(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="details")
     title = models.CharField(max_length=200)
     value = models.CharField(max_length=200)
@@ -133,6 +139,8 @@ class ProductDetails(models.Model):
         return f"{self.product.name} - {self.title}"
 
 class ProductGallery(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="gallery")
     image = models.ImageField(upload_to="product_gallery/")
 
@@ -141,6 +149,8 @@ class ProductGallery(models.Model):
 
 
 class ProductBarcode(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="barcodes")
     value = models.CharField(max_length=120)
 

@@ -7,6 +7,8 @@ from stores.models import Store
 
 
 class ExpenseType(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="expense_types")
     name = models.CharField(max_length=120)
 
@@ -18,6 +20,8 @@ class ExpenseType(models.Model):
 
 
 class ExpenseReason(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="expense_reasons")
     name = models.CharField(max_length=120)
 
@@ -29,6 +33,8 @@ class ExpenseReason(models.Model):
 
 
 class Expense(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="expenses")
     amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     date = models.DateField(default=timezone.now)

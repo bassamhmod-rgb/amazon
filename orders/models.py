@@ -25,6 +25,7 @@ PAYMENT_TYPES = [
 
 class Order(models.Model):
     is_seen_by_store = models.BooleanField(default=False)
+    update_time = models.BigIntegerField(blank=True, null=True)
 
     
     customer = models.ForeignKey(
@@ -176,6 +177,8 @@ class Order(models.Model):
 
 
 class OrderItem(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     order = models.ForeignKey(
         Order,
         on_delete=models.CASCADE,

@@ -4,6 +4,8 @@ from stores.models import Store
 
 
 class Cart(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     user = models.ForeignKey(
         User,
         null=True,
@@ -40,6 +42,8 @@ class Cart(models.Model):
 
 
 class CartItem(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
     cart = models.ForeignKey(
         Cart,
         on_delete=models.CASCADE,

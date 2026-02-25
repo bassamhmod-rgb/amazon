@@ -1,4 +1,4 @@
-from django.db.models import F, Sum, DecimalField
+from django.db.models import F, Sum, DecimalField, Q
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from orders.models import Order, OrderItem
@@ -24,7 +24,9 @@ def merchant_orders_api(request, merchant_id):
         status="confirmed",                 # ✅ فقط المؤكدة
         accounting_invoice_number__isnull=True
    
-    ).order_by("created_at")
+        ).filter(
+        Q(items__access_id__isnull=True) | Q(items__access_id=0)
+    ).distinct().order_by("created_at")
 
     result = []
 
@@ -39,9 +41,15 @@ def merchant_orders_api(request, merchant_id):
             )
         )["sum"] or 0
 
+        # noaf in Access: -1 sale, 1 purchase
+        noaf_value = -1 if order.transaction_type == "sale" else 1
+
         result.append({
             "order_id": order.id,
+            "store_id": order.id,  # convenience alias for Access
             "transaction_type": order.transaction_type,  # sale / purchase
+            "noaf": noaf_value,
+            "document_kind": order.document_kind,
             "items_total": float(items_total),
             "payment": float(order.payment or 0),
             "discount": float(order.discount or 0),      # ✅ الحسم
@@ -53,6 +61,7 @@ def merchant_orders_api(request, merchant_id):
             ),
             "items": [
                 {
+                    "order_item_id": item.id,
                     "product": item.product.name if item.product else "",
                     "quantity": float(item.quantity),
                     "price": float(item.price),
@@ -128,7 +137,8 @@ def create_order_from_access(request):
         if existing_order:
             return JsonResponse({
                 "status": "exists",
-                "order_id": existing_order.id
+                "order_id": existing_order.id,
+                "id": existing_order.id,
             })
 
         # ✅ تحديد نوع العملية
@@ -166,7 +176,8 @@ def create_order_from_access(request):
 
         return JsonResponse({
             "status": "created",
-            "order_id": order.id
+            "order_id": order.id,
+            "id": order.id,
         })
 
     except Exception as e:
@@ -181,6 +192,7 @@ def create_order_item_from_access(request):
         data = json.loads(request.body.decode("utf-8"))
 
         order_id = data.get("order_id")
+        access_id = data.get("access_id")
         product_name = data.get("product_name", "").strip()
 
         order = Order.objects.filter(id=order_id).first()
@@ -206,10 +218,20 @@ def create_order_item_from_access(request):
         ).first()
 
         if existing_item:
-            return JsonResponse({"status": "exists"})
+            return JsonResponse({
+                "status": "exists",
+                "order_item_id": existing_item.id,
+                "id": existing_item.id,
+            })
 
-        OrderItem.objects.create(
+        if access_id in ("", None):
+            access_id = None
+        else:
+            access_id = int(access_id)
+
+        order_item = OrderItem.objects.create(
             order=order,
+            access_id=access_id,
             product=product,
             quantity=quantity,
             direction=direction,
@@ -217,7 +239,11 @@ def create_order_item_from_access(request):
             price=price,
         )
 
-        return JsonResponse({"status": "created"})
+        return JsonResponse({
+            "status": "created",
+            "order_item_id": order_item.id,
+            "id": order_item.id,
+        })
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
