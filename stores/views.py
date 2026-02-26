@@ -10,6 +10,12 @@ from django.db.models import Q, Exists, OuterRef
 from django.contrib.auth.decorators import login_required
 from stores.models import Store, StorePaymentMethod
 from cart.models import Cart
+from django.http import JsonResponse
+from django.http import HttpResponse
+from django.urls import reverse
+from django.templatetags.static import static
+from io import BytesIO
+from PIL import Image, ImageDraw
 
 def store_list(request):
     stores = Store.objects.filter(is_active=True)
@@ -118,6 +124,76 @@ def store_front(request, slug):
         "current_category2": category2_id,
         "q": q or "",
     })
+
+
+def store_manifest(request, slug):
+    store = get_object_or_404(Store, slug=slug, is_active=True)
+
+    start_url = reverse("stores:store_front", kwargs={"slug": store.slug})
+    icon_192 = request.build_absolute_uri(
+        reverse("stores:store_app_icon", kwargs={"slug": store.slug, "size": 192})
+    )
+    icon_512 = request.build_absolute_uri(
+        reverse("stores:store_app_icon", kwargs={"slug": store.slug, "size": 512})
+    )
+
+    data = {
+        "name": store.slug,
+        "short_name": store.slug,
+        "id": start_url,
+        "start_url": start_url,
+        "scope": start_url,
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#0d6efd",
+        "icons": [
+            {
+                "src": icon_192,
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any maskable",
+            },
+            {
+                "src": icon_512,
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable",
+            },
+        ],
+    }
+    response = JsonResponse(data, content_type="application/manifest+json")
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
+def store_app_icon(request, slug, size):
+    store = get_object_or_404(Store, slug=slug, is_active=True)
+    if size not in (192, 512):
+        size = 192
+
+    if not store.logo:
+        fallback_url = static("pwa/icon-512.png" if size == 512 else "pwa/icon-192.png")
+        return redirect(fallback_url)
+
+    with Image.open(store.logo.path).convert("RGBA") as img:
+        # Center-crop to square, then mask to a circle to match storefront logo style.
+        side = min(img.width, img.height)
+        left = (img.width - side) // 2
+        top = (img.height - side) // 2
+        square = img.crop((left, top, left + side, top + side)).resize((size, size), Image.LANCZOS)
+
+        mask = Image.new("L", (size, size), 0)
+        ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+
+        canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        canvas.paste(square, (0, 0), mask)
+
+        output = BytesIO()
+        canvas.save(output, format="PNG", optimize=True)
+
+    response = HttpResponse(output.getvalue(), content_type="image/png")
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
 
 # تفاصيل المنتج للزبون
 def product_public(request, store_slug, product_id):
@@ -261,3 +337,4 @@ def payment_methods_delete(request, store_slug, method_id):
     method.delete()
 
     return redirect("stores:payment_methods", store_slug=store.slug)
+

@@ -43,5 +43,7 @@ urlpatterns = [
     ),
     
     # ⚠️ هذا لازم يكون آخر شي
+    path("<slug:slug>/manifest.json", views.store_manifest, name="store_manifest"),
+    path("<slug:slug>/app-icon-<int:size>.png", views.store_app_icon, name="store_app_icon"),
     path("<slug:slug>/", views.store_front, name="store_front"),
 ]
