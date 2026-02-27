@@ -110,6 +110,15 @@ def store_front(request, slug):
     else:
         category2_id = ""
 
+    products = list(products)
+    exchange_rate = store.exchange_rate or 0
+    if store.pricing_currency == "USD" and exchange_rate > 0:
+        for p in products:
+            p.price_syp = p.price * exchange_rate
+    else:
+        for p in products:
+            p.price_syp = p.price
+
     return render(request, "stores/store_front.html", {
         "store": store,
         "products": products,
@@ -199,6 +208,11 @@ def store_app_icon(request, slug, size):
 def product_public(request, store_slug, product_id):
     store = get_object_or_404(Store, slug=store_slug)
     product = get_object_or_404(Product, id=product_id, store=store)
+    exchange_rate = store.exchange_rate or 0
+    if store.pricing_currency == "USD" and exchange_rate > 0:
+        product.price_syp = product.price * exchange_rate
+    else:
+        product.price_syp = product.price
     return render(request, "stores/product_public.html", {
     "store": store,
     "product": product,

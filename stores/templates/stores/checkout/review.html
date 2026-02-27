@@ -4,7 +4,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>مراجعة الطلب – {{ store.name }}</title>
+    <title>مراجعة الطلب – {{ store.slug }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap RTL -->
@@ -140,15 +140,27 @@
         <!-- ================= محتوى الطلب ================ -->
         <h5 class="section-title">🛒 محتوى الطلب</h5>
 
-        {% for item in cart.items.all %}
+        {% for item in items %}
             <p class="info-row">
                 {{ item.quantity }} × {{ item.product.name }}
-                — {{ item.product.price|floatformat:2 }} $
+                —
+                {% if store.pricing_currency == "USD" %}
+                    <span dir="ltr">{{ item.product.price|floatformat:2 }} $</span>
+                    <span class="text-muted" dir="rtl">({{ item.price_syp|floatformat:0 }} ل.س)</span>
+                {% else %}
+                    <span dir="rtl">{{ item.price_syp|floatformat:0 }} ل.س</span>
+                {% endif %}
             </p>
         {% endfor %}
 
         <p class="mt-3" style="font-weight:700; color:var(--primary-color); font-size:1.1rem;">
-            <strong>الإجمالي:</strong> {{ cart.total|floatformat:2 }} $
+            <strong>الإجمالي:</strong>
+            {% if store.pricing_currency == "USD" %}
+                <span dir="ltr">{{ cart.get_total|floatformat:2 }} $</span>
+                <span class="text-muted" dir="rtl">({{ cart.total_syp|floatformat:0 }} ل.س)</span>
+            {% else %}
+                <span dir="rtl">{{ cart.total_syp|floatformat:0 }} ل.س</span>
+            {% endif %}
         </p>
 
         <div class="divider"></div>

@@ -1,8 +1,18 @@
-from django.db import models
+﻿from django.db import models
 from stores.models import Store
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+import time
+
+
+def _touch_update_time(instance, kwargs):
+    instance.update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("update_time")
+        kwargs["update_fields"] = update_fields
 
 class Customer(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
@@ -15,20 +25,20 @@ class Customer(models.Model):
     address = models.TextField(blank=True, null=True)
     note = models.TextField(blank=True, null=True)
 
-    # 🔥 الرصيد الحالي للعميل (مبلغ)
+    # ًں”¥ ط§ظ„ط±طµظٹط¯ ط§ظ„ط­ط§ظ„ظٹ ظ„ظ„ط¹ظ…ظٹظ„ (ظ…ط¨ظ„ط؛)
     balance = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         default=0,
-        help_text="رصيد العميل الحالي (موجب: عليه / سالب: له)"
+        help_text="ط±طµظٹط¯ ط§ظ„ط¹ظ…ظٹظ„ ط§ظ„ط­ط§ظ„ظٹ (ظ…ظˆط¬ط¨: ط¹ظ„ظٹظ‡ / ط³ط§ظ„ط¨: ظ„ظ‡)"
     )
 
-    # 🔥 الرصيد السابق (اختياري – إن كنت تستخدمه)
+    # ًں”¥ ط§ظ„ط±طµظٹط¯ ط§ظ„ط³ط§ط¨ظ‚ (ط§ط®طھظٹط§ط±ظٹ â€“ ط¥ظ† ظƒظ†طھ طھط³طھط®ط¯ظ…ظ‡)
     opening_balance = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         default=0,
-        help_text="الرصيد السابق بين التاجر والعميل"
+        help_text="ط§ظ„ط±طµظٹط¯ ط§ظ„ط³ط§ط¨ظ‚ ط¨ظٹظ† ط§ظ„طھط§ط¬ط± ظˆط§ظ„ط¹ظ…ظٹظ„"
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -45,11 +55,11 @@ class Customer(models.Model):
             ),
         ]
     def save(self, *args, **kwargs):
-        # 🔐 ضمان الاسم: إذا فاضي → خليه رقم الهاتف
+        _touch_update_time(self, kwargs)
+        # ًں”گ ط¶ظ…ط§ظ† ط§ظ„ط§ط³ظ…: ط¥ط°ط§ ظپط§ط¶ظٹ â†’ ط®ظ„ظټظ‡ ط±ظ‚ظ… ط§ظ„ظ‡ط§طھظپ
         if not self.name:
             self.name = self.phone
         super().save(*args, **kwargs)
-
     def __str__(self):
         return f"{self.name} - {self.phone}"
     
@@ -79,7 +89,11 @@ class PointsTransaction(models.Model):
     )
     def __str__(self):
         return f"{self.customer} - {self.points} pts ({self.transaction_type})"
-# الموردين
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
+# ط§ظ„ظ…ظˆط±ط¯ظٹظ†
 
 class Supplier(models.Model):
     store = models.ForeignKey(
@@ -95,7 +109,7 @@ class Supplier(models.Model):
     address = models.CharField(max_length=255, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
 
-    # 🔥 الرصيد السابق بين التاجر والمورّد
+    # الرصيد السابق بين التاجر والمورّد
     opening_balance = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -103,7 +117,7 @@ class Supplier(models.Model):
         help_text="الرصيد السابق بين التاجر والمورّد"
     )
 
-    # 🔥 الرصيد الحالي للمورّد (مبلغ)
+    # الرصيد الحالي للمورّد (مبلغ)
     balance = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -129,16 +143,20 @@ class Supplier(models.Model):
 
     def __str__(self):
         return self.name
-#رسائل للبرامج و المتاجر
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
+#ط±ط³ط§ط¦ظ„ ظ„ظ„ط¨ط±ط§ظ…ط¬ ظˆ ط§ظ„ظ…طھط§ط¬ط±
 
 class SystemNotification(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
-    # ===== المحتوى =====
+    # ===== ط§ظ„ظ…ط­طھظˆظ‰ =====
     title = models.CharField(max_length=200)
     message = models.TextField()
 
-    # ===== القناة =====
+    # ===== ط§ظ„ظ‚ظ†ط§ط© =====
     channel = models.CharField(
         max_length=20,
         choices=[
@@ -149,7 +167,7 @@ class SystemNotification(models.Model):
         default="both",
     )
 
-    # ===== مستوى الأهمية =====
+    # ===== ظ…ط³طھظˆظ‰ ط§ظ„ط£ظ‡ظ…ظٹط© =====
     severity = models.CharField(
         max_length=20,
         choices=[
@@ -160,10 +178,10 @@ class SystemNotification(models.Model):
         default="info",
     )
 
-    # ===== الاستهداف =====
+    # ===== ط§ظ„ط§ط³طھظ‡ط¯ط§ظپ =====
     is_global = models.BooleanField(
         default=False,
-        help_text="إذا مفعّل، الإشعار يوصل للجميع حسب القناة"
+        help_text="ط¥ط°ط§ ظ…ظپط¹ظ‘ظ„طŒ ط§ظ„ط¥ط´ط¹ط§ط± ظٹظˆطµظ„ ظ„ظ„ط¬ظ…ظٹط¹ ط­ط³ط¨ ط§ظ„ظ‚ظ†ط§ط©"
     )
 
     target_store = models.ForeignKey(
@@ -182,21 +200,21 @@ class SystemNotification(models.Model):
         related_name="system_notifications",
     )
 
-    # ===== تحكم زمني =====
+    # ===== طھط­ظƒظ… ط²ظ…ظ†ظٹ =====
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True, blank=True)
 
-    # ===== خصائص مستقبلية =====
+    # ===== ط®طµط§ط¦طµ ظ…ط³طھظ‚ط¨ظ„ظٹط© =====
     require_ack = models.BooleanField(
         default=False,
-        help_text="هل يجب تأكيد قراءة الإشعار؟"
+        help_text="ظ‡ظ„ ظٹط¬ط¨ طھط£ظƒظٹط¯ ظ‚ط±ط§ط،ط© ط§ظ„ط¥ط´ط¹ط§ط±طں"
     )
 
     version_min = models.CharField(
         max_length=20,
         null=True,
         blank=True,
-        help_text="أدنى إصدار برنامج يظهر له الإشعار"
+        help_text="ط£ط¯ظ†ظ‰ ط¥طµط¯ط§ط± ط¨ط±ظ†ط§ظ…ط¬ ظٹط¸ظ‡ط± ظ„ظ‡ ط§ظ„ط¥ط´ط¹ط§ط±"
     )
 
     class Meta:
@@ -205,27 +223,27 @@ class SystemNotification(models.Model):
         verbose_name_plural = "System Notifications"
 
     def clean(self):
-        # لازم يكون في استهداف
+        # ظ„ط§ط²ظ… ظٹظƒظˆظ† ظپظٹ ط§ط³طھظ‡ط¯ط§ظپ
         if not self.is_global and not self.target_store and not self.target_accounting_client:
             raise ValidationError(
-                "يجب تحديد إشعار عام أو متجر أو برنامج محاسبة."
+                "ظٹط¬ط¨ طھط­ط¯ظٹط¯ ط¥ط´ط¹ط§ط± ط¹ط§ظ… ط£ظˆ ظ…طھط¬ط± ط£ظˆ ط¨ط±ظ†ط§ظ…ط¬ ظ…ط­ط§ط³ط¨ط©."
             )
 
-        # ما بصير متجر + برنامج مع بعض
+        # ظ…ط§ ط¨طµظٹط± ظ…طھط¬ط± + ط¨ط±ظ†ط§ظ…ط¬ ظ…ط¹ ط¨ط¹ط¶
         if self.target_store and self.target_accounting_client:
             raise ValidationError(
-                "لا يمكن تحديد متجر وبرنامج محاسبة معاً."
+                "ظ„ط§ ظٹظ…ظƒظ† طھط­ط¯ظٹط¯ ظ…طھط¬ط± ظˆط¨ط±ظ†ط§ظ…ط¬ ظ…ط­ط§ط³ط¨ط© ظ…ط¹ط§ظ‹."
             )
 
-        # تاريخ الانتهاء
+        # طھط§ط±ظٹط® ط§ظ„ط§ظ†طھظ‡ط§ط،
         if self.expires_at and self.expires_at <= timezone.now():
             raise ValidationError(
-                "تاريخ الانتهاء يجب أن يكون بالمستقبل."
+                "طھط§ط±ظٹط® ط§ظ„ط§ظ†طھظ‡ط§ط، ظٹط¬ط¨ ط£ظ† ظٹظƒظˆظ† ط¨ط§ظ„ظ…ط³طھظ‚ط¨ظ„."
             )
 
     def __str__(self):
         return self.title
-# لبرامج المحاسبة المرتبط
+# ظ„ط¨ط±ط§ظ…ط¬ ط§ظ„ظ…ط­ط§ط³ط¨ط© ط§ظ„ظ…ط±طھط¨ط·
 # accounts/models.py
 class AccountingClient(models.Model):
     store = models.ForeignKey(
@@ -243,7 +261,7 @@ class AccountingClient(models.Model):
 
     def __str__(self):
         return f"{self.store} - {self.access_id}"
-#للتحديث
+#ظ„ظ„طھط­ط¯ظٹط«
 
 class AppUpdate(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)

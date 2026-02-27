@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -23,7 +23,6 @@
             font-family: "Cairo", sans-serif;
         }
 
-        /* 🎯 نفس container التاجر بالضبط */
         .login-container {
             max-width: 440px;
             margin: 4rem auto;
@@ -34,14 +33,12 @@
             border: 1px solid #dfe3e8;
         }
 
-        /* 🎯 نفس عنوان التاجر */
         .login-title {
             font-size: 1.7rem;
             font-weight: 700;
             color: var(--primary-color);
         }
 
-        /* 🎯 نفس ستايل الحقول */
         .login-container input {
             width: 100%;
             border-radius: 12px !important;
@@ -50,7 +47,6 @@
             font-size: 1rem;
         }
 
-        /* 🎯 نفس زر التاجر */
         .login-btn {
             width: 100%;
             background-color: var(--primary-color);
@@ -67,7 +63,6 @@
             background-color: #111e36;
         }
 
-        /* 🎯 صندوق الخطأ مثل صفحة التاجر */
         .error-box {
             background: #ffecec;
             border: 1px solid #ffb3b3;
@@ -76,6 +71,15 @@
             border-radius: 12px;
             font-size: .9rem;
             margin-bottom: 10px;
+        }
+
+        .back-link {
+            display: block;
+            margin-top: 12px;
+            text-align: center;
+            color: #1A2A4A;
+            text-decoration: none;
+            font-weight: 600;
         }
     </style>
 </head>
@@ -86,7 +90,6 @@
 
         <div class="login-container">
 
-            <!-- 🎯 محتوى الزبون فقط -->
             <h2 class="text-center login-title mb-3">يرجى إدخال رقم الموبايل للمتابعة</h2>
 
             {% if message %}
@@ -97,12 +100,14 @@
 
             <form method="POST">
                 {% csrf_token %}
-                
+
                 <input type="hidden" name="next" value="{{ next }}">
 
                 <input type="text" name="phone" placeholder="الرقم" required>
 
                 <button type="submit" class="login-btn">متابعة</button>
+
+                <a href="{% url 'stores:store_front' store.slug %}" class="back-link">رجوع للمتجر</a>
             </form>
 
         </div>

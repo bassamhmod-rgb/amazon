@@ -112,18 +112,51 @@
                 </div>
 
                 <div class="col-md-6 bg-light p-3 rounded">
-                    <p><strong>مجموع العناصر:</strong> {{ order.items_total|floatformat:2 }} $</p>
-                    <p><strong>الحسم:</strong> <span class="text-danger">{{ order.discount|floatformat:2 }} $</span></p>
+                    <p><strong>مجموع العناصر:</strong>
+                        {% if store.pricing_currency == "USD" %}
+                            {{ order.items_total|floatformat:2 }} $
+                            <span class="text-muted">({{ order.items_total_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                        {% else %}
+                            {{ order.items_total_syp|floatformat:0 }} &#1604;.&#1587;
+                        {% endif %}
+                    </p>
+                    <p><strong>الحسم:</strong>
+                        {% if store.pricing_currency == "USD" %}
+                            <span class="text-danger">{{ order.discount|floatformat:2 }} $</span>
+                            <span class="text-muted">({{ order.discount_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                        {% else %}
+                            <span class="text-danger">{{ order.discount_syp|floatformat:0 }} &#1604;.&#1587;</span>
+                        {% endif %}
+                    </p>
 
-                    <p class="fs-5 fw-bold"><strong>الصافي للدفع:</strong> {{ order.net_total|floatformat:2 }} $</p>
+                    <p class="fs-5 fw-bold"><strong>الصافي للدفع:</strong>
+                        {% if store.pricing_currency == "USD" %}
+                            {{ order.net_total|floatformat:2 }} $
+                            <span class="text-muted">({{ order.net_total_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                        {% else %}
+                            {{ order.net_total_syp|floatformat:0 }} &#1604;.&#1587;
+                        {% endif %}
+                    </p>
 
                     <hr>
 
-                    <p><strong>المدفوع:</strong> {{ order.payment|floatformat:2 }} $</p>
+                    <p><strong>المدفوع:</strong>
+                        {% if store.pricing_currency == "USD" %}
+                            {{ order.payment|floatformat:2 }} $
+                            <span class="text-muted">({{ order.payment_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                        {% else %}
+                            {{ order.payment_syp|floatformat:0 }} &#1604;.&#1587;
+                        {% endif %}
+                    </p>
 
                     <p><strong>المتبقي:</strong>
                         <span class="{% if order.remaining > 0 %}text-danger{% else %}text-success{% endif %}">
-                            {{ order.remaining|floatformat:2 }} $
+                            {% if store.pricing_currency == "USD" %}
+                                {{ order.remaining|floatformat:2 }} $
+                                <span class="text-muted">({{ order.remaining_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                            {% else %}
+                                {{ order.remaining_syp|floatformat:0 }} &#1604;.&#1587;
+                            {% endif %}
                         </span>
                     </p>
                 </div>
@@ -151,8 +184,22 @@
                         <tr>
                             <td>{{ item.product.name }}</td>
                             <td>{{ item.quantity }}</td>
-                            <td>{{ item.price|floatformat:2 }} $</td>
-                            <td class="fw-bold">{{ item.subtotal|floatformat:2 }} $</td>
+                            <td>
+                                {% if store.pricing_currency == "USD" %}
+                                    {{ item.price|floatformat:2 }} $
+                                    <span class="text-muted">({{ item.price_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                                {% else %}
+                                    {{ item.price_syp|floatformat:0 }} &#1604;.&#1587;
+                                {% endif %}
+                            </td>
+                            <td class="fw-bold">
+                                {% if store.pricing_currency == "USD" %}
+                                    {{ item.subtotal|floatformat:2 }} $
+                                    <span class="text-muted">({{ item.subtotal_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                                {% else %}
+                                    {{ item.subtotal_syp|floatformat:0 }} &#1604;.&#1587;
+                                {% endif %}
+                            </td>
 
                             <td>
                                 {% if item.item_note %}

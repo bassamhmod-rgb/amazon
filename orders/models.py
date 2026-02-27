@@ -1,33 +1,41 @@
-from django.db import models
+﻿from django.db import models
 from django.contrib.auth.models import User
 
 from stores.models import Store, StorePaymentMethod
 from accounts.models import Customer
 from django.utils import timezone
+import time
 
 
 STATUS_CHOICES = [
-    ("pending", "قيد الانتظار"),
-    ("confirmed", "تم التأكيد"),
+    ("pending", "ظ‚ظٹط¯ ط§ظ„ط§ظ†طھط¸ط§ط±"),
+    ("confirmed", "طھظ… ط§ظ„طھط£ظƒظٹط¯"),
 ]
 
 TRANSACTION_TYPES = [
-    ("sale", "بيع"),
-    ("purchase", "شراء"),
+    ("sale", "ط¨ظٹط¹"),
+    ("purchase", "ط´ط±ط§ط،"),
 ]
 
 PAYMENT_TYPES = [
-    ("full", "تحويل كامل"),
-    ("partial", "دفعة مسبقة + باقي عند التسليم"),
-    ("cod", "الدفع عند الاستلام"),
+    ("full", "طھط­ظˆظٹظ„ ظƒط§ظ…ظ„"),
+    ("partial", "ط¯ظپط¹ط© ظ…ط³ط¨ظ‚ط© + ط¨ط§ظ‚ظٹ ط¹ظ†ط¯ ط§ظ„طھط³ظ„ظٹظ…"),
+    ("cod", "ط§ظ„ط¯ظپط¹ ط¹ظ†ط¯ ط§ظ„ط§ط³طھظ„ط§ظ…"),
 ]
 
 
+
+def _touch_update_time(instance, kwargs):
+    instance.update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("update_time")
+        kwargs["update_fields"] = update_fields
 class Order(models.Model):
     is_seen_by_store = models.BooleanField(default=False)
     update_time = models.BigIntegerField(blank=True, null=True)
 
-    
     customer = models.ForeignKey(
         Customer,
         on_delete=models.SET_NULL,
@@ -55,10 +63,7 @@ class Order(models.Model):
         help_text="رقم الفاتورة في برنامج المحاسبة"
     )
 
-    
-    created_at = models.DateTimeField(
-    default=timezone.now
-    )
+    created_at = models.DateTimeField(default=timezone.now)
 
     status = models.CharField(
         max_length=20,
@@ -83,14 +88,12 @@ class Order(models.Model):
         decimal_places=2,
         default=0
     )
-    # مبلغ الإشعار (قبض/صرف) فقط
+
     amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=0
     )
-
-    # ================= الدفع =================
 
     payment_method = models.ForeignKey(
         StorePaymentMethod,
@@ -147,21 +150,24 @@ class Order(models.Model):
         blank=True,
         null=True
     )
+
     DOCUMENT_KINDS = (
-    (1, "Invoice"),   # فاتورة
-    (2, "Notice"),    # إشعار (قبض / صرف)
-)
+        (1, "Invoice"),
+        (2, "Notice"),
+    )
 
     document_kind = models.SmallIntegerField(
-    choices=DOCUMENT_KINDS,
-    default=1,
-    help_text="1 = فاتورة, 2 = إشعار قبض/صرف"
-)
+        choices=DOCUMENT_KINDS,
+        default=1,
+        help_text="1 = فاتورة, 2 = إشعار قبض/صرف"
+    )
 
     def __str__(self):
-        return f"Order #{self.id} – {self.store.name}"
+        return f"Order #{self.id} â€“ {self.store.name}"
 
-    # ================= حسابات =================
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
 
     @property
     def items_total(self):
@@ -175,7 +181,6 @@ class Order(models.Model):
     def remaining(self):
         return self.net_total - self.payment
 
-
 class OrderItem(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
@@ -185,7 +190,7 @@ class OrderItem(models.Model):
         related_name="items"
     )
 
-    # ✅ الربط الصحيح (Lazy Reference)
+    # âœ… ط§ظ„ط±ط¨ط· ط§ظ„طµط­ظٹط­ (Lazy Reference)
     product = models.ForeignKey(
         "products.Product",
         on_delete=models.SET_NULL,
@@ -205,13 +210,13 @@ class OrderItem(models.Model):
 
     direction = models.IntegerField(
         default=-1,
-        help_text="بيع = -1 / شراء = +1"
+        help_text="ط¨ظٹط¹ = -1 / ط´ط±ط§ط، = +1"
     )
 
     item_note = models.TextField(
         blank=True,
         null=True,
-        verbose_name="ملاحظات المنتج"
+        verbose_name="ظ…ظ„ط§ط­ط¸ط§طھ ط§ظ„ظ…ظ†طھط¬"
     )
 
     buy_price = models.DecimalField(
@@ -219,7 +224,7 @@ class OrderItem(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="تكلفة القطعة وقت البيع / سعر الشراء"
+        help_text="طھظƒظ„ظپط© ط§ظ„ظ‚ط·ط¹ط© ظˆظ‚طھ ط§ظ„ط¨ظٹط¹ / ط³ط¹ط± ط§ظ„ط´ط±ط§ط،"
     )
 
     @property
@@ -231,3 +236,7 @@ class OrderItem(models.Model):
         if self.direction == 1 or self.buy_price is None:
             return 0
         return (self.price - self.buy_price) * abs(self.quantity)
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        return super().save(*args, **kwargs)

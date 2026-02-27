@@ -8,6 +8,7 @@ from products.models import Product
 from accounts.models import Customer
 from stores.models import StorePaymentMethod
 from django.urls import reverse
+from decimal import Decimal
 
 
 
@@ -36,6 +37,15 @@ def get_cart(request, store):
     )
     return cart
 
+
+def _to_syp(store, amount):
+    if amount is None:
+        return Decimal("0")
+    exchange_rate = store.exchange_rate or Decimal("0")
+    if store.pricing_currency == "USD" and exchange_rate > 0:
+        return amount * exchange_rate
+    return amount
+
 def checkout(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, is_active=True)
 
@@ -58,6 +68,7 @@ def checkout(request, store_slug):
 
     required_percent = store.payment_required_percentage or 0
     required_amount = (cart.get_total() * required_percent) / 100 if required_percent else 0
+    required_amount_syp = _to_syp(store, required_amount)
 
     if request.method == "POST":
 
@@ -109,8 +120,9 @@ def checkout(request, store_slug):
                     "checkout_data": checkout_data,
                     "error_message": "يجب رفع صورة التحويل أو إدخال رقم العملية.",
                     "required_percent": required_percent,
-                    "required_amount": required_amount,
-                })
+                  "required_amount": required_amount,
+                  "required_amount_syp": required_amount_syp,
+              })
 
         if proof_image_file:
             filename = f"proofs/{uuid.uuid4()}_{proof_image_file.name}"
@@ -133,8 +145,9 @@ def checkout(request, store_slug):
             "customer_note": "",
         },
         "required_percent": required_percent,
-        "required_amount": required_amount,
-    })
+          "required_amount": required_amount,
+          "required_amount_syp": required_amount_syp,
+      })
 
 def customer_orders(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, is_active=True)
@@ -152,6 +165,8 @@ def customer_orders(request, store_slug):
 
     # جلب طلبات الزبون
     orders = Order.objects.filter(customer=customer, store=store).order_by("-id")
+    for order in orders:
+        order.items_total_syp = _to_syp(store, order.items_total)
 
     return render(request, "orders/customer_orders.html", {
         "store": store,
@@ -170,6 +185,15 @@ def order_detail(request, store_slug, order_id):
         return redirect("orders:customer_orders", store_slug=store.slug)
 
     items = order.items.all()
+    for item in items:
+        item.price_syp = _to_syp(store, item.price)
+        item.subtotal_syp = _to_syp(store, item.subtotal)
+
+    order.items_total_syp = _to_syp(store, order.items_total)
+    order.discount_syp = _to_syp(store, order.discount)
+    order.net_total_syp = _to_syp(store, order.net_total)
+    order.payment_syp = _to_syp(store, order.payment)
+    order.remaining_syp = _to_syp(store, order.remaining)
 
     return render(request, "orders/order_detail.html", {
         "store": store,
@@ -205,12 +229,19 @@ def review_order(request, store_slug):
             store=store
         ).first()
 
+    items = list(cart.items.select_related("product").all())
+    for item in items:
+        item.price_syp = _to_syp(store, item.product.price)
+        item.subtotal_syp = _to_syp(store, item.subtotal())
+    cart.total_syp = _to_syp(store, cart.get_total())
+
     return render(request, "stores/checkout/review.html", {
         "store": store,
         "customer": customer,
         "data": data,
         "payment_method": payment_method,
         "cart": cart,
+        "items": items,
     })
 import os
 from django.core.files import File
@@ -273,6 +304,10 @@ def confirm_order(request, store_slug):
             item_note=item.item_note,
         )
 
+    # اعتبر الطلب مدفوع بالكامل عند إنشائه من قبل الزبون
+    order.payment = order.net_total
+    order.save(update_fields=["payment"])
+
     cart.items.all().delete()
 
     if "checkout_data" in request.session:
@@ -284,6 +319,7 @@ def confirm_order(request, store_slug):
 def order_success(request, store_slug, order_id):
     store = get_object_or_404(Store, slug=store_slug)
     order = get_object_or_404(Order, id=order_id, store=store)
+    order.net_total_syp = _to_syp(store, order.net_total)
 
     return render(request, "stores/checkout/success.html", {
         "store": store,

@@ -93,7 +93,14 @@
                     <div>
                         <div><strong>رقم الطلب:</strong> #{{ order.id }}</div>
                         <div><strong>التاريخ:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</div>
-                        <div><strong>المجموع:</strong> {{ order.items_total|floatformat:2 }} $</div>
+                        <div><strong>المجموع:</strong>
+                            {% if store.pricing_currency == "USD" %}
+                                {{ order.items_total|floatformat:2 }} $
+                                <span class="text-muted">({{ order.items_total_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                            {% else %}
+                                {{ order.items_total_syp|floatformat:0 }} &#1604;.&#1587;
+                            {% endif %}
+                        </div>
                     </div>
 
                     <div class="text-end">

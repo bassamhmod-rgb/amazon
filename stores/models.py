@@ -41,6 +41,21 @@ class Store(models.Model):
         default=Decimal("0.00"),
         help_text="نسبة الكاش باك من ربح الطلب (مثال: 5 = 5%)"
     )
+    PRICING_CURRENCIES = [
+        ("USD", "دولار"),
+        ("SYP", "ليرة سورية"),
+    ]
+    pricing_currency = models.CharField(
+        max_length=3,
+        choices=PRICING_CURRENCIES,
+        default="SYP",
+    )
+    exchange_rate = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="سعر صرف الدولار مقابل الليرة السورية (1 USD = ? SYP)"
+    )
     hero_fit = models.CharField(
         max_length=10,
         choices=[

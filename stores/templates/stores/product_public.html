@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>{{ product.name }} – {{ store.name }}</title>
+    <title>{{ product.name }} – {{ store.slug }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
@@ -169,7 +169,14 @@
 
                 <h1 class="product-title">{{ product.name }}</h1>
 
-                <div class="product-price">{{ product.price|floatformat:2 }} $</div>
+                {% if store.pricing_currency == "USD" %}
+                    <div class="product-price">{{ product.price|floatformat:2 }} $</div>
+                    <div class="text-muted" style="font-size:1rem;">
+                        {{ product.price_syp|floatformat:0 }} ل.س
+                    </div>
+                {% else %}
+                    <div class="product-price">{{ product.price_syp|floatformat:0 }} ل.س</div>
+                {% endif %}
 
                 <p><strong>الكمية المتوفرة:</strong> {{ product.real_stock }}</p>
                 <p><strong>الفئة:</strong>

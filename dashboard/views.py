@@ -1504,6 +1504,29 @@ def store_settings(request, store_slug):
         if hero_fit in ["contain", "cover"]:
             store.hero_fit = hero_fit
 
+        pricing_currency = (request.POST.get("pricing_currency") or "").strip()
+        if pricing_currency in ["USD", "SYP"]:
+            store.pricing_currency = pricing_currency
+        else:
+            messages.error(request, "طريقة التسعير غير صحيحة.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
+
+        exchange_rate_raw = (request.POST.get("exchange_rate") or "").strip()
+        if exchange_rate_raw != "":
+            try:
+                exchange_rate = Decimal(exchange_rate_raw)
+            except InvalidOperation:
+                messages.error(request, "سعر الصرف غير صحيح.")
+                return redirect(f"/dashboard/{store.slug}/settings/")
+            if exchange_rate <= 0:
+                messages.error(request, "سعر الصرف يجب أن يكون أكبر من صفر.")
+                return redirect(f"/dashboard/{store.slug}/settings/")
+            store.exchange_rate = exchange_rate
+        else:
+            if store.pricing_currency == "USD":
+                messages.error(request, "سعر الصرف مطلوب عند اختيار التسعير بالدولار.")
+                return redirect(f"/dashboard/{store.slug}/settings/")
+
         store.save()
 
         messages.success(request, "تم حفظ إعدادات المتجر بنجاح.")

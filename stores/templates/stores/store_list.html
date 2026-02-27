@@ -11,9 +11,9 @@
       <li>
         <a href="{% url 'stores:store_front' store.slug %}">
           {% if store.logo %}
-            <img src="{{ store.logo.url }}" alt="{{ store.name }}" style="height:50px;">
+            <img src="{{ store.logo.url }}" alt="{{ store.slug }}" style="height:50px;">
           {% endif %}
-          {{ store.name }} - {{ store.mobile }}
+          {{ store.slug }} - {{ store.mobile }}
         </a>
       </li>
     {% empty %}

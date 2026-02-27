@@ -1,8 +1,18 @@
 from django.db import models
+import time
 from stores.models import Store
 from django.db.models import Sum, F
 from decimal import Decimal
 from orders.models import OrderItem
+
+
+def _touch_update_time(instance, kwargs):
+    instance.update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("update_time")
+        kwargs["update_fields"] = update_fields
 
 
 class Category(models.Model):
@@ -21,6 +31,10 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
 
 
 
@@ -77,6 +91,10 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
 
     # ⭐⭐⭐ المخزون الحقيقي = المخزون الابتدائي + الحركات
     @property

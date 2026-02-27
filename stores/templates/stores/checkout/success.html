@@ -4,7 +4,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تم إرسال الطلب – {{ store.name }}</title>
+    <title>تم إرسال الطلب – {{ store.slug }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap RTL -->
@@ -82,7 +82,14 @@
             <p><strong>رقم الطلب:</strong> #{{ order.id }}</p>
             <p><strong>الزبون:</strong> {{ order.customer.name }}</p>
             <p><strong>رقم الهاتف:</strong> {{ order.customer.phone }}</p>
-            <p><strong>إجمالي المبلغ:</strong> {{ order.net_total|floatformat:2 }} $</p>
+            <p><strong>إجمالي المبلغ:</strong>
+                {% if store.pricing_currency == "USD" %}
+                    {{ order.net_total|floatformat:2 }} $
+                    <span class="text-muted">({{ order.net_total_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                {% else %}
+                    {{ order.net_total_syp|floatformat:0 }} &#1604;.&#1587;
+                {% endif %}
+            </p>
 
             <hr>
 

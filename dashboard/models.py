@@ -1,11 +1,20 @@
-from decimal import Decimal
+﻿from decimal import Decimal
 
 from django.db import models
 from django.utils import timezone
+import time
 
 from stores.models import Store
 
 
+
+def _touch_update_time(instance, kwargs):
+    instance.update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("update_time")
+        kwargs["update_fields"] = update_fields
 class ExpenseType(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
@@ -19,6 +28,9 @@ class ExpenseType(models.Model):
         return self.name
 
 
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
 class ExpenseReason(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
@@ -32,6 +44,9 @@ class ExpenseReason(models.Model):
         return self.name
 
 
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
 class Expense(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
@@ -59,3 +74,6 @@ class Expense(models.Model):
 
     def __str__(self):
         return f"{self.store} - {self.amount}"
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        return super().save(*args, **kwargs)

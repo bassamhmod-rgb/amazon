@@ -468,7 +468,14 @@ button.btn-primary {
                     </a>
 
                     <div class="product-name">{{ p.name }}</div>
-                    <div class="product-price">{{ p.price }} ?.?</div>
+                      {% if store.pricing_currency == "USD" %}
+                          <div class="product-price">{{ p.price|floatformat:2 }} $</div>
+                          <div class="product-price text-muted" style="font-size:0.85rem;">
+                              {{ p.price_syp|floatformat:0 }} ل.س
+                          </div>
+                      {% else %}
+                          <div class="product-price">{{ p.price_syp|floatformat:0 }} ل.س</div>
+                      {% endif %}
 
                     <form method="POST" action="{% url 'cart:add_to_cart' store.slug p.id %}" class="add-to-cart-form">
                         {% csrf_token %}

@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
 from django.http import JsonResponse
+from decimal import Decimal
 from stores.models import Store
 from products.models import Product
 from .models import Cart, CartItem
@@ -28,6 +29,15 @@ def get_cart(request, store):
         store=store
     )
     return cart
+
+
+def _to_syp(store, amount):
+    if amount is None:
+        return Decimal("0")
+    exchange_rate = store.exchange_rate or Decimal("0")
+    if store.pricing_currency == "USD" and exchange_rate > 0:
+        return amount * exchange_rate
+    return amount
 
 
 
@@ -83,9 +93,18 @@ def cart_detail(request, store_slug):
             session_key=session_key, store=store
         ).first()
 
+    items = []
+    if cart:
+        items = list(cart.items.select_related("product").all())
+        for item in items:
+            item.price_syp = _to_syp(store, item.product.price)
+            item.subtotal_syp = _to_syp(store, item.subtotal())
+        cart.total_syp = _to_syp(store, cart.get_total())
+
     return render(request, "cart/cart_detail.html", {
         "store": store,
         "cart": cart,
+        "items": items,
     })
 def remove_from_cart(request, store_slug, item_id):
     store = get_object_or_404(Store, slug=store_slug, is_active=True)

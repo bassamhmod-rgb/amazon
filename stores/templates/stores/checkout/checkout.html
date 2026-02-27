@@ -4,7 +4,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إتمام الطلب – {{ store.name }}</title>
+    <title>إتمام الطلب – {{ store.slug }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap RTL -->
@@ -150,7 +150,12 @@
                 <strong>⚠️ ملاحظة:</strong><br>
                 يُنصَح أن لا تقل الدفعة الأولى عن:
                 <span class="fw-bold text-danger">
-                    {{ required_amount|floatformat:2 }} $
+                    {% if store.pricing_currency == "USD" %}
+                        {{ required_amount|floatformat:2 }} $
+                        <span class="text-muted">({{ required_amount_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                    {% else %}
+                        {{ required_amount_syp|floatformat:0 }} &#1604;.&#1587;
+                    {% endif %}
                 </span>
                 ({{ required_percent }}%)
             </div>
@@ -235,6 +240,10 @@
             <button class="btn btn-primary w-100 py-2">
                 متابعة لإتمام الطلب
             </button>
+
+            <a href="{% url 'cart:cart_detail' store.slug %}" class="btn btn-link w-100 mt-3">
+                رجوع لسلة المشتريات
+            </a>
 
         </form>
 
