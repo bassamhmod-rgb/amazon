@@ -218,6 +218,11 @@ def product_public(request, store_slug, product_id):
     "product": product,
 })
 
+
+def store_contact_links(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, is_active=True)
+    return render(request, "stores/store_contact_links.html", {"store": store})
+
 #بحث عام للصفحة العامة
 
 from django.db.models import Q, Exists, OuterRef

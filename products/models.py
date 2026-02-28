@@ -52,6 +52,7 @@ class Product(models.Model):
     description = models.TextField(blank=True)
 
     price = models.DecimalField(max_digits=8, decimal_places=2)
+    show_price = models.BooleanField(default=True)
 
     buy_price = models.DecimalField(
         max_digits=10,

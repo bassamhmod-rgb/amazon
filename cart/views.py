@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
 from django.http import JsonResponse
+from django.contrib import messages
 from decimal import Decimal
 from stores.models import Store
 from products.models import Product
@@ -44,7 +45,26 @@ def _to_syp(store, amount):
 # --- الدالة الأولى: إضافة المنتج للسلة (التي قمنا بتعديلها) ---
 def add_to_cart(request, store_slug, product_id):
     store = get_object_or_404(Store, slug=store_slug, is_active=True)
+    if store.sales_paused:
+        pause_message = (store.sales_pause_message or "").strip() or "Sales are temporarily paused for this store."
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"error": pause_message}, status=403)
+        messages.error(request, pause_message)
+        referer = request.META.get("HTTP_REFERER")
+        if referer:
+            return redirect(referer)
+        return redirect("stores:store_front", slug=store.slug)
+
     product = get_object_or_404(Product, id=product_id, store=store, active=True)
+    if not product.show_price:
+        hidden_price_message = "هذا المنتج لا يُباع عبر المتجر الإلكتروني. البيع عن طريق المركز مباشرة."
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"error": hidden_price_message}, status=403)
+        messages.error(request, hidden_price_message)
+        referer = request.META.get("HTTP_REFERER")
+        if referer:
+            return redirect(referer)
+        return redirect("stores:store_front", slug=store.slug)
 
     cart = get_cart(request, store)
 

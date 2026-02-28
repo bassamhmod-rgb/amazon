@@ -250,6 +250,13 @@ button.btn-primary {
 </head>
 
 <body>
+{% if messages %}
+<div class="container mt-3">
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
 
 <header class="main-header">
     <div class="container py-2 d-flex justify-content-between align-items-center">
@@ -263,6 +270,8 @@ button.btn-primary {
 
 
         <div class="d-flex align-items-center gap-3">
+            <a href="{% url 'stores:store_contact_links' store.slug %}" class="btn btn-outline-primary d-none d-md-inline">&#1578;&#1608;&#1575;&#1589;&#1604; &#1605;&#1593;&#1606;&#1575;
+            </a>
 
             <a href="{% url 'cart:cart_detail' store.slug %}" class="btn btn-outline-primary cart-btn">
                 &#128722;
@@ -291,6 +300,11 @@ button.btn-primary {
                 </button>
                 
                 <ul class="dropdown-menu dropdown-menu-end text-end">
+                    <li>
+                        <a class="dropdown-item" href="{% url 'stores:store_contact_links' store.slug %}">&#1578;&#1608;&#1575;&#1589;&#1604; &#1605;&#1593;&#1606;&#1575;
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
                     {% if customer %}
                     <li>
                         <a class="dropdown-item" href="{% url 'orders:customer_orders' store.slug %}">
@@ -447,7 +461,6 @@ button.btn-primary {
 
 <section class="stores-section">
     <div class="container text-center">
-
         <h2 class="section-title">{{ store.description3 }}</h2>
         <p class="section-subtitle">{{ store.description4 }}</p>
 
@@ -468,6 +481,7 @@ button.btn-primary {
                     </a>
 
                     <div class="product-name">{{ p.name }}</div>
+                    {% if p.show_price %}
                       {% if store.pricing_currency == "USD" %}
                           <div class="product-price">{{ p.price|floatformat:2 }} $</div>
                           <div class="product-price text-muted" style="font-size:0.85rem;">
@@ -476,6 +490,7 @@ button.btn-primary {
                       {% else %}
                           <div class="product-price">{{ p.price_syp|floatformat:0 }} ل.س</div>
                       {% endif %}
+                    {% endif %}
 
                     <form method="POST" action="{% url 'cart:add_to_cart' store.slug p.id %}" class="add-to-cart-form">
                         {% csrf_token %}
@@ -646,13 +661,25 @@ button.btn-primary {
                 body: new FormData(form)
             })
             .then(function (res) {
-                if (!res.ok) throw res;
-                return res.json();
+                return res.json()
+                    .catch(function () { return {}; })
+                    .then(function (data) {
+                        if (!res.ok) {
+                            var err = new Error(data.error || "");
+                            err.hasMessage = !!data.error;
+                            throw err;
+                        }
+                        return data;
+                    });
             })
             .then(function (data) {
                 updateCartBadge(data.cart_count);
             })
-            .catch(function () {
+            .catch(function (err) {
+                if (err && err.hasMessage) {
+                    alert(err.message);
+                    return;
+                }
                 form.submit();
             })
             .finally(function () {
@@ -664,6 +691,10 @@ button.btn-primary {
 
 </body>
 </html>
+
+
+
+
 
 
 

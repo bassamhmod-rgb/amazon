@@ -19,6 +19,11 @@ urlpatterns = [
         views.product_public,
         name="product_public"
     ),
+    path(
+        "store/<slug:store_slug>/contact/",
+        views.store_contact_links,
+        name="store_contact_links"
+    ),
 
     # ================== طرق الدفع ==================
     path(

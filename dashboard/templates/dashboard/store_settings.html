@@ -151,6 +151,26 @@
                             <p class="text-danger mt-1" style="font-size:13px;">⚠️ تعديل رقم الهاتف يتم حصريًا عبر التواصل مع إدارة المنصة.</p>
                         </div>
 
+                        <div class="col-md-6">
+                            <label class="form-label">رابط فيسبوك</label>
+                            <input type="url" class="form-control" name="facebook_url" value="{{ store.facebook_url }}" placeholder="https://facebook.com/...">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">رابط انستغرام</label>
+                            <input type="url" class="form-control" name="instagram_url" value="{{ store.instagram_url }}" placeholder="https://instagram.com/...">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">رابط تلغرام</label>
+                            <input type="url" class="form-control" name="telegram_url" value="{{ store.telegram_url }}" placeholder="https://t.me/...">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">رابط واتساب</label>
+                            <input type="url" class="form-control" name="whatsapp_url" value="{{ store.whatsapp_url }}" placeholder="https://wa.me/...">
+                        </div>
+
                         <div class="mb-3">
                           <label class="form-label">النسبة المطلوبة للدفع المسبق (%)</label>
                           <input type="number" name="payment_required_percentage" value="{{ store.payment_required_percentage }}" min="0" max="100" class="form-control">
@@ -170,6 +190,16 @@
                                 <input class="form-check-input" type="checkbox" name="allow_cash_on_delivery" {% if store.allow_cash_on_delivery %}checked{% endif %}>
                                 <label class="form-check-label">الدفع عند الاستلام</label>
                             </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">حالة البيع</label>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="sales_paused" id="sales_paused" {% if store.sales_paused %}checked{% endif %}>
+                                <label class="form-check-label" for="sales_paused">إيقاف البيع مؤقتًا</label>
+                            </div>
+                            <label class="form-label">رسالة إيقاف البيع (تظهر للزبون)</label>
+                            <textarea class="form-control" name="sales_pause_message" rows="2" placeholder="مثال: البيع متوقف مؤقتًا بسبب جرد المستودع.">{{ store.sales_pause_message }}</textarea>
                         </div>
 
                         <div class="mb-3">

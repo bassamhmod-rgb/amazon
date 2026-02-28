@@ -1461,6 +1461,12 @@ def store_settings(request, store_slug):
         store.description3 = request.POST.get("description3", "")
         store.description4 = request.POST.get("description4", "")
         store.description5 = request.POST.get("description5", "")
+        store.facebook_url = request.POST.get("facebook_url", "").strip()
+        store.instagram_url = request.POST.get("instagram_url", "").strip()
+        store.telegram_url = request.POST.get("telegram_url", "").strip()
+        store.whatsapp_url = request.POST.get("whatsapp_url", "").strip()
+        store.sales_paused = "sales_paused" in request.POST
+        store.sales_pause_message = request.POST.get("sales_pause_message", "").strip()
 
         theme_value = request.POST.get("theme")
         if theme_value and theme_value.isdigit():

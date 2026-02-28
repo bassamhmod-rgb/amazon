@@ -5,10 +5,11 @@ from .models import Product, Category
 class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
-        fields = ["name", "price", "stock", "category", "category2", "main_image", "description", "active"]
+        fields = ["name", "price", "show_price", "stock", "category", "category2", "main_image", "description", "active"]
         labels = {
             "name": "اسم المنتج",
             "price": "السعر",
+            "show_price": "إظهار السعر بصفحة العرض",
             "stock": "الكمية بالمخزون",
             "category": "الفئة",
             "category2": "فئة فرعية",
