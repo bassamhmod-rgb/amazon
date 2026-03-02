@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -15,7 +15,6 @@
             overflow-x:hidden;
         }
 
-        /* ===== SIDEBAR ===== */
         .sidebar{
             width:230px;
             background:#fff;
@@ -43,19 +42,14 @@
             color:#0d6efd;
         }
 
-        /* ===== CONTENT ===== */
         .content{
             margin-right:240px;
             padding:20px;
             transition:.3s;
         }
 
-        /* ===== SIDEBAR ARROW ===== */
-        #sidebarArrow{
-            display:none;
-        }
+        #sidebarArrow{ display:none; }
 
-        /* ===== MOBILE (نفس صفحة المنتجات) ===== */
         @media (max-width:768px){
             .sidebar{ right:-260px; }
             .sidebar.active{ right:0; }
@@ -85,15 +79,12 @@
                 user-select:none;
             }
 
-            /* الجدول قابل للسحب */
             .table-responsive{
                 overflow-x:auto;
                 -webkit-overflow-scrolling:touch;
             }
 
-            table{
-                min-width:500px;
-            }
+            table{ min-width:500px; }
 
             table th,
             table td{
@@ -107,19 +98,15 @@
 
 <body>
 
-<!-- سهم السايدبار -->
 <div id="sidebarArrow">❯</div>
 
-<!-- Sidebar -->
 {% include "dashboard/sidebar.html" %}
 
-<!-- Content -->
 <div class="content">
 
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h3 class="mb-0">العملاء</h3>
-        <a href="{% url 'dashboard:customer_create' store.slug %}"
-           class="btn btn-primary w-100 w-md-auto">
+        <a href="{% url 'dashboard:customer_create' store.slug %}" class="btn btn-primary w-100 w-md-auto">
             + إضافة عميل جديد
         </a>
     </div>
@@ -129,6 +116,14 @@
             <div class="alert alert-{{ message.tags|default:'info' }} mb-3">{{ message }}</div>
         {% endfor %}
     {% endif %}
+
+    <div class="card p-3 shadow-sm mb-3">
+        <input type="text"
+               id="liveSearchCustomers"
+               class="form-control"
+               placeholder="ابحث بالاسم أو الموبايل (الأسهم للتنقل و Enter للاختيار)"
+               autocomplete="off">
+    </div>
 
     <div class="card p-3 shadow-sm">
         <div class="table-responsive">
@@ -141,33 +136,26 @@
                     </tr>
                 </thead>
                 <tbody>
-
                 {% for customer in customers %}
-                    <tr>
+                    <tr class="customer-row" data-search="{{ customer.name|default:'' }} {{ customer.phone|default:'' }}">
                         <td>{{ customer.name }}</td>
                         <td>{{ customer.phone }}</td>
                         <td class="text-center">
-                            <form method="post"
-                                  action="{% url 'dashboard:delete_customer' store.slug customer.id %}"
-                                  style="display:inline;">
+                            <a href="{% url 'dashboard:customer_update' store.slug customer.id %}" class="btn btn-warning">تعديل</a>
+                            <form method="post" action="{% url 'dashboard:delete_customer' store.slug customer.id %}" style="display:inline;">
                                 {% csrf_token %}
-                                <button type="submit"
-                                        class="btn btn-danger js-confirm-delete">
-                                    حذف
-                                </button>
+                                <button type="submit" class="btn btn-danger js-confirm-delete">حذف</button>
                             </form>
                         </td>
                     </tr>
                 {% empty %}
-                    <tr>
-                        <td colspan="3" class="text-center text-muted">
-                            لا يوجد عملاء بعد
-                        </td>
+                    <tr class="empty-initial-row">
+                        <td colspan="3" class="text-center text-muted">لا يوجد عملاء بعد</td>
                     </tr>
                 {% endfor %}
-
                 </tbody>
             </table>
+            <div id="noCustomerResults" class="text-center text-muted py-3 d-none">لا توجد نتائج مطابقة</div>
         </div>
     </div>
 
@@ -181,6 +169,73 @@
         sidebar.classList.toggle("active");
         arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
     };
+
+    const customerSearchInput = document.getElementById("liveSearchCustomers");
+    const customerRows = Array.from(document.querySelectorAll(".customer-row"));
+    const noCustomerResults = document.getElementById("noCustomerResults");
+    let customerVisibleRows = [...customerRows];
+    let customerActiveIndex = -1;
+
+    function updateCustomerHighlight() {
+        customerRows.forEach((row) => row.classList.remove("table-active"));
+        if (customerActiveIndex >= 0 && customerVisibleRows[customerActiveIndex]) {
+            customerVisibleRows[customerActiveIndex].classList.add("table-active");
+            customerVisibleRows[customerActiveIndex].scrollIntoView({ block: "nearest" });
+        }
+    }
+
+    function filterCustomers() {
+        const q = (customerSearchInput.value || "").trim().toLowerCase();
+        customerVisibleRows = [];
+
+        customerRows.forEach((row) => {
+            const haystack = (row.dataset.search || "").toLowerCase();
+            const matched = !q || haystack.includes(q);
+            row.style.display = matched ? "" : "none";
+            if (matched) customerVisibleRows.push(row);
+        });
+
+        customerActiveIndex = customerVisibleRows.length ? 0 : -1;
+        updateCustomerHighlight();
+
+        if (q && customerRows.length && !customerVisibleRows.length) {
+            noCustomerResults.classList.remove("d-none");
+        } else {
+            noCustomerResults.classList.add("d-none");
+        }
+    }
+
+    customerSearchInput.addEventListener("input", filterCustomers);
+    customerSearchInput.addEventListener("keydown", (e) => {
+        if (!customerVisibleRows.length) {
+            if (e.key === "Escape") {
+                customerSearchInput.value = "";
+                filterCustomers();
+            }
+            return;
+        }
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            customerActiveIndex = (customerActiveIndex + 1) % customerVisibleRows.length;
+            updateCustomerHighlight();
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            customerActiveIndex = (customerActiveIndex - 1 + customerVisibleRows.length) % customerVisibleRows.length;
+            updateCustomerHighlight();
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (customerActiveIndex >= 0) {
+                const editBtn = customerVisibleRows[customerActiveIndex].querySelector("a.btn-warning");
+                if (editBtn) editBtn.click();
+            }
+        } else if (e.key === "Escape") {
+            customerSearchInput.value = "";
+            filterCustomers();
+        }
+    });
+
+    filterCustomers();
 </script>
 <script src="{% static 'js/confirm_delete.js' %}"></script>
 </body>

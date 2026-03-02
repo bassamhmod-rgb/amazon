@@ -7,6 +7,8 @@ from orders.models import OrderItem
 
 
 def _touch_update_time(instance, kwargs):
+    if hasattr(instance, "access_id") and getattr(instance, "access_id", None) in (None, 0, ""):
+        return
     instance.update_time = int(time.time() // 60)
     update_fields = kwargs.get("update_fields")
     if update_fields:

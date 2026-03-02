@@ -40,6 +40,7 @@ path(
 #موردين
 path("<slug:store_slug>/suppliers/", views.suppliers_list, name="suppliers_list"),
 path("<slug:store_slug>/suppliers/create/", views.supplier_create, name="supplier_create"),
+path("<slug:store_slug>/suppliers/<int:supplier_id>/edit/", views.supplier_update, name="supplier_update"),
 path("<slug:store_slug>/suppliers/<int:supplier_id>/delete/", views.delete_supplier, name="delete_supplier"),
 path("<slug:store_slug>/balances/", views.balances_report, name="balances_report"),
 path("<slug:store_slug>/profits/", views.profits_report, name="profits_report"),
@@ -50,6 +51,7 @@ path("<slug:store_slug>/search-suppliers/", views.search_suppliers),
 # Customers (Clients)
 path("<slug:store_slug>/customers/", views.customers_list, name="customers_list"),
 path("<slug:store_slug>/customers/add/", views.customer_create, name="customer_create"),
+path("<slug:store_slug>/customers/<int:customer_id>/edit/", views.customer_update, name="customer_update"),
 path("<slug:store_slug>/customers/<int:customer_id>/delete/", views.delete_customer, name="delete_customer"),
 # ادارة النقاط
 path("<slug:store_slug>/points/", views.points_page, name="points_page"),

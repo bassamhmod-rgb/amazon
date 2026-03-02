@@ -71,7 +71,7 @@ def create_expense_from_access(request, merchant_id):
 
     try:
         data = json.loads(request.body.decode("utf-8"))
-
+        access_id = data.get("access_id")
         amount = data.get("amount", 0)
         date_str = data.get("date")
         expense_type_name = (data.get("expense_type") or "").strip()
@@ -104,6 +104,7 @@ def create_expense_from_access(request, merchant_id):
 
         expense = Expense.objects.create(
             store=store,
+            access_id=access_id,
             amount=Decimal(str(amount)) if amount not in ("", None) else Decimal("0"),
             date=date_only if date_only else timezone.now().date(),
             expense_type=expense_type,

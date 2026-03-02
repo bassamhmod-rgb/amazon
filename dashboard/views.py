@@ -1291,11 +1291,21 @@ def expense_settings(request, store_slug):
 @login_required
 def suppliers_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
-    suppliers = Supplier.objects.filter(store=store).order_by("-id")
+    suppliers = Supplier.objects.filter(store=store)
+    q = (request.GET.get("q") or "").strip()
+    if q:
+        suppliers = suppliers.filter(
+            Q(name__icontains=q)
+            | Q(phone__icontains=q)
+            | Q(address__icontains=q)
+            | Q(email__icontains=q)
+        )
+    suppliers = suppliers.order_by("-id")
 
     return render(request, "dashboard/suppliers_list.html", {
         "store": store,
         "suppliers": suppliers,
+        "q": q,
     })
 
 
@@ -1303,10 +1313,20 @@ def suppliers_list(request, store_slug):
 def customers_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
     customers = Customer.objects.filter(store=store)
+    q = (request.GET.get("q") or "").strip()
+    if q:
+        customers = customers.filter(
+            Q(name__icontains=q)
+            | Q(phone__icontains=q)
+            | Q(address__icontains=q)
+            | Q(note__icontains=q)
+        )
+    customers = customers.order_by("-id")
 
     return render(request, "dashboard/customers_list.html", {
         "store": store,
         "customers": customers,
+        "q": q,
     })
 
 
@@ -1340,6 +1360,63 @@ def customer_create(request, store_slug):
 
     return render(request, "dashboard/customer_create.html", {
         "store": store
+    })
+
+
+@login_required
+def customer_update(request, store_slug, customer_id):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    customer = get_object_or_404(Customer, id=customer_id, store=store)
+
+    if request.method == "POST":
+        name = (request.POST.get("name") or "").strip()
+        phone = (request.POST.get("phone") or "").strip()
+        address = (request.POST.get("address") or "").strip()
+        note = (request.POST.get("note") or "").strip()
+
+        if not name or not phone:
+            messages.error(request, "الاسم ورقم الموبايل مطلوبان.")
+            return render(request, "dashboard/customer_update.html", {
+                "store": store,
+                "customer": customer,
+            })
+
+        duplicate_name = Customer.objects.filter(
+            store=store,
+            name=name
+        ).exclude(id=customer.id).exists()
+        duplicate_phone = Customer.objects.filter(
+            store=store,
+            phone=phone
+        ).exclude(id=customer.id).exists()
+
+        if duplicate_name or duplicate_phone:
+            if duplicate_name and duplicate_phone:
+                messages.error(request, "لم يتم التعديل: الاسم ورقم الموبايل مسجلان مسبقًا.")
+            elif duplicate_name:
+                messages.error(request, "لم يتم التعديل: الاسم مسجل مسبقًا.")
+            else:
+                messages.error(request, "لم يتم التعديل: رقم الموبايل مسجل مسبقًا.")
+            return render(request, "dashboard/customer_update.html", {
+                "store": store,
+                "customer": customer,
+            })
+
+        update_data = {
+            "name": name,
+            "phone": phone,
+            "address": address,
+            "note": note,
+        }
+        if customer.access_id not in (None, 0, ""):
+            update_data["update_time"] = int(timezone.now().timestamp() // 60)
+        Customer.objects.filter(id=customer.id, store=store).update(**update_data)
+        messages.success(request, "تم تعديل بيانات العميل بنجاح.")
+        return redirect("dashboard:customers_list", store_slug=store.slug)
+
+    return render(request, "dashboard/customer_update.html", {
+        "store": store,
+        "customer": customer,
     })
 
 
@@ -1816,6 +1893,74 @@ def supplier_create(request, store_slug):
 
     return render(request, "dashboard/supplier_create.html", {
         "store": store
+    })
+
+
+@login_required
+def supplier_update(request, store_slug, supplier_id):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    supplier = get_object_or_404(Supplier, id=supplier_id, store=store)
+
+    if request.method == "POST":
+        name = (request.POST.get("name") or "").strip()
+        phone = (request.POST.get("phone") or "").strip()
+        address = (request.POST.get("address") or "").strip()
+        email = (request.POST.get("email") or "").strip()
+        opening_balance_raw = (request.POST.get("opening_balance") or "0").strip()
+
+        if not name:
+            messages.error(request, "اسم المورد مطلوب.")
+            return render(request, "dashboard/supplier_update.html", {
+                "store": store,
+                "supplier": supplier,
+            })
+
+        duplicate_name = Supplier.objects.filter(
+            store=store,
+            name=name
+        ).exclude(id=supplier.id).exists()
+        duplicate_phone = bool(phone) and Supplier.objects.filter(
+            store=store,
+            phone=phone
+        ).exclude(id=supplier.id).exists()
+
+        if duplicate_name or duplicate_phone:
+            if duplicate_name and duplicate_phone:
+                messages.error(request, "لم يتم التعديل: الاسم ورقم الموبايل مسجلان مسبقًا.")
+            elif duplicate_name:
+                messages.error(request, "لم يتم التعديل: الاسم مسجل مسبقًا.")
+            else:
+                messages.error(request, "لم يتم التعديل: رقم الموبايل مسجل مسبقًا.")
+            return render(request, "dashboard/supplier_update.html", {
+                "store": store,
+                "supplier": supplier,
+            })
+
+        try:
+            opening_balance = Decimal(opening_balance_raw)
+        except (InvalidOperation, TypeError):
+            messages.error(request, "قيمة الرصيد السابق غير صالحة.")
+            return render(request, "dashboard/supplier_update.html", {
+                "store": store,
+                "supplier": supplier,
+            })
+
+        update_data = {
+            "name": name,
+            "phone": phone,
+            "address": address,
+            "email": email,
+            "opening_balance": opening_balance,
+        }
+        if supplier.access_id not in (None, 0, ""):
+            update_data["update_time"] = int(timezone.now().timestamp() // 60)
+        Supplier.objects.filter(id=supplier.id, store=store).update(**update_data)
+        messages.success(request, "تم تعديل بيانات المورد بنجاح.")
+        return redirect("dashboard:suppliers_list", store_slug=store.slug)
+
+    return render(request, "dashboard/supplier_update.html", {
+        "store": store,
+        "supplier": supplier,
     })
 #حذف مورد
 @login_required
