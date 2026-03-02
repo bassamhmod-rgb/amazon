@@ -3,7 +3,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>الرصيد – {{ store }}</title>
+    <title>الرصيد - {{ store }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
@@ -15,7 +15,6 @@
             overflow-x:hidden;
         }
 
-        /* ===== SIDEBAR ===== */
         .sidebar{
             width:230px;
             background:#fff;
@@ -43,19 +42,22 @@
             color:#0d6efd;
         }
 
-        /* ===== CONTENT ===== */
         .content{
             margin-right:240px;
             padding:20px;
             transition:.3s;
         }
 
-        /* ===== SIDEBAR ARROW ===== */
         #sidebarArrow{
             display:none;
         }
 
-        /* ===== MOBILE ===== */
+        #customerSearchResults .list-group-item.active{
+            background:#0d6efd;
+            border-color:#0d6efd;
+            color:#fff;
+        }
+
         @media (max-width:768px){
             .sidebar{ right:-260px; }
             .sidebar.active{ right:0; }
@@ -114,18 +116,18 @@
 
     <h3 class="mb-4">الرصيد</h3>
 
-    <form class="card p-3 border-0 shadow-sm mb-4">
+    <div class="card p-3 border-0 shadow-sm mb-4">
         <label class="form-label fw-bold">اختيار زبون</label>
-        <select class="form-control" onchange="location='?customer='+this.value">
-            <option disabled selected>اختر زبوناً...</option>
-            {% for c in customers %}
-                <option value="{{ c.id }}"
-                    {% if selected_customer and c.id == selected_customer.id %}selected{% endif %}>
-                    {{ c }}
-                </option>
-            {% endfor %}
-        </select>
-    </form>
+        <input type="text"
+               id="customerSearchLive"
+               class="form-control mb-2"
+               placeholder="ابحث عن زبون (الأسهم للتنقل و Enter للاختيار)"
+               autocomplete="off"
+               value="{% if selected_customer %}{{ selected_customer }}{% endif %}">
+        <div id="customerSearchResults"
+             class="list-group"
+             style="display:none; max-height:240px; overflow-y:auto;"></div>
+    </div>
 
     {% if selected_customer %}
 
@@ -151,7 +153,7 @@
                         step="0.01"
                         inputmode="decimal"
                         required
-                        placeholder="مثلاً: 6.20 أو -1.50">
+                        placeholder="مثال: 6.20 أو -1.50">
                 </div>
 
                 <div class="col-md-4">
@@ -224,6 +226,99 @@
         sidebar.classList.toggle("active");
         arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
     };
+</script>
+
+<script>
+    const customersData = [
+        {% for c in customers %}
+            { id: "{{ c.id }}", name: "{{ c|escapejs }}" }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const customerSearchInput = document.getElementById("customerSearchLive");
+    const customerResultsBox = document.getElementById("customerSearchResults");
+
+    let filteredCustomers = [...customersData];
+    let activeCustomerIndex = -1;
+
+    function updateActiveCustomer() {
+        const items = customerResultsBox.querySelectorAll(".list-group-item");
+        items.forEach((el, i) => {
+            el.classList.toggle("active", i === activeCustomerIndex);
+        });
+    }
+
+    function openSelectedCustomer() {
+        if (activeCustomerIndex >= 0 && filteredCustomers[activeCustomerIndex]) {
+            location = "?customer=" + filteredCustomers[activeCustomerIndex].id;
+        }
+    }
+
+    function drawCustomerResults() {
+        customerResultsBox.innerHTML = "";
+
+        if (!filteredCustomers.length) {
+            customerResultsBox.style.display = "none";
+            activeCustomerIndex = -1;
+            return;
+        }
+
+        filteredCustomers.forEach((item, index) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "list-group-item list-group-item-action";
+            btn.textContent = item.name;
+            btn.addEventListener("mouseenter", () => {
+                activeCustomerIndex = index;
+                updateActiveCustomer();
+            });
+            btn.addEventListener("click", () => {
+                location = "?customer=" + item.id;
+            });
+            customerResultsBox.appendChild(btn);
+        });
+
+        customerResultsBox.style.display = "block";
+        if (activeCustomerIndex < 0 || activeCustomerIndex >= filteredCustomers.length) {
+            activeCustomerIndex = 0;
+        }
+        updateActiveCustomer();
+    }
+
+    function filterCustomers() {
+        const q = (customerSearchInput.value || "").trim().toLowerCase();
+        filteredCustomers = customersData.filter(item => item.name.toLowerCase().includes(q));
+        activeCustomerIndex = -1;
+        drawCustomerResults();
+    }
+
+    customerSearchInput.addEventListener("input", filterCustomers);
+    customerSearchInput.addEventListener("focus", filterCustomers);
+    customerSearchInput.addEventListener("keydown", (e) => {
+        if (!filteredCustomers.length) return;
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            activeCustomerIndex = (activeCustomerIndex + 1) % filteredCustomers.length;
+            updateActiveCustomer();
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            activeCustomerIndex = (activeCustomerIndex - 1 + filteredCustomers.length) % filteredCustomers.length;
+            updateActiveCustomer();
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            openSelectedCustomer();
+        } else if (e.key === "Escape") {
+            customerResultsBox.style.display = "none";
+            activeCustomerIndex = -1;
+        }
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!customerResultsBox.contains(e.target) && e.target !== customerSearchInput) {
+            customerResultsBox.style.display = "none";
+        }
+    });
 </script>
 
 </body>
