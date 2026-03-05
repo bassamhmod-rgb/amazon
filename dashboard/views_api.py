@@ -2,6 +2,7 @@ from decimal import Decimal
 import json
 
 from django.http import JsonResponse
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
@@ -20,7 +21,11 @@ def merchant_expenses_export_api(request, merchant_id):
         return JsonResponse({"error": "Merchant not found"}, status=404)
 
     expenses = (
-        Expense.objects.filter(store=store, access_id__isnull=True)
+        Expense.objects.filter(store=store).filter(
+            Q(access_id__isnull=True) |
+            Q(access_id=0) |
+            Q(update_time__isnull=False)
+        )
         .select_related("expense_type", "expense_reason")
         .order_by("id")
     )
@@ -34,6 +39,8 @@ def merchant_expenses_export_api(request, merchant_id):
             "expense_type": e.expense_type.name if e.expense_type else "",
             "expense_reason": e.expense_reason.name if e.expense_reason else "",
             "notes": e.notes or "",
+            "access_id": e.access_id,
+            "update_time": e.update_time,
         })
 
     return JsonResponse({
@@ -53,7 +60,8 @@ def merchant_expenses_confirm_api(request):
             Expense.objects.filter(
                 id=int(item["expense_id"])
             ).update(
-                access_id=int(item["access_id"])
+                access_id=int(item["access_id"]),
+                update_time=None
             )
 
         return JsonResponse({"status": "ok"})
@@ -102,11 +110,38 @@ def create_expense_from_access(request, merchant_id):
 
         date_only = parse_date(date_str) if date_str else None
 
+        amount_dec = Decimal(str(amount)) if amount not in ("", None) else Decimal("0")
+        final_date = date_only if date_only else timezone.now().date()
+
+        if access_id not in ("", None):
+            try:
+                access_id_int = int(access_id)
+            except (TypeError, ValueError):
+                access_id_int = None
+
+            if access_id_int is not None:
+                by_access = Expense.objects.filter(store=store, access_id=access_id_int).first()
+                if by_access:
+                    Expense.objects.filter(id=by_access.id, store=store).update(
+                        amount=amount_dec,
+                        date=final_date,
+                        expense_type=expense_type,
+                        expense_reason=expense_reason,
+                        notes=notes or "",
+                        update_time=None,
+                    )
+                    return JsonResponse({
+                        "status": "updated",
+                        "id": by_access.id,
+                    })
+        else:
+            access_id_int = None
+
         expense = Expense.objects.create(
             store=store,
-            access_id=access_id,
-            amount=Decimal(str(amount)) if amount not in ("", None) else Decimal("0"),
-            date=date_only if date_only else timezone.now().date(),
+            access_id=access_id_int if 'access_id_int' in locals() else None,
+            amount=amount_dec,
+            date=final_date,
             expense_type=expense_type,
             expense_reason=expense_reason,
             notes=notes or "",

@@ -75,6 +75,74 @@ def merchant_orders_api(request, merchant_id):
     return JsonResponse(result, safe=False)
 
 
+@csrf_exempt
+def merchant_orders_updates_api(request, merchant_id):
+    store = Store.objects.filter(id=merchant_id).first()
+    if not store:
+        return JsonResponse([], safe=False)
+
+    # فواتير مرتبطة بالمحاسبة وصار عليها تعديل، أو انضاف فيها سطر جديد لم يُربط بعد.
+    orders = (
+        Order.objects.filter(
+            store=store,
+            status="confirmed",
+            accounting_invoice_number__isnull=False
+        )
+        .filter(
+            Q(update_time__isnull=False) |
+            Q(items__update_time__isnull=False) |
+            Q(items__access_id__isnull=True) |
+            Q(items__access_id=0)
+        )
+        .distinct()
+        .order_by("created_at")
+    )
+
+    result = []
+
+    for order in orders:
+        items = OrderItem.objects.filter(order=order)
+
+        items_total = items.aggregate(
+            sum=Sum(
+                F("quantity") * F("price"),
+                output_field=DecimalField()
+            )
+        )["sum"] or 0
+
+        noaf_value = -1 if order.transaction_type == "sale" else 1
+
+        result.append({
+            "order_id": order.id,
+            "store_id": order.id,
+            "transaction_type": order.transaction_type,
+            "noaf": noaf_value,
+            "document_kind": order.document_kind,
+            "items_total": float(items_total),
+            "payment": float(order.payment or 0),
+            "discount": float(order.discount or 0),
+            "created_at": order.created_at.strftime("%Y-%m-%d"),
+            "party_name": (
+                order.customer.name if order.customer
+                else order.supplier.name if order.supplier
+                else ""
+            ),
+            "items": [
+                {
+                    "order_item_id": item.id,
+                    "product": item.product.name if item.product else "",
+                    "quantity": float(item.quantity),
+                    "price": float(item.price),
+                    "buy_price": float(item.buy_price or 0),
+                    "direction": item.direction
+                }
+                for item in items
+            ]
+        })
+
+    return JsonResponse(result, safe=False)
+
+
 # ================================
 # API: حفظ رقم الفاتورة بعد النقل للمحاسبة
 # ================================
@@ -93,6 +161,8 @@ def set_invoice_number(request):
 
         order = Order.objects.get(id=order_id)
         order.accounting_invoice_number = invoice_number
+        order.update_time = None
+        order._skip_update_time_touch = True
         order.save()
 
         return JsonResponse({"status": "ok"})
@@ -100,6 +170,50 @@ def set_invoice_number(request):
     except Order.DoesNotExist:
         return JsonResponse({"error": "Order not found"}, status=404)
 
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@csrf_exempt
+def set_order_items_access_ids(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, list):
+            return JsonResponse({"error": "Expected JSON list"}, status=400)
+
+        updated = 0
+        not_found = []
+        touched_order_ids = set()
+        for item in data:
+            order_item_id = item.get("order_item_id")
+            access_id = item.get("access_id")
+            if not order_item_id or access_id in (None, ""):
+                continue
+            qs = OrderItem.objects.filter(id=int(order_item_id))
+            order_item = qs.select_related("order").first()
+            if not order_item:
+                not_found.append(int(order_item_id))
+                continue
+
+            qs.update(
+                access_id=int(access_id),
+                update_time=None
+            )
+            updated += 1
+            touched_order_ids.add(order_item.order_id)
+
+        # إذا وصل تأكيد تفاصيل فاتورة، صفّر update_time للأوردر الأب أيضاً.
+        if touched_order_ids:
+            Order.objects.filter(id__in=touched_order_ids).update(update_time=None)
+
+        return JsonResponse({
+            "status": "ok",
+            "updated": updated,
+            "not_found": not_found,
+        })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 #استيراد الفواتير
@@ -128,18 +242,11 @@ def create_order_from_access(request):
         if not store:
             return JsonResponse({"error": "store not found"}, status=404)
 
-        # ✅ منع التكرار
+        # ✅ منع التكرار: إذا الفاتورة موجودة نحدّثها بدل رفضها
         existing_order = Order.objects.filter(
             accounting_invoice_number=invoice_no,
             store=store
         ).first()
-
-        if existing_order:
-            return JsonResponse({
-                "status": "exists",
-                "order_id": existing_order.id,
-                "id": existing_order.id,
-            })
 
         # ✅ تحديد نوع العملية
         transaction_type = "sale" if noaf == -1 else "purchase"
@@ -159,7 +266,26 @@ def create_order_from_access(request):
         # ✅ معالجة التاريخ
         created_at = parse_datetime(created_at_str) if created_at_str else timezone.now()
 
-        order = Order.objects.create(
+        if existing_order:
+            existing_order.customer = customer
+            existing_order.supplier = supplier
+            existing_order.created_at = created_at
+            existing_order.amount = amount
+            existing_order.document_kind = document_kind
+            existing_order.transaction_type = transaction_type
+            existing_order.payment = payment
+            existing_order.discount = discount
+            existing_order.is_seen_by_store = True
+            existing_order.status = "confirmed"
+            existing_order._skip_update_time_touch = True
+            existing_order.save()
+            return JsonResponse({
+                "status": "updated",
+                "order_id": existing_order.id,
+                "id": existing_order.id,
+            })
+
+        order = Order(
             store=store,
             accounting_invoice_number=invoice_no,
             customer=customer,
@@ -173,6 +299,8 @@ def create_order_from_access(request):
             is_seen_by_store=True,
             status="confirmed",
         )
+        order._skip_update_time_touch = True
+        order.save()
 
         return JsonResponse({
             "status": "created",
@@ -208,28 +336,48 @@ def create_order_item_from_access(request):
         buy_price = data.get("buy_price", 0)
         price = data.get("price", 0)
 
-        # ✅ منع تكرار نفس السطر
-        existing_item = OrderItem.objects.filter(
-            order=order,
-            product=product,
-            price=price,
-            buy_price=buy_price,
-            direction=direction
-        ).first()
-
-        if existing_item:
-            return JsonResponse({
-                "status": "exists",
-                "order_item_id": existing_item.id,
-                "id": existing_item.id,
-            })
-
         if access_id in ("", None):
             access_id = None
         else:
             access_id = int(access_id)
 
-        order_item = OrderItem.objects.create(
+        # تحديث السطر المرتبط بـ access_id إن وجد، وإلا نضيفه.
+        if access_id is not None:
+            existing_item = OrderItem.objects.filter(
+                order=order,
+                access_id=access_id
+            ).first()
+            if existing_item:
+                existing_item.product = product
+                existing_item.quantity = quantity
+                existing_item.direction = direction
+                existing_item.buy_price = buy_price
+                existing_item.price = price
+                existing_item._skip_update_time_touch = True
+                existing_item.save()
+                return JsonResponse({
+                    "status": "updated",
+                    "order_item_id": existing_item.id,
+                    "id": existing_item.id,
+                })
+        else:
+            # بدون access_id: نمنع التكرار الصريح بنفس البيانات
+            existing_item = OrderItem.objects.filter(
+                order=order,
+                product=product,
+                quantity=quantity,
+                price=price,
+                buy_price=buy_price,
+                direction=direction
+            ).first()
+            if existing_item:
+                return JsonResponse({
+                    "status": "exists",
+                    "order_item_id": existing_item.id,
+                    "id": existing_item.id,
+                })
+
+        order_item = OrderItem(
             order=order,
             access_id=access_id,
             product=product,
@@ -238,6 +386,8 @@ def create_order_item_from_access(request):
             buy_price=buy_price,
             price=price,
         )
+        order_item._skip_update_time_touch = True
+        order_item.save()
 
         return JsonResponse({
             "status": "created",

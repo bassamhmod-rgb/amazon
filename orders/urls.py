@@ -12,7 +12,9 @@ urlpatterns = [
 
   # ⭐ API مباشر بدون include
     path("api/orders/<int:merchant_id>/", views_api.merchant_orders_api),
+    path("api/orders/updates/<int:merchant_id>/", views_api.merchant_orders_updates_api),
     path("api/set-invoice-number/", views_api.set_invoice_number),
+    path("api/set-order-items-access-ids/", views_api.set_order_items_access_ids),
     path(
         "api/create_order_from_access/",
         views_api.create_order_from_access,

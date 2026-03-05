@@ -14,10 +14,12 @@ def merchant_categories_api(request, merchant_id):
         return JsonResponse([], safe=False)
 
     categories = Category.objects.filter(store=store).filter(
-        Q(access_id__isnull=True) | Q(access_id=0)
+        Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
     ).values(
         "id",
-        "name"
+        "name",
+        "access_id",
+        "update_time",
     )
 
     return JsonResponse(list(categories), safe=False)
@@ -32,12 +34,14 @@ def merchant_products_api(request, merchant_id):
         return JsonResponse([], safe=False)
 
     products = Product.objects.filter(store=store).filter(
-        Q(access_id__isnull=True) | Q(access_id=0)
+        Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
     ).values(
         "id",
         "name",
         "price",
         "description",
+        "access_id",
+        "update_time",
        category_name=F("category__name"),
     )
 
@@ -51,7 +55,8 @@ def merchant_categories_confirm_api(request):
         Category.objects.filter(
             id=int(item["category_id"])
         ).update(
-            access_id=int(item["access_id"])
+            access_id=int(item["access_id"]),
+            update_time=None
         )
 
     return JsonResponse({"status": "ok"})
@@ -65,7 +70,8 @@ def merchant_products_confirm_api(request):
         Product.objects.filter(
             id=int(item["product_id"])
         ).update(
-            access_id=int(item["access_id"])
+            access_id=int(item["access_id"]),
+            update_time=None
         )
 
     return JsonResponse({"status": "ok"})
@@ -89,22 +95,37 @@ def create_category_from_access(request):
         if not store:
             return JsonResponse({"error": "Merchant not found"}, status=404)
 
-        # ✅ منع تكرار الفئة (مو المنتج)
-        existing = Category.objects.filter(store=store, name=name).first()
-        if existing:
-            # إذا الفئة موجودة ومن أكسس وصل access_id، اربطها مرة واحدة
-            if access_id not in ("", None) and existing.access_id in ("", None):
-                existing.access_id = int(access_id)
-                existing.save(update_fields=["access_id"])
-            return JsonResponse({
-                "status": "exists",
-                "id": existing.id,
-            })
-
         if access_id in ("", None):
             access_id = None
         else:
             access_id = int(access_id)
+
+        # تحديث صريح حسب access_id (رقم سجل أكسس) إن وجد.
+        if access_id is not None:
+            by_access = Category.objects.filter(store=store, access_id=access_id).first()
+            if by_access:
+                Category.objects.filter(id=by_access.id, store=store).update(
+                    name=name,
+                    update_time=None
+                )
+                return JsonResponse({
+                    "status": "updated",
+                    "id": by_access.id,
+                })
+
+        # fallback: بالاسم
+        existing = Category.objects.filter(store=store, name=name).first()
+        if existing:
+            update_data = {}
+            if access_id is not None and existing.access_id in (None, 0, ""):
+                update_data["access_id"] = access_id
+            if update_data:
+                update_data["update_time"] = None
+                Category.objects.filter(id=existing.id, store=store).update(**update_data)
+            return JsonResponse({
+                "status": "exists",
+                "id": existing.id,
+            })
 
         category = Category.objects.create(
             store=store,
@@ -149,17 +170,47 @@ def create_product_from_access(request):
                 name=category_name
             )
 
-        existing = Product.objects.filter(store=store, name=name).first()
-        if existing:
-           return JsonResponse({
-        "status": "exists",
-        "id": existing.id
-           })
-
         if access_id in ("", None):
             access_id = None
         else:
             access_id = int(access_id)
+
+        # تحديث صريح حسب access_id (رقم سجل أكسس) إن وجد.
+        if access_id is not None:
+            by_access = Product.objects.filter(store=store, access_id=access_id).first()
+            if by_access:
+                Product.objects.filter(id=by_access.id, store=store).update(
+                    name=name,
+                    price=float(price) if price not in ("", None) else 0,
+                    description=description,
+                    category=category,
+                    update_time=None
+                )
+                return JsonResponse({
+                    "status": "updated",
+                    "id": by_access.id
+                })
+
+        # fallback: بالاسم
+        existing = Product.objects.filter(store=store, name=name).first()
+        if existing:
+            update_data = {}
+            if access_id is not None and existing.access_id in (None, 0, ""):
+                update_data["access_id"] = access_id
+            new_price = float(price) if price not in ("", None) else 0
+            if float(existing.price) != float(new_price):
+                update_data["price"] = new_price
+            if (existing.description or "") != description:
+                update_data["description"] = description
+            if existing.category_id != (category.id if category else None):
+                update_data["category"] = category
+            if update_data:
+                update_data["update_time"] = None
+                Product.objects.filter(id=existing.id, store=store).update(**update_data)
+            return JsonResponse({
+                "status": "exists",
+                "id": existing.id
+            })
 
         product = Product.objects.create(
             store=store,

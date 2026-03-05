@@ -26,6 +26,8 @@ PAYMENT_TYPES = [
 
 
 def _touch_update_time(instance, kwargs):
+    if getattr(instance, "_skip_update_time_touch", False):
+        return
     if hasattr(instance, "access_id") and getattr(instance, "access_id", None) in (None, 0, ""):
         return
     instance.update_time = int(time.time() // 60)
@@ -168,7 +170,27 @@ class Order(models.Model):
         return f"Order #{self.id} â€“ {self.store.name}"
 
     def save(self, *args, **kwargs):
-        _touch_update_time(self, kwargs)
+        if not getattr(self, "_skip_update_time_touch", False):
+            should_touch = False
+            # لا نعبّي وقت التعديل عند الإنشاء.
+            if self.pk:
+                current_inv = getattr(self, "accounting_invoice_number", None)
+                # لا نعبّي وقت التعديل إلا للسجلات المربوطة مسبقاً بالمحاسبة.
+                if current_inv not in (None, ""):
+                    old_inv = (
+                        Order.objects.filter(pk=self.pk)
+                        .values_list("accounting_invoice_number", flat=True)
+                        .first()
+                    )
+                    if old_inv not in (None, ""):
+                        should_touch = True
+            if should_touch:
+                self.update_time = int(time.time() // 60)
+                update_fields = kwargs.get("update_fields")
+                if update_fields:
+                    update_fields = set(update_fields)
+                    update_fields.add("update_time")
+                    kwargs["update_fields"] = update_fields
         return super().save(*args, **kwargs)
 
     @property

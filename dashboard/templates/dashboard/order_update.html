@@ -213,6 +213,7 @@
                         <td>
                             {{ item.product.name }}
                             <input type="hidden" name="product_id[]" value="{{ item.product.id }}">
+                            <input type="hidden" name="item_id[]" value="{{ item.id }}">
                         </td>
                         <td>
                             <input type="number" name="price[]" value="{{ item.price }}" step="0.01"
@@ -380,6 +381,7 @@ function selectProduct(item){
     row.innerHTML = `
         <td>${item.name}
             <input type="hidden" name="product_id[]" value="${item.id}">
+            <input type="hidden" name="item_id[]" value="">
         </td>
         <td>
             <input type="number" name="price[]" value="${item.price}" step="0.01"

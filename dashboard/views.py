@@ -362,6 +362,42 @@ def add_category(request, store_slug):
         "store": store
     })
 
+
+@login_required
+def edit_category(request, store_slug, category_id):
+    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    category = get_object_or_404(Category, id=category_id, store=store)
+
+    if request.method == "POST":
+        name = (request.POST.get("name") or "").strip()
+
+        if not name:
+            return render(request, "dashboard/category_form.html", {
+                "store": store,
+                "category": category,
+                "error": "الرجاء إدخال اسم الفئة",
+                "is_edit": True,
+            })
+
+        if Category.objects.filter(store=store, name=name).exclude(id=category.id).exists():
+            return render(request, "dashboard/category_form.html", {
+                "store": store,
+                "category": category,
+                "error": "اسم الفئة موجود مسبقاً",
+                "is_edit": True,
+            })
+
+        category.name = name
+        # save() يحدّث update_time تلقائياً إذا كانت الفئة مربوطة بالمحاسبة.
+        category.save()
+        return redirect("dashboard:categories_list", store_slug=store.slug)
+
+    return render(request, "dashboard/category_form.html", {
+        "store": store,
+        "category": category,
+        "is_edit": True,
+    })
+
 #حذف فئة
 @login_required
 # def delete_category(request, store_slug, category_id):
@@ -690,43 +726,69 @@ def order_update(request, store_slug, order_id):
 
         order.save()
 
-        # 🟦 4) حذف العناصر القديمة
-        order.items.all().delete()
-
-        # 🟦 5) إضافة العناصر الجديدة
         products = request.POST.getlist("product_id[]")
         prices   = request.POST.getlist("price[]")
         qtys     = request.POST.getlist("quantity[]")
+        item_ids = request.POST.getlist("item_id[]")
         purchase_product_prices = {}
+        kept_item_ids = set()
+        existing_items = {
+            oi.id: oi for oi in order.items.select_related("product")
+        }
 
         for i in range(len(products)):
-
-            product = Product.objects.filter(id=products[i]).first()
+            product = Product.objects.filter(id=products[i], store=store).first()
             if not product:
                 continue
 
-            price = float(prices[i])
-            qty = float(qtys[i])
-
-            # بيع أو شراء؟
+            price = _to_decimal(prices[i])
+            qty = _to_decimal(qtys[i])
             direction = -1 if transaction_type == "sale" else 1
-
-            # snapshot
             if transaction_type == "sale":
                 buy_price = _to_decimal(product.get_avg_buy_price())
             else:
-                buy_price = price  # snapshot لتكلفة الشراء
+                buy_price = _to_decimal(price)
 
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                price=price,
-                quantity=qty,
-                direction=direction,
-                buy_price=buy_price,
-            )
+            item_id = None
+            if i < len(item_ids):
+                raw_item_id = (item_ids[i] or "").strip()
+                if raw_item_id.isdigit():
+                    item_id = int(raw_item_id)
+
+            existing_item = existing_items.get(item_id) if item_id else None
+            if existing_item:
+                kept_item_ids.add(existing_item.id)
+                changed = (
+                    existing_item.product_id != product.id or
+                    existing_item.price != price or
+                    existing_item.quantity != qty or
+                    existing_item.direction != direction or
+                    existing_item.buy_price != buy_price
+                )
+                if changed:
+                    existing_item.product = product
+                    existing_item.price = price
+                    existing_item.quantity = qty
+                    existing_item.direction = direction
+                    existing_item.buy_price = buy_price
+                    existing_item.save()
+            else:
+                new_item = OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    price=price,
+                    quantity=qty,
+                    direction=direction,
+                    buy_price=buy_price,
+                )
+                kept_item_ids.add(new_item.id)
+
             if transaction_type == "purchase":
                 purchase_product_prices[product.id] = (product, price)
+
+        for old_id, old_item in existing_items.items():
+            if old_id not in kept_item_ids:
+                old_item.delete()
 
         if transaction_type == "purchase" and purchase_product_prices:
             for _, (product, price) in purchase_product_prices.items():
