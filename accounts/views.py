@@ -136,6 +136,7 @@ from django.shortcuts import render, redirect
 def customer_points(request, store_slug):
     customer_id = request.session.get("customer_id")
     customer = Customer.objects.filter(id=customer_id,store__slug=store_slug).first()
+    store = customer.store if customer else None
 
     # 🔴 إذا مو مسجّل دخول → روح ع login
     if not customer:
@@ -189,12 +190,15 @@ def customer_points(request, store_slug):
 
     # 🔹 الرصيد القابل للسحب
     withdrawable_points = total_points if can_withdraw else 0
+    blocked_points = total_points - withdrawable_points
 
     context = {
+        "store": store,
         "store_slug": store_slug,
         "customer": customer,
         "transactions": transactions,
         "total_points": total_points,
+        "blocked_points": blocked_points,
         "withdrawable_points": withdrawable_points,
         "can_withdraw": can_withdraw,
         "adds_after_last_withdraw": adds_after_last_withdraw,

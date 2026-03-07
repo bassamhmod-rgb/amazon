@@ -77,6 +77,26 @@ path(
     name="merchant_status"
 ),
 # للتحديث
-path("api/check-update/", views_api.check_update)
+path("api/check-update/", views_api.check_update),
+path(
+    "api/merchant/<int:merchant_id>/delete-sync/export/",
+    views_api.merchant_delete_sync_export_api,
+    name="merchant_delete_sync_export"
+),
+path(
+    "api/merchant/<int:merchant_id>/delete-sync/import/",
+    views_api.merchant_delete_sync_import_api,
+    name="merchant_delete_sync_import"
+),
+path(
+    "api/merchant/<int:merchant_id>/delete-sync/apply/",
+    views_api.merchant_delete_sync_apply_api,
+    name="merchant_delete_sync_apply"
+),
+path(
+    "api/merchant/delete-sync/confirm/",
+    views_api.merchant_delete_sync_confirm_api,
+    name="merchant_delete_sync_confirm"
+)
    
     ]

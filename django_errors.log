@@ -4166,3 +4166,11 @@ Traceback (most recent call last):
     raise TemplateDoesNotExist(template_name, chain=chain)
 django.template.exceptions.TemplateDoesNotExist: dashboard/categories_list.html
 "GET /dashboard/Alaman/categories/ HTTP/1.1" 500 82677
+Internal Server Error: /accounts/api/merchant/1/points/import/
+"POST /accounts/api/merchant/1/points/import/ HTTP/1.1" 500 45
+Internal Server Error: /accounts/api/merchant/1/points/import/
+"POST /accounts/api/merchant/1/points/import/ HTTP/1.1" 500 45
+Internal Server Error: /accounts/api/merchant/1/points/import/
+"POST /accounts/api/merchant/1/points/import/ HTTP/1.1" 500 45
+Internal Server Error: /accounts/api/merchant/1/points/import/
+"POST /accounts/api/merchant/1/points/import/ HTTP/1.1" 500 43

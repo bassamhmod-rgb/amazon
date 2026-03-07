@@ -412,6 +412,18 @@ def delete_category(request, store_slug, category_id):
     category = get_object_or_404(Category, id=category_id, store=store)
 
     if request.method == "POST":
+        linked_products = Product.objects.filter(
+            store=store
+        ).filter(
+            Q(category=category) | Q(category2=category)
+        ).count()
+        if linked_products > 0:
+            messages.error(
+                request,
+                f"لا يمكن حذف الفئة لأنها مرتبطة بـ {linked_products} منتج. احذف/عدّل الارتباطات أولاً."
+            )
+            return redirect("dashboard:categories_list", store_slug=store.slug)
+
         category.delete()
         return redirect("dashboard:categories_list", store_slug=store.slug)
 
@@ -1488,6 +1500,15 @@ def delete_customer(request, store_slug, customer_id):
     customer = get_object_or_404(Customer, id=customer_id, store=store)
 
     if request.method == "POST":
+        linked_orders = Order.objects.filter(store=store, customer=customer).count()
+        linked_points = PointsTransaction.objects.filter(customer=customer).count()
+        if linked_orders > 0 or linked_points > 0:
+            messages.error(
+                request,
+                f"لا يمكن حذف العميل. يوجد ارتباطات: طلبات={linked_orders}، نقاط={linked_points}. احذف السجلات المرتبطة أولاً."
+            )
+            return redirect("dashboard:customers_list", store_slug=store.slug)
+
         customer.delete()
         return redirect("dashboard:customers_list", store_slug=store.slug)
 
@@ -2031,6 +2052,14 @@ def delete_supplier(request, store_slug, supplier_id):
     supplier = get_object_or_404(Supplier, id=supplier_id, store=store)
 
     if request.method == "POST":
+        linked_orders = Order.objects.filter(store=store, supplier=supplier).count()
+        if linked_orders > 0:
+            messages.error(
+                request,
+                f"لا يمكن حذف المورد لأنه مرتبط بـ {linked_orders} طلب. احذف السجلات المرتبطة أولاً."
+            )
+            return redirect("dashboard:suppliers_list", store_slug=store.slug)
+
         supplier.delete()
         return redirect("dashboard:suppliers_list", store_slug=store.slug)
 

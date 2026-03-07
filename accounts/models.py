@@ -276,3 +276,11 @@ class AppUpdate(models.Model):
 
     def __str__(self):
         return self.app_name
+
+
+class DeleteSync(models.Model):
+    source_flag = models.IntegerField()
+    store_record_id = models.BigIntegerField(blank=True, null=True)
+    store_model_name = models.CharField(max_length=100, blank=True, null=True)
+    access_record_id = models.BigIntegerField(blank=True, null=True)
+    access_table_name = models.CharField(max_length=100, blank=True, null=True)

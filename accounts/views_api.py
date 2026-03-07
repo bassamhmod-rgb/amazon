@@ -3,10 +3,11 @@ from django.views.decorators.csrf import csrf_exempt
 from accounts.models import Customer
 from stores.models import Store
 from accounts.models import Supplier
-from .models import PointsTransaction
+from .models import PointsTransaction, DeleteSync
 from django.shortcuts import get_object_or_404
-from django.utils.dateparse import parse_datetime
-from django.db.models import Q
+from django.utils.dateparse import parse_date, parse_datetime
+from django.db.models import Q
+from datetime import datetime
 
 #ط·ع¾ط·آµط·آ¯ط¸ظ¹ط·آ±
 # ط·ع¾ط·آµط·آ¯ط¸ظ¹ط·آ± ط·آ§ط¸â€‍ط·آ¹ط¸â€¦ط¸â€‍ط·آ§ط·طŒ ط¸â€¦ط¸â€  ط·آ§ط¸â€‍ط¸â€¦ط·ع¾ط·آ¬ط·آ± ط·آ¥ط¸â€‍ط¸â€° ط·آ§ط¸â€‍ط·آ£ط¸ئ’ط·آ³ط·آ³
@@ -360,15 +361,18 @@ def create_cashback_from_access(request, merchant_id):
         if access_id in ("", None):
             access_id = rkmamel
 
-        pt = PointsTransaction.objects.create(
-            customer=customer,
-            access_id=int(access_id) if access_id not in ("", None) else None,
-            points=int(amount),
-            created_at=created_at,
-            note=note
-        )
-
-        # ظ‹ع؛â€‌â€ک ط¸â€ ط·آ±ط·آ¬ط¸â€کط·آ¹ ID ط·آ³ط·آ¬ط¸â€‍ ط·آ§ط¸â€‍ط¸â€ ط¸â€ڑط·آ§ط·آ·
+        pt = PointsTransaction.objects.create(
+            customer=customer,
+            access_id=int(access_id) if access_id not in ("", None) else None,
+            points=int(amount),
+            created_at=created_at,
+            note=note
+        )
+
+        # Imported from Access: do not mark as locally updated.
+        PointsTransaction.objects.filter(id=pt.id).update(update_time=None)
+
+        # ظ‹ع؛â€‌â€ک ط¸â€ ط·آ±ط·آ¬ط¸â€کط·آ¹ ID ط·آ³ط·آ¬ط¸â€‍ ط·آ§ط¸â€‍ط¸â€ ط¸â€ڑط·آ§ط·آ·
         return JsonResponse({
             "status": "created",
             "points_id": pt.id,
@@ -493,5 +497,231 @@ def check_update(request):
 
 
 
+
+
+
+@csrf_exempt
+def merchant_delete_sync_export_api(request, merchant_id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    rows = DeleteSync.objects.filter(source_flag=2).order_by("id")
+    data = []
+    for r in rows:
+        data.append({
+            "id": r.id,
+            "source_flag": r.source_flag,
+            "store_record_id": r.store_record_id,
+            "store_model_name": r.store_model_name,
+            "access_record_id": r.access_record_id,
+            "access_table_name": r.access_table_name,
+        })
+
+    return JsonResponse(
+        {"merchant_id": merchant_id, "rows": data},
+        json_dumps_params={"ensure_ascii": False},
+    )
+
+
+@csrf_exempt
+def merchant_delete_sync_import_api(request, merchant_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    import json
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    if not isinstance(payload, list):
+        return JsonResponse({"error": "Payload must be a JSON array"}, status=400)
+
+    created_count = 0
+    for item in payload:
+        # Any row imported via this endpoint is, by definition, from Access.
+        source_flag = 1
+        store_record_id = item.get("store_record_id")
+        store_model_name = item.get("store_model_name")
+        access_record_id = item.get("access_record_id")
+        access_table_name = item.get("access_table_name")
+
+        exists = DeleteSync.objects.filter(
+            source_flag=source_flag,
+            store_record_id=store_record_id,
+            store_model_name=store_model_name,
+            access_record_id=access_record_id,
+            access_table_name=access_table_name,
+        ).exists()
+        if exists:
+            continue
+
+        DeleteSync.objects.create(
+            source_flag=source_flag,
+            store_record_id=store_record_id,
+            store_model_name=store_model_name,
+            access_record_id=access_record_id,
+            access_table_name=access_table_name,
+        )
+        created_count += 1
+
+    applied_result = _apply_delete_sync_from_access(merchant_id)
+    pending_after = DeleteSync.objects.filter(source_flag=1).count()
+    return JsonResponse({
+        "status": "ok",
+        "created": created_count,
+        "applied": applied_result["applied"],
+        "cleared": applied_result["cleared"],
+        "errors": applied_result["errors"],
+        "pending_after": pending_after,
+    })
+
+
+def _apply_delete_sync_from_access(merchant_id):
+    from accounts.models import Customer, Supplier
+    from dashboard.models import Expense
+    from orders.models import Order, OrderItem
+    from products.models import Category, Product
+
+    model_map = {
+        "accounts.Customer": Customer,
+        "accounts.Supplier": Supplier,
+        "products.Category": Category,
+        "products.Product": Product,
+        "orders.Order": Order,
+        "orders.OrderItem": OrderItem,
+        "accounts.PointsTransaction": PointsTransaction,
+        "dashboard.Expense": Expense,
+    }
+    short_to_full = {
+        "Customer": "accounts.Customer",
+        "Supplier": "accounts.Supplier",
+        "Category": "products.Category",
+        "Product": "products.Product",
+        "Order": "orders.Order",
+        "OrderItem": "orders.OrderItem",
+        "PointsTransaction": "accounts.PointsTransaction",
+        "Expense": "dashboard.Expense",
+    }
+
+    table_to_model = {
+        "أسماء العملاء": "accounts.Customer",
+        "الموردون": "accounts.Supplier",
+        "almontg": "products.Category",
+        "الأصناف": "products.Product",
+        "fatoraaam": "orders.Order",
+        "فاتورة": "orders.OrderItem",
+        "cashback": "accounts.PointsTransaction",
+        "الصرفيات": "dashboard.Expense",
+    }
+
+    rows = DeleteSync.objects.filter(source_flag=1).order_by("id")
+    applied = 0
+    cleared = 0
+    errors = 0
+
+    for row in rows:
+        model_key = (row.store_model_name or "").strip()
+        if model_key in short_to_full:
+            model_key = short_to_full[model_key]
+        elif model_key.lower() in {k.lower() for k in short_to_full.keys()}:
+            for k, v in short_to_full.items():
+                if model_key.lower() == k.lower():
+                    model_key = v
+                    break
+        if not model_key:
+            model_key = table_to_model.get((row.access_table_name or "").strip(), "")
+        model_cls = model_map.get(model_key)
+
+        if not model_cls:
+            errors += 1
+            row.delete()
+            cleared += 1
+            continue
+
+        qs = model_cls.objects.none()
+
+        # Preferred delete target in store is store_record_id.
+        if row.store_record_id not in (None, 0, ""):
+            qs = model_cls.objects.filter(id=row.store_record_id)
+        elif row.access_record_id not in (None, 0, ""):
+            # Fallback by Access key mapping.
+            if model_key == "orders.Order":
+                qs = model_cls.objects.filter(accounting_invoice_number=row.access_record_id)
+            else:
+                qs = model_cls.objects.filter(access_id=row.access_record_id)
+
+        # Scope to merchant whenever possible.
+        if model_key == "orders.OrderItem":
+            qs = qs.filter(order__store_id=merchant_id)
+        elif model_key == "accounts.PointsTransaction":
+            qs = qs.filter(customer__store_id=merchant_id)
+        else:
+            if hasattr(model_cls, "store_id"):
+                qs = qs.filter(store_id=merchant_id)
+
+        try:
+            target = qs.first()
+            if target:
+                if model_key == "orders.Order":
+                    # Delete items first with skip flags to avoid touching parent update_time
+                    # while parent is being removed by sync.
+                    for item in OrderItem.objects.filter(order_id=target.id):
+                        item._skip_delete_sync = True
+                        item._skip_order_update_touch = True
+                        item.delete()
+                    target._skip_delete_sync = True
+                    target._skip_order_update_touch = True
+                    target.delete()
+                else:
+                    target._skip_delete_sync = True
+                    target._skip_order_update_touch = True
+                    target.delete()
+                applied += 1
+        except Exception:
+            errors += 1
+        finally:
+            row.delete()
+            cleared += 1
+
+    return {"applied": applied, "cleared": cleared, "errors": errors}
+
+
+@csrf_exempt
+def merchant_delete_sync_apply_api(request, merchant_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    result = _apply_delete_sync_from_access(merchant_id)
+    return JsonResponse({"status": "ok", **result})
+
+
+@csrf_exempt
+def merchant_delete_sync_confirm_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    import json
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    if not isinstance(payload, list):
+        return JsonResponse({"error": "Payload must be a JSON array"}, status=400)
+
+    ids = []
+    for item in payload:
+        row_id = item.get("id")
+        if row_id in (None, ""):
+            continue
+        ids.append(int(row_id))
+
+    if ids:
+        DeleteSync.objects.filter(id__in=ids).delete()
+
+    return JsonResponse({"status": "ok", "deleted": len(ids)})
 
 
