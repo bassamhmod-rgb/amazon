@@ -16,6 +16,13 @@ def _touch_update_time(instance, kwargs):
         update_fields.add("update_time")
         kwargs["update_fields"] = update_fields
 
+
+def normalize_phone_number(value):
+    phone = str(value or "").strip()
+    if not phone:
+        return ""
+    return phone.lstrip("0") or "0"
+
 class Customer(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     update_time = models.BigIntegerField(blank=True, null=True)
@@ -58,6 +65,7 @@ class Customer(models.Model):
         ]
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        self.phone = normalize_phone_number(self.phone)
         # ًں”گ ط¶ظ…ط§ظ† ط§ظ„ط§ط³ظ…: ط¥ط°ط§ ظپط§ط¶ظٹ â†’ ط®ظ„ظټظ‡ ط±ظ‚ظ… ط§ظ„ظ‡ط§طھظپ
         if not self.name:
             self.name = self.phone

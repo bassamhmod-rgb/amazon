@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.db import models
 from django.contrib.auth.decorators import login_required
 from stores.models import Store
-from accounts.models import Customer
+from accounts.models import Customer, normalize_phone_number
 from accounts.models import PointsTransaction
 from django.db.models import Sum
 from django.urls import reverse
@@ -13,7 +13,8 @@ def customer_register(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug)
 
     if request.method == "POST":
-        phone = request.POST.get("phone", "").strip()
+        phone_raw = request.POST.get("phone", "").strip()
+        phone = normalize_phone_number(phone_raw)
         name = request.POST.get("name", "").strip()
 
         # 🔐 fallback: إذا الاسم ما انكتب، خليه رقم الموبايل
@@ -21,10 +22,8 @@ def customer_register(request, store_slug):
             name = phone
 
         # 🔥 منع تكرار رقم الهاتف فقط عند نفس المتجر
-        exists = Customer.objects.filter(
-            store=store,
-            phone=phone
-        ).exists()
+        phone_candidates = [p for p in dict.fromkeys([phone_raw, phone, f"0{phone}" if phone else ""]) if p]
+        exists = Customer.objects.filter(store=store, phone__in=phone_candidates).exists()
 
         if exists:
             messages.error(request, "⚠️ رقم الهاتف مسجّل مسبقاً عند هذا المتجر.")
@@ -54,14 +53,18 @@ def customer_login(request, store_slug):
     message = None
 
     if request.method == "POST":
-        phone = request.POST.get("phone", "").strip()
+        phone_raw = request.POST.get("phone", "").strip()
+        phone = normalize_phone_number(phone_raw)
 
         if not store:
             message = "خطأ: لا يمكن تحديد المتجر."
-        elif not phone:
+        elif not phone_raw:
             message = "❌ يرجى إدخال رقم الهاتف."
         else:
-            customer = Customer.objects.filter(store=store, phone=phone).first()
+            phone_candidates = [
+                p for p in dict.fromkeys([phone_raw, phone, f"0{phone}" if phone else ""]) if p
+            ]
+            customer = Customer.objects.filter(store=store, phone__in=phone_candidates).first()
 
             # ✔️ إذا موجود → تابع مباشرة
             if customer:
@@ -111,7 +114,7 @@ def quick_register(request, store_slug):
 
     store = get_object_or_404(Store, slug=store_slug)
 
-    phone = request.session.get("temp_phone")
+    phone = normalize_phone_number(request.session.get("temp_phone"))
     next_page = request.session.get("next_after_register") or f"/orders/{store_slug}/checkout/"
 
     if not phone:
@@ -215,14 +218,18 @@ def customer_points_login(request, store_slug):
     message = None
 
     if request.method == "POST":
-        phone = request.POST.get("phone", "").strip()
+        phone_raw = request.POST.get("phone", "").strip()
+        phone = normalize_phone_number(phone_raw)
 
         if not store:
             message = "خطأ: لا يمكن تحديد المتجر."
-        elif not phone:
+        elif not phone_raw:
             message = "❌ يرجى إدخال رقم الهاتف."
         else:
-            customer = Customer.objects.filter(store=store, phone=phone).first()
+            phone_candidates = [
+                p for p in dict.fromkeys([phone_raw, phone, f"0{phone}" if phone else ""]) if p
+            ]
+            customer = Customer.objects.filter(store=store, phone__in=phone_candidates).first()
 
             # ✔️ إذا موجود → روح مباشرة على صفحة النقاط
             if customer:
@@ -254,3 +261,6 @@ def csrf_failure(request, reason=""):
         "انتهت الجلسة، يرجى إعادة المحاولة."
     )
     return redirect("accounts:merchant_login")
+
+
+
