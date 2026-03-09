@@ -8,6 +8,7 @@ import codecs
 import io
 import html
 import zipfile
+import time
 from io import BytesIO
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -20,7 +21,7 @@ from products.models import Category, Product
 from products.forms import CategoryForm, ProductForm
 from stores.models import Store, StorePaymentMethod
 from orders.models import Order, OrderItem
-from accounts.models import PointsTransaction, AccountingClient, SystemNotification
+from accounts.models import PointsTransaction, AccountingClient, SystemNotification, DeleteSync
 from cart.models import Cart
 from loyalty.models import LoyaltyPoints
 
@@ -52,6 +53,48 @@ from stores.models import Store
 from products.models import Product, Category
 from orders.models import OrderItem
 
+
+
+def _is_store_access_linked(store):
+    return bool((store.rkmdb or "").strip() and (store.rkmtb or "").strip())
+
+
+def _consume_access_delete_ack(request, ack_key, max_age_seconds=180):
+    raw_ts = request.session.get(ack_key)
+    request.session.pop(ack_key, None)
+    if not raw_ts:
+        return False
+    try:
+        ts = int(raw_ts)
+    except (TypeError, ValueError):
+        return False
+    return (int(time.time()) - ts) <= max_age_seconds
+
+
+def _set_access_delete_ack(request, ack_key):
+    request.session[ack_key] = int(time.time())
+
+
+HIDDEN_CUSTOMER_NAMES_IN_LISTS = [
+    "اتلاف",
+    "إتلاف",
+    "مرتجع إلى مورد",
+    "مرتجع الى مورد",
+    "أخطاء التسجيل",
+    "اخطاء التسجيل",
+    "زبون عام",
+]
+
+HIDDEN_SUPPLIER_NAMES_IN_LISTS = [
+    "مرتجع من زبون",
+    "فاتورة بدء",
+    "أخطاء التسجيل",
+    "اخطاء التسجيل",
+]
+
+HIDDEN_CATEGORY_NAMES_IN_LISTS = [
+    "بدون",
+]
 
 
 @login_required
@@ -329,7 +372,7 @@ def product_detail(request, store_slug, product_id):
 #عرض
 def categories_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
-    categories = Category.objects.filter(store=store)
+    categories = Category.objects.filter(store=store).exclude(name__in=HIDDEN_CATEGORY_NAMES_IN_LISTS)
 
     return render(request, 'dashboard/categories_list.html', {
         'store': store,
@@ -412,6 +455,7 @@ def delete_category(request, store_slug, category_id):
     category = get_object_or_404(Category, id=category_id, store=store)
 
     if request.method == "POST":
+        access_ack_key = f"access_delete_ack:category:{store.id}:{category.id}"
         linked_products = Product.objects.filter(
             store=store
         ).filter(
@@ -421,6 +465,15 @@ def delete_category(request, store_slug, category_id):
             messages.error(
                 request,
                 f"لا يمكن حذف الفئة لأنها مرتبطة بـ {linked_products} منتج. احذف/عدّل الارتباطات أولاً."
+            )
+            request.session.pop(access_ack_key, None)
+            return redirect("dashboard:categories_list", store_slug=store.slug)
+
+        if _is_store_access_linked(store) and not _consume_access_delete_ack(request, access_ack_key):
+            _set_access_delete_ack(request, access_ack_key)
+            messages.warning(
+                request,
+                "متجرك مرتبط ببرنامج الأمان للمحاسبة. عند المزامنة رح يتم حذف كل المنتجات المرتبطة بهذه الفئة. اضغط حذف مرة ثانية للتأكيد."
             )
             return redirect("dashboard:categories_list", store_slug=store.slug)
 
@@ -1365,7 +1418,7 @@ def expense_settings(request, store_slug):
 @login_required
 def suppliers_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
-    suppliers = Supplier.objects.filter(store=store)
+    suppliers = Supplier.objects.filter(store=store).exclude(name__in=HIDDEN_SUPPLIER_NAMES_IN_LISTS)
     q = (request.GET.get("q") or "").strip()
     if q:
         suppliers = suppliers.filter(
@@ -1386,7 +1439,7 @@ def suppliers_list(request, store_slug):
 @login_required
 def customers_list(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
-    customers = Customer.objects.filter(store=store)
+    customers = Customer.objects.filter(store=store).exclude(name__in=HIDDEN_CUSTOMER_NAMES_IN_LISTS)
     q = (request.GET.get("q") or "").strip()
     if q:
         customers = customers.filter(
@@ -1500,12 +1553,22 @@ def delete_customer(request, store_slug, customer_id):
     customer = get_object_or_404(Customer, id=customer_id, store=store)
 
     if request.method == "POST":
+        access_ack_key = f"access_delete_ack:customer:{store.id}:{customer.id}"
         linked_orders = Order.objects.filter(store=store, customer=customer).count()
         linked_points = PointsTransaction.objects.filter(customer=customer).count()
         if linked_orders > 0 or linked_points > 0:
             messages.error(
                 request,
                 f"لا يمكن حذف العميل. يوجد ارتباطات: طلبات={linked_orders}، نقاط={linked_points}. احذف السجلات المرتبطة أولاً."
+            )
+            request.session.pop(access_ack_key, None)
+            return redirect("dashboard:customers_list", store_slug=store.slug)
+
+        if _is_store_access_linked(store) and not _consume_access_delete_ack(request, access_ack_key):
+            _set_access_delete_ack(request, access_ack_key)
+            messages.warning(
+                request,
+                "متجرك مرتبط ببرنامج الأمان للمحاسبة. عند المزامنة رح يتم حذف كل الفواتير المرتبطة بهذا العميل. اضغط حذف مرة ثانية للتأكيد."
             )
             return redirect("dashboard:customers_list", store_slug=store.slug)
 
@@ -1721,6 +1784,21 @@ def _perform_store_reset(request, store):
         return redirect(f"/dashboard/{store.slug}/settings/")
 
     with transaction.atomic():
+        delete_sync_targets = {
+            "accounts.Supplier": list(Supplier.objects.filter(store=store).values_list("id", flat=True)),
+            "accounts.Customer": list(Customer.objects.filter(store=store).values_list("id", flat=True)),
+            "products.Category": list(Category.objects.filter(store=store).values_list("id", flat=True)),
+            "products.Product": list(Product.objects.filter(store=store).values_list("id", flat=True)),
+            "orders.Order": list(Order.objects.filter(store=store).values_list("id", flat=True)),
+            "orders.OrderItem": list(
+                OrderItem.objects.filter(order__store=store).values_list("id", flat=True)
+            ),
+            "accounts.PointsTransaction": list(
+                PointsTransaction.objects.filter(customer__store=store).values_list("id", flat=True)
+            ),
+            "dashboard.Expense": list(Expense.objects.filter(store=store).values_list("id", flat=True)),
+        }
+
         Order.objects.filter(store=store).delete()
         Cart.objects.filter(store=store).delete()
 
@@ -1739,6 +1817,29 @@ def _perform_store_reset(request, store):
 
         AccountingClient.objects.filter(store=store).delete()
         SystemNotification.objects.filter(target_store=store).delete()
+
+        # Remove pending delete-log records for rows cleared by store reset.
+        for model_name, ids in delete_sync_targets.items():
+            if ids:
+                DeleteSync.objects.filter(
+                    store_model_name=model_name,
+                    store_record_id__in=ids,
+                ).delete()
+
+        # Mark that this store was fully reset, so sync clients can warn
+        # the user to enable full re-send from Access settings.
+        DeleteSync.objects.filter(
+            source_flag=2,
+            store_model_name=DeleteSync.RESET_MARKER_MODEL,
+            store_record_id=store.id,
+        ).delete()
+        DeleteSync.objects.create(
+            source_flag=2,
+            store_record_id=store.id,
+            store_model_name=DeleteSync.RESET_MARKER_MODEL,
+            access_record_id=int(timezone.now().timestamp()),
+            access_table_name=DeleteSync.RESET_MARKER_TABLE,
+        )
 
     messages.success(request, "تم تفريغ بيانات المتجر بنجاح (مع الاحتفاظ ببيانات المتجر).")
     return redirect(f"/dashboard/{store.slug}/settings/")
@@ -2052,11 +2153,21 @@ def delete_supplier(request, store_slug, supplier_id):
     supplier = get_object_or_404(Supplier, id=supplier_id, store=store)
 
     if request.method == "POST":
+        access_ack_key = f"access_delete_ack:supplier:{store.id}:{supplier.id}"
         linked_orders = Order.objects.filter(store=store, supplier=supplier).count()
         if linked_orders > 0:
             messages.error(
                 request,
                 f"لا يمكن حذف المورد لأنه مرتبط بـ {linked_orders} طلب. احذف السجلات المرتبطة أولاً."
+            )
+            request.session.pop(access_ack_key, None)
+            return redirect("dashboard:suppliers_list", store_slug=store.slug)
+
+        if _is_store_access_linked(store) and not _consume_access_delete_ack(request, access_ack_key):
+            _set_access_delete_ack(request, access_ack_key)
+            messages.warning(
+                request,
+                "متجرك مرتبط ببرنامج الأمان للمحاسبة. عند المزامنة رح يتم حذف كل الفواتير المرتبطة بهذا المورد. اضغط حذف مرة ثانية للتأكيد."
             )
             return redirect("dashboard:suppliers_list", store_slug=store.slug)
 

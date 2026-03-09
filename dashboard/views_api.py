@@ -9,6 +9,15 @@ from django.views.decorators.csrf import csrf_exempt
 
 from stores.models import Store
 from .models import Expense, ExpenseType, ExpenseReason
+from accounts.models import DeleteSync
+
+
+def _clear_store_reset_marker(store_id):
+    DeleteSync.objects.filter(
+        source_flag=2,
+        store_model_name=DeleteSync.RESET_MARKER_MODEL,
+        store_record_id=store_id,
+    ).delete()
 
 
 # ================================
@@ -130,6 +139,7 @@ def create_expense_from_access(request, merchant_id):
                         notes=notes or "",
                         update_time=None,
                     )
+                    _clear_store_reset_marker(store.id)
                     return JsonResponse({
                         "status": "updated",
                         "id": by_access.id,
@@ -147,6 +157,7 @@ def create_expense_from_access(request, merchant_id):
             notes=notes or "",
         )
 
+        _clear_store_reset_marker(store.id)
         return JsonResponse({
             "status": "created",
             "id": expense.id,

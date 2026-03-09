@@ -287,6 +287,9 @@ class AppUpdate(models.Model):
 
 
 class DeleteSync(models.Model):
+    RESET_MARKER_MODEL = "__system.store_reset__"
+    RESET_MARKER_TABLE = "__STORE_RESET__"
+
     source_flag = models.IntegerField()
     store_record_id = models.BigIntegerField(blank=True, null=True)
     store_model_name = models.CharField(max_length=100, blank=True, null=True)

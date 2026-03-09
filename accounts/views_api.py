@@ -186,6 +186,7 @@ def create_customer_from_access(request):
                     phone=phone,
                     update_time=None
                 )
+                _clear_store_reset_marker(store.id)
                 return JsonResponse({
                     "status": "updated",
                     "customer_id": by_access.id,
@@ -221,6 +222,7 @@ def create_customer_from_access(request):
                 update_data["update_time"] = None
                 Customer.objects.filter(id=existing.id, store=store).update(**update_data)
 
+            _clear_store_reset_marker(store.id)
             return JsonResponse({
                 "status": "exists",
                 "id": existing.id,
@@ -234,6 +236,7 @@ def create_customer_from_access(request):
             phone=phone,
         )
 
+        _clear_store_reset_marker(store.id)
         return JsonResponse({
             "status": "created",
             "message": "تم إنشاء الزبون بنجاح",
@@ -282,6 +285,7 @@ def create_supplier_from_access(request):
                     phone=phone,
                     update_time=None
                 )
+                _clear_store_reset_marker(store.id)
                 return JsonResponse({
                     "status": "updated",
                     "supplier_id": by_access.id,
@@ -299,6 +303,7 @@ def create_supplier_from_access(request):
             if update_data:
                 update_data["update_time"] = None
                 Supplier.objects.filter(id=existing.id, store=store).update(**update_data)
+            _clear_store_reset_marker(store.id)
             return JsonResponse({
                 "status": "exists",
                 "id": existing.id,
@@ -312,6 +317,7 @@ def create_supplier_from_access(request):
             phone=phone,
         )
 
+        _clear_store_reset_marker(store.id)
         return JsonResponse({
             "status": "created",
             "supplier_id": supplier.id,
@@ -373,7 +379,8 @@ def create_cashback_from_access(request, merchant_id):
         PointsTransaction.objects.filter(id=pt.id).update(update_time=None)
 
         # ظ‹ع؛â€‌â€ک ط¸â€ ط·آ±ط·آ¬ط¸â€کط·آ¹ ID ط·آ³ط·آ¬ط¸â€‍ ط·آ§ط¸â€‍ط¸â€ ط¸â€ڑط·آ§ط·آ·
-        return JsonResponse({
+        _clear_store_reset_marker(store.id)
+        return JsonResponse({
             "status": "created",
             "points_id": pt.id,
             "id": pt.id,
@@ -505,6 +512,27 @@ def merchant_delete_sync_export_api(request, merchant_id):
     if request.method != "GET":
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
+    reset_marker_exists = DeleteSync.objects.filter(
+        source_flag=2,
+        store_model_name=DeleteSync.RESET_MARKER_MODEL,
+        store_record_id=merchant_id,
+    ).exists()
+    if reset_marker_exists:
+        return JsonResponse(
+            {
+                "status": "blocked",
+                "error": "تم تفريغ بيانات المتجر. فعّل إعادة إرسال كامل البيانات من إعدادات برنامج الأكسس ثم أعد المحاولة.",
+                "merchant_id": merchant_id,
+                "store_was_reset": True,
+                "warning_code": "STORE_RESET_RESEND_REQUIRED",
+                "warning_message": (
+                    "تم تفريغ بيانات المتجر. قبل المزامنة، فعّل إعادة إرسال كامل البيانات من إعدادات برنامج الأكسس ثم أعد المحاولة."
+                ),
+            },
+            status=409,
+            json_dumps_params={"ensure_ascii": False},
+        )
+
     rows = DeleteSync.objects.filter(source_flag=2).order_by("id")
     data = []
     for r in rows:
@@ -518,7 +546,13 @@ def merchant_delete_sync_export_api(request, merchant_id):
         })
 
     return JsonResponse(
-        {"merchant_id": merchant_id, "rows": data},
+        {
+            "merchant_id": merchant_id,
+            "rows": data,
+            "store_was_reset": False,
+            "warning_code": "",
+            "warning_message": "",
+        },
         json_dumps_params={"ensure_ascii": False},
     )
 
@@ -686,6 +720,14 @@ def _apply_delete_sync_from_access(merchant_id):
             cleared += 1
 
     return {"applied": applied, "cleared": cleared, "errors": errors}
+
+
+def _clear_store_reset_marker(store_id):
+    DeleteSync.objects.filter(
+        source_flag=2,
+        store_model_name=DeleteSync.RESET_MARKER_MODEL,
+        store_record_id=store_id,
+    ).delete()
 
 
 @csrf_exempt
