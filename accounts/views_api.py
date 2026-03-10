@@ -1,157 +1,305 @@
-﻿from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from accounts.models import Customer
-from stores.models import Store
-from accounts.models import Supplier
+from django.http import JsonResponse
+
+from django.views.decorators.csrf import csrf_exempt
+
+from accounts.models import Customer
+
+from stores.models import Store
+
+from accounts.models import Supplier
+
 from .models import PointsTransaction, DeleteSync
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404
+
 from django.utils.dateparse import parse_date, parse_datetime
 from django.db.models import Q
 from datetime import datetime
-
-#ط·ع¾ط·آµط·آ¯ط¸ظ¹ط·آ±
-# ط·ع¾ط·آµط·آ¯ط¸ظ¹ط·آ± ط·آ§ط¸â€‍ط·آ¹ط¸â€¦ط¸â€‍ط·آ§ط·طŒ ط¸â€¦ط¸â€  ط·آ§ط¸â€‍ط¸â€¦ط·ع¾ط·آ¬ط·آ± ط·آ¥ط¸â€‍ط¸â€° ط·آ§ط¸â€‍ط·آ£ط¸ئ’ط·آ³ط·آ³
-@csrf_exempt
-def merchant_customers_api(request, merchant_id):
-    """
-    API: ط·آ¬ط¸â€‍ط·آ¨ ط·آ¹ط¸â€¦ط¸â€‍ط·آ§ط·طŒ ط·ع¾ط·آ§ط·آ¬ط·آ± ط¸â€¦ط·آ¹ط¸ظ¹ط¸â€  (ط¸â€ڑط·آ±ط·آ§ط·طŒط·آ© ط¸ظ¾ط¸â€ڑط·آ·)
-    """
-
-    store = Store.objects.filter(id=merchant_id).first()
-    if not store:
-        return JsonResponse({"error": "Merchant not found"}, status=404)
-
-    customers = Customer.objects.filter(store=store).filter(
-        Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
-    ).values(
-        "id",        # -> ظ‡ط°ط§ ظ‡ظˆ ط§ظ„ظ…ظپطھط§ط­ ط§ظ„ط°ظ‡ط¨ظٹ
-        "name",
-        "phone",
-        "access_id",
-        "update_time",
-    )
-
-    return JsonResponse({
-        "merchant_id": merchant_id,
-        "customers": list(customers)
-    })
-
-
-@csrf_exempt
-def merchant_suppliers_api(request, merchant_id):
-    """
-    API: ط·آ¬ط¸â€‍ط·آ¨ ط¸â€¦ط¸ث†ط·آ±ط·آ¯ط¸ظ¹ ط·ع¾ط·آ§ط·آ¬ط·آ± ط¸â€¦ط·آ¹ط¸ظ¹ط¸â€  (ط¸â€ڑط·آ±ط·آ§ط·طŒط·آ© ط¸ظ¾ط¸â€ڑط·آ·)
-    """
-
-    store = Store.objects.filter(id=merchant_id).first()
-    if not store:
-        return JsonResponse({"error": "Merchant not found"}, status=404)
-
-    suppliers = Supplier.objects.filter(store=store).filter(
-        Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
-    ).values(
-        "id",
-        "name",
-        "phone",
-        "access_id",
-        "update_time",
-    )
-
-    return JsonResponse({
-        "merchant_id": merchant_id,
-        "suppliers": list(suppliers)
-    })
-
-#ط¸â€ ط¸â€ڑط¸â€‍ ط·آ§ط¸â€‍ط¸ئ’ط·آ§ط·آ´ ط·آ¨ط·آ§ط¸ئ’
-@csrf_exempt
-def merchant_points_export_api(request, merchant_id):
-    store = Store.objects.filter(id=merchant_id).first()
-    if not store:
-        return JsonResponse({"error": "Merchant not found"}, status=404)
-
-    points = PointsTransaction.objects.filter(customer__store=store).filter(
+from decimal import Decimal, InvalidOperation
+
+#Ø·Ú¾Ø·ÂµØ·Â¯Ø¸Ù¹Ø·Â±
+
+# Ø·Ú¾Ø·ÂµØ·Â¯Ø¸Ù¹Ø·Â± Ø·Â§Ø¸â€žØ·Â¹Ø¸â€¦Ø¸â€žØ·Â§Ø·ØŒ Ø¸â€¦Ø¸â€  Ø·Â§Ø¸â€žØ¸â€¦Ø·Ú¾Ø·Â¬Ø·Â± Ø·Â¥Ø¸â€žØ¸â€° Ø·Â§Ø¸â€žØ·Â£Ø¸Æ’Ø·Â³Ø·Â³
+
+@csrf_exempt
+
+def merchant_customers_api(request, merchant_id):
+
+    """
+
+    API: Ø·Â¬Ø¸â€žØ·Â¨ Ø·Â¹Ø¸â€¦Ø¸â€žØ·Â§Ø·ØŒ Ø·Ú¾Ø·Â§Ø·Â¬Ø·Â± Ø¸â€¦Ø·Â¹Ø¸Ù¹Ø¸â€  (Ø¸â€šØ·Â±Ø·Â§Ø·ØŒØ·Â© Ø¸Ù¾Ø¸â€šØ·Â·)
+
+    """
+
+
+
+    store = Store.objects.filter(id=merchant_id).first()
+
+    if not store:
+
+        return JsonResponse({"error": "Merchant not found"}, status=404)
+
+
+
+    customers = Customer.objects.filter(store=store).filter(
+
         Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
-    ).select_related("customer")
-
-    data = []
-    for p in points:
-        data.append({
-            "id": p.id,  # ظ‹ع؛â€‌â€ک ط¸â€¦ط¸â€،ط¸â€¦ ط¸â€ ط·آ±ط·آ¬ط·آ¹ ط¸â€ ط·آ±ط·آ¨ط·آ· ط·آ¹ط¸â€‍ط¸ظ¹ط¸â€،
-            "rkmamel_m": p.customer_id,
-            "asm": p.customer.name,
-            "amount": p.points,
-            "trans_date": p.created_at.strftime("%Y-%m-%d"),
+
+    ).values(
+
+        "id",        # -> Ù‡Ø°Ø§ Ù‡Ùˆ Ø§Ù„Ù…ÙØªØ§Ø­ Ø§Ù„Ø°Ù‡Ø¨ÙŠ
+
+        "name",
+
+        "phone",
+
+        "access_id",
+
+        "update_time",
+
+    )
+
+
+
+    return JsonResponse({
+
+        "merchant_id": merchant_id,
+
+        "customers": list(customers)
+
+    })
+
+
+
+
+
+@csrf_exempt
+
+def merchant_suppliers_api(request, merchant_id):
+
+    """
+
+    API: Ø·Â¬Ø¸â€žØ·Â¨ Ø¸â€¦Ø¸Ë†Ø·Â±Ø·Â¯Ø¸Ù¹ Ø·Ú¾Ø·Â§Ø·Â¬Ø·Â± Ø¸â€¦Ø·Â¹Ø¸Ù¹Ø¸â€  (Ø¸â€šØ·Â±Ø·Â§Ø·ØŒØ·Â© Ø¸Ù¾Ø¸â€šØ·Â·)
+
+    """
+
+
+
+    store = Store.objects.filter(id=merchant_id).first()
+
+    if not store:
+
+        return JsonResponse({"error": "Merchant not found"}, status=404)
+
+
+
+    suppliers = Supplier.objects.filter(store=store).filter(
+
+        Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
+
+    ).values(
+
+        "id",
+
+        "name",
+
+        "phone",
+
+        "access_id",
+
+        "update_time",
+
+    )
+
+
+
+    return JsonResponse({
+
+        "merchant_id": merchant_id,
+
+        "suppliers": list(suppliers)
+
+    })
+
+
+
+#Ø¸â€ Ø¸â€šØ¸â€ž Ø·Â§Ø¸â€žØ¸Æ’Ø·Â§Ø·Â´ Ø·Â¨Ø·Â§Ø¸Æ’
+
+@csrf_exempt
+
+def merchant_points_export_api(request, merchant_id):
+
+    store = Store.objects.filter(id=merchant_id).first()
+
+    if not store:
+
+        return JsonResponse({"error": "Merchant not found"}, status=404)
+
+
+
+    points = PointsTransaction.objects.filter(customer__store=store).filter(
+
+        Q(access_id__isnull=True) | Q(access_id=0)
+    ).select_related("customer")
+
+
+
+    data = []
+
+    for p in points:
+
+        data.append({
+
+            "id": p.id,# Ù‹Úºâ€â€˜ Ø¸â€¦Ø¸â€¡Ø¸â€¦ Ø¸â€ Ø·Â±Ø·Â¬Ø·Â¹ Ø¸â€ Ø·Â±Ø·Â¨Ø·Â· Ø·Â¹Ø¸â€žØ¸Ù¹Ø¸â€¡
+            "points_id": p.id,
+            "rkmamel_m": p.customer_id,
+
+            "asm": p.customer.name,
+
+            "amount": p.points,
+
+            "trans_date": p.created_at.strftime("%Y-%m-%d"),
+
             "note": p.note or "",
             "access_id": p.access_id,
             "update_time": p.update_time,
-        })
-
-    return JsonResponse({
-        "merchant_id": merchant_id,
-        "points": data
-    })
-#ط·آ§ط·آ±ط·آ¬ط·آ§ط·آ¹ ط·آ±ط¸â€ڑط¸â€¦ ط·آ§ط¸â€‍ط·آ³ط·آ¬ط¸â€‍
-@csrf_exempt
-def merchant_points_confirm_api(request):
-    import json
-
-    data = json.loads(request.body)
-
-    for item in data:
-        PointsTransaction.objects.filter(
-            id=int(item["points_id"])   # ظ‹ع؛â€‌آ´ ط·ع¾ط·آ­ط¸ث†ط¸ظ¹ط¸â€‍ ط·آµط·آ±ط¸ظ¹ط·آ­
-        ).update(
-            access_id=int(item["access_id"]),
-            update_time=None
-        )
-
-    return JsonResponse({"status": "ok"})
-@csrf_exempt
-def merchant_customers_confirm_api(request):
-    import json
-
-    data = json.loads(request.body)
-
-    for item in data:
-        Customer.objects.filter(
-            id=int(item["customer_id"])
-        ).update(
-            access_id=int(item["access_id"]),
-            update_time=None
-        )
-
-    return JsonResponse({"status": "ok"})
-
-
-@csrf_exempt
-def merchant_suppliers_confirm_api(request):
-    import json
-
-    data = json.loads(request.body)
-
-    for item in data:
-        Supplier.objects.filter(
-            id=int(item["supplier_id"])
-        ).update(
-            access_id=int(item["access_id"]),
-            update_time=None
-        )
-
-    return JsonResponse({"status": "ok"})
-
-## ط·آ§ط·آ³ط·ع¾ط¸ظ¹ط·آ±ط·آ§ط·آ¯ ط¸â€¦ط¸â€  ط·آ§ط¸â€‍ط·آ¨ط·آ±ط¸â€ ط·آ§ط¸â€¦ط·آ¬
-
-# accounts/views_api.py
-from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from django.db.models import Q
-import json
-
-from stores.models import Store
-from accounts.models import Customer
-
-from django.db.models import Q
-
+        })
+
+
+
+    return JsonResponse({
+
+        "merchant_id": merchant_id,
+
+        "points": data
+
+    })
+
+#Ø·Â§Ø·Â±Ø·Â¬Ø·Â§Ø·Â¹ Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€žØ·Â³Ø·Â¬Ø¸â€ž
+
+@csrf_exempt
+
+def merchant_points_confirm_api(request):
+
+    import json
+
+    try:
+        data = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    if not isinstance(data, list):
+        return JsonResponse({"error": "Payload must be a JSON array"}, status=400)
+
+    updated = 0
+    for item in data:
+        point_id = item.get("points_id", item.get("id"))
+        access_id = item.get("access_id")
+        if point_id in (None, "") or access_id in (None, ""):
+            continue
+        try:
+            updated += PointsTransaction.objects.filter(
+                id=int(point_id)
+            ).update(
+                access_id=int(access_id),
+                update_time=None
+            )
+        except (ValueError, TypeError):
+            continue
+
+    return JsonResponse({"status": "ok", "updated": updated})
+
+@csrf_exempt
+
+def merchant_customers_confirm_api(request):
+
+    import json
+
+
+
+    data = json.loads(request.body)
+
+
+
+    for item in data:
+
+        Customer.objects.filter(
+
+            id=int(item["customer_id"])
+
+        ).update(
+
+            access_id=int(item["access_id"]),
+
+            update_time=None
+
+        )
+
+
+
+    return JsonResponse({"status": "ok"})
+
+
+
+
+
+@csrf_exempt
+
+def merchant_suppliers_confirm_api(request):
+
+    import json
+
+
+
+    data = json.loads(request.body)
+
+
+
+    for item in data:
+
+        Supplier.objects.filter(
+
+            id=int(item["supplier_id"])
+
+        ).update(
+
+            access_id=int(item["access_id"]),
+
+            update_time=None
+
+        )
+
+
+
+    return JsonResponse({"status": "ok"})
+
+
+
+## Ø·Â§Ø·Â³Ø·Ú¾Ø¸Ù¹Ø·Â±Ø·Â§Ø·Â¯ Ø¸â€¦Ø¸â€  Ø·Â§Ø¸â€žØ·Â¨Ø·Â±Ø¸â€ Ø·Â§Ø¸â€¦Ø·Â¬
+
+
+
+# accounts/views_api.py
+
+from django.views.decorators.csrf import csrf_exempt
+
+from django.http import JsonResponse
+
+from django.db.models import Q
+
+import json
+
+
+
+from stores.models import Store
+
+from accounts.models import Customer
+
+
+
+from django.db.models import Q
+
+
+
 @csrf_exempt
 def create_customer_from_access(request):
     if request.method != "POST":
@@ -166,7 +314,7 @@ def create_customer_from_access(request):
         phone = (data.get("phone") or "").strip()
 
         if not merchant_id or not name:
-            return JsonResponse({"error": "بيانات ناقصة"}, status=400)
+            return JsonResponse({"error": "ÈíÇäÇÊ äÇÞÕÉ"}, status=400)
 
         store = Store.objects.filter(id=merchant_id).first()
         if not store:
@@ -177,7 +325,7 @@ def create_customer_from_access(request):
         else:
             access_id = int(access_id)
 
-        # تحديث صريح حسب access_id (رقم سجل أكسس) إذا كان موجودا
+        # ÊÍÏíË ÕÑíÍ ÍÓÈ access_id (ÑÞã ÓÌá ÃßÓÓ) ÅÐÇ ßÇä ãæÌæÏÇ
         if access_id is not None:
             by_access = Customer.objects.filter(store=store, access_id=access_id).first()
             if by_access:
@@ -193,7 +341,7 @@ def create_customer_from_access(request):
                     "id": by_access.id,
                 })
 
-        # fallback: ابحث بالاسم أو الهاتف
+        # fallback: ÇÈÍË ÈÇáÇÓã Ãæ ÇáåÇÊÝ
         existing = Customer.objects.filter(
             store=store
         ).filter(
@@ -201,11 +349,11 @@ def create_customer_from_access(request):
         ).only("id", "name", "phone", "access_id").first()
 
         if existing:
-            # نفس الرقم واسم مختلف -> نفس الرسالة القديمة
+            # äÝÓ ÇáÑÞã æÇÓã ãÎÊáÝ -> äÝÓ ÇáÑÓÇáÉ ÇáÞÏíãÉ
             if existing.phone == phone and existing.name != name:
                 return JsonResponse({
                     "status": "exists",
-                    "message": "رقم الموبايل مسجل باسم آخر لن يتم إكمال مزامنة الفواتير الا بعد حل المشكلة . يفضل التأكد من نقل العملاء من فورم العملاء اولا",
+                    "message": "ÑÞã ÇáãæÈÇíá ãÓÌá ÈÇÓã ÂÎÑ áä íÊã ÅßãÇá ãÒÇãäÉ ÇáÝæÇÊíÑ ÇáÇ ÈÚÏ Íá ÇáãÔßáÉ . íÝÖá ÇáÊÃßÏ ãä äÞá ÇáÚãáÇÁ ãä ÝæÑã ÇáÚãáÇÁ ÇæáÇ",
                     "existing_name": existing.name,
                     "id": existing.id,
                     "customer_id": existing.id,
@@ -239,7 +387,7 @@ def create_customer_from_access(request):
         _clear_store_reset_marker(store.id)
         return JsonResponse({
             "status": "created",
-            "message": "تم إنشاء الزبون بنجاح",
+            "message": "Êã ÅäÔÇÁ ÇáÒÈæä ÈäÌÇÍ",
             "customer_id": customer.id,
             "id": customer.id,
         })
@@ -265,7 +413,7 @@ def create_supplier_from_access(request):
             phone = str(phone).strip()
 
         if not merchant_id or not name:
-            return JsonResponse({"error": "بيانات ناقصة"}, status=400)
+            return JsonResponse({"error": "ÈíÇäÇÊ äÇÞÕÉ"}, status=400)
 
         store = Store.objects.filter(id=merchant_id).first()
         if not store:
@@ -276,7 +424,7 @@ def create_supplier_from_access(request):
         else:
             access_id = int(access_id)
 
-        # تحديث صريح حسب access_id (رقم سجل أكسس) إذا كان موجودا
+        # ÊÍÏíË ÕÑíÍ ÍÓÈ access_id (ÑÞã ÓÌá ÃßÓÓ) ÅÐÇ ßÇä ãæÌæÏÇ
         if access_id is not None:
             by_access = Supplier.objects.filter(store=store, access_id=access_id).first()
             if by_access:
@@ -292,7 +440,7 @@ def create_supplier_from_access(request):
                     "id": by_access.id,
                 })
 
-        # fallback: بالاسم
+        # fallback: ÈÇáÇÓã
         existing = Supplier.objects.filter(store=store, name=name).first()
         if existing:
             update_data = {}
@@ -325,52 +473,101 @@ def create_supplier_from_access(request):
         })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-@csrf_exempt
-def create_cashback_from_access(request, merchant_id):
-    if request.method != "POST":
-        return JsonResponse({"error": "POST only"}, status=405)
-
-    try:
-        data = json.loads(request.body.decode("utf-8"))
-
-        rkmamel = data.get("rkmamel")  # ط·آ±ط¸â€ڑط¸â€¦ ط·آ§ط¸â€‍ط·آ¹ط¸â€¦ط¸ظ¹ط¸â€‍ ط·آ¨ط·آ§ط¸â€‍ط·آ¨ط·آ±ط¸â€ ط·آ§ط¸â€¦ط·آ¬
-        access_id = data.get("access_id")  # ID ط³ط¬ظ„ ط§ظ„ط§ظƒط³ط³
-        customer_name = (data.get("customer_name") or "").strip()
-        amount = data.get("amount")
-        trans_date = data.get("trans_date")
-        note = data.get("note", "")
-
-        if not customer_name or amount is None or not trans_date:
-            return JsonResponse({"error": "ط·آ¨ط¸ظ¹ط·آ§ط¸â€ ط·آ§ط·ع¾ ط¸â€ ط·آ§ط¸â€ڑط·آµط·آ©"}, status=400)
-
-        store = Store.objects.filter(id=merchant_id).first()
-        if not store:
-            return JsonResponse({"error": "Merchant not found"}, status=404)
-
-        customer = Customer.objects.filter(
-            store=store,
-            name=customer_name
-        ).first()
-
-        if not customer:
-            return JsonResponse({
-                "error": "ط·آ§ط¸â€‍ط·آ¹ط¸â€¦ط¸ظ¹ط¸â€‍ ط·ط›ط¸ظ¹ط·آ± ط¸â€¦ط¸ث†ط·آ¬ط¸ث†ط·آ¯ ط·آ¨ط·آ§ط¸â€‍ط¸â€¦ط·ع¾ط·آ¬ط·آ±",
-                "customer_name": customer_name
-            }, status=400)
-
-        date_only = parse_date(trans_date)
-        if not date_only:
-            return JsonResponse({"error": "Invalid trans_date"}, status=400)
-
-        created_at = datetime.combine(date_only, datetime.min.time())
-        # ط¯ط¹ظ… ظ‚ط¯ظٹظ…: ط¥ط°ط§ ظ…ط§ ظˆطµظ„ access_id ط§ط³طھط®ط¯ظ… rkmamel
-        if access_id in ("", None):
-            access_id = rkmamel
-
+@csrf_exempt
+
+def create_cashback_from_access(request, merchant_id):
+
+    if request.method != "POST":
+
+        return JsonResponse({"error": "POST only"}, status=405)
+
+
+
+    try:
+
+        data = json.loads(request.body.decode("utf-8"))
+
+
+
+        rkmamel = data.get("rkmamel")  # Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€žØ·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€ž Ø·Â¨Ø·Â§Ø¸â€žØ·Â¨Ø·Â±Ø¸â€ Ø·Â§Ø¸â€¦Ø·Â¬
+
+        access_id = data.get("access_id")  # ID Ø³Ø¬Ù„ Ø§Ù„Ø§ÙƒØ³Ø³
+
+        customer_name = (data.get("customer_name") or "").strip()
+
+        amount = data.get("amount")
+
+        trans_date = data.get("trans_date")
+
+        note = data.get("note", "")
+
+
+
+        if not customer_name or amount in (None, "") or not trans_date:
+
+            return JsonResponse({"error": "Ø·Â¨Ø¸Ù¹Ø·Â§Ø¸â€ Ø·Â§Ø·Ú¾ Ø¸â€ Ø·Â§Ø¸â€šØ·ÂµØ·Â©"}, status=400)
+
+
+        # Preserve fractional cashback values and support Access decimal comma.
+        try:
+            amount_value = Decimal(str(amount).strip().replace(",", "."))
+        except (InvalidOperation, ValueError, TypeError):
+            return JsonResponse({"error": "Invalid amount"}, status=400)
+
+
+
+        store = Store.objects.filter(id=merchant_id).first()
+
+        if not store:
+
+            return JsonResponse({"error": "Merchant not found"}, status=404)
+
+
+
+        customer = Customer.objects.filter(
+
+            store=store,
+
+            name=customer_name
+
+        ).first()
+
+
+
+        if not customer:
+
+            return JsonResponse({
+
+                "error": "Ø·Â§Ø¸â€žØ·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€ž Ø·Ø›Ø¸Ù¹Ø·Â± Ø¸â€¦Ø¸Ë†Ø·Â¬Ø¸Ë†Ø·Â¯ Ø·Â¨Ø·Â§Ø¸â€žØ¸â€¦Ø·Ú¾Ø·Â¬Ø·Â±",
+
+                "customer_name": customer_name
+
+            }, status=400)
+
+
+
+        date_only = parse_date(trans_date)
+
+        if not date_only:
+
+            return JsonResponse({"error": "Invalid trans_date"}, status=400)
+
+
+
+        created_at = datetime.combine(date_only, datetime.min.time())
+
+        # Ø¯Ø¹Ù… Ù‚Ø¯ÙŠÙ…: Ø¥Ø°Ø§ Ù…Ø§ ÙˆØµÙ„ access_id Ø§Ø³ØªØ®Ø¯Ù… rkmamel
+
+        if access_id in ("", None):
+
+            access_id = rkmamel
+
+
+
         pt = PointsTransaction.objects.create(
             customer=customer,
             access_id=int(access_id) if access_id not in ("", None) else None,
-            points=int(amount),
+            points=amount_value,
             created_at=created_at,
             note=note
         )
@@ -378,132 +575,255 @@ def create_cashback_from_access(request, merchant_id):
         # Imported from Access: do not mark as locally updated.
         PointsTransaction.objects.filter(id=pt.id).update(update_time=None)
 
-        # ظ‹ع؛â€‌â€ک ط¸â€ ط·آ±ط·آ¬ط¸â€کط·آ¹ ID ط·آ³ط·آ¬ط¸â€‍ ط·آ§ط¸â€‍ط¸â€ ط¸â€ڑط·آ§ط·آ·
+        # Ù‹Úºâ€â€˜ Ø¸â€ Ø·Â±Ø·Â¬Ø¸â€˜Ø·Â¹ ID Ø·Â³Ø·Â¬Ø¸â€ž Ø·Â§Ø¸â€žØ¸â€ Ø¸â€šØ·Â§Ø·Â·
         _clear_store_reset_marker(store.id)
         return JsonResponse({
-            "status": "created",
-            "points_id": pt.id,
-            "id": pt.id,
-        })
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
-# ط¸â€‍ط·ع¾ط·آ±ط·آ¬ط¸ظ¹ط·آ¹ ط·آ±ط¸â€ڑط¸â€¦ ط·آ§ط¸â€‍ط·آ¹ط¸â€¦ط¸ظ¹ط¸â€‍ ط¸â€‍ط¸â€‍ط·آ£ط¸ئ’ط·آ³ط·آ³
-@csrf_exempt
-def get_customer_id_for_access(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "POST only"}, status=405)
-
-    try:
-        data = json.loads(request.body.decode("utf-8"))
-        access_row_id = data.get("access_row_id")
-
-        if not access_row_id:
-            return JsonResponse({"error": "Missing access_row_id"}, status=400)
-
-        pt = PointsTransaction.objects.filter(
-            access_id=access_row_id
-        ).select_related("customer").first()
-
-        if not pt or not pt.customer_id:
-            return JsonResponse({"error": "Not found"}, status=404)
-
-        return JsonResponse({
-            "access_row_id": access_row_id,
-            "customer_id": pt.customer_id
-        })
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-#ط¸â€‍ط¸â€‍ط·آ§ط·آ´ط·آ¹ط·آ§ط·آ±ط·آ§ط·ع¾
-from django.http import JsonResponse
-from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from .models import SystemNotification, AccountingClient
-from django.db.models import Q
-from django.db import models
-@csrf_exempt
-def accounting_notifications(request):
-    access_id = request.GET.get("access_id")
-
-    if not access_id:
-        return JsonResponse({"error": "access_id required"}, status=400)
-
-    try:
-        AccountingClient.objects.get(access_id=access_id)
-    except AccountingClient.DoesNotExist:
-        return JsonResponse({"error": "invalid access_id"}, status=403)
-
-    now = timezone.now()
-
-    notifications = (
-        SystemNotification.objects
-        .filter(channel__in=["accounting", "both"])
-        .filter(
-            Q(expires_at__isnull=True) |
-            Q(expires_at__gt=now)
-        )
-        .order_by("id")
-    )
-
-    data = []
-
-    for n in notifications:
-        data.append({
-            "id": n.id,
-            "title": n.title,
-            "message": n.message,
-            "severity": n.severity,
-            "created_at": n.created_at.isoformat(),
-            "target_store_id": n.target_store_id,  # أ¢آ­ع¯ ط¸â€¦ط¸â€،ط¸â€¦ ط¸â€‍ط¸â€‍ط·آ¥ط¸ئ’ط·آ³ط·آ³
-        })
-
-    return JsonResponse(
-        {"notifications": data},
-        json_dumps_params={"ensure_ascii": False}
-    )
-
-#ط¸â€‍ط·آ§ط·آ®ط·ع¾ط·آ¨ط·آ§ط·آ± ط¸â€¦ط¸â€  ط·آ§ط¸ئ’ط·آ³ط·آ³ ط·آ§ط·آ°ط·آ§ ط·آ§ط¸â€‍ط·آ­ط·آ³ط·آ§ط·آ¨ ط¸ظ¾ط·آ¹ط·آ§ط¸â€‍
-from django.http import JsonResponse
-from accounts.models import Store
-
-def merchant_status(request, merchant_id):
-    store = Store.objects.filter(id=merchant_id).first()
-
-    if not store:
-        return JsonResponse(
-            {"error": "Store not found"},
-            status=404
-        )
-
-    return JsonResponse({
-        "id": store.id,
-        "is_active": store.is_active,
-    })
-#ط¸â€‍ط¸â€‍ط·ع¾ط·آ­ط·آ¯ط¸ظ¹ط·آ«
-# views.py
-from django.http import JsonResponse
-from .models import AppUpdate
-
-def check_update(request):
-    app = AppUpdate.objects.get(app_name="alaman")
-    return JsonResponse({
-        "version": app.version,
-        "prices_version": app.prices_version,
-    })
-
-
-
-
-
-
-
-
-
-
-
-
+            "status": "created",
+
+            "points_id": pt.id,
+
+            "id": pt.id,
+
+        })
+
+
+
+    except Exception as e:
+
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+
+# Ø¸â€žØ·Ú¾Ø·Â±Ø·Â¬Ø¸Ù¹Ø·Â¹ Ø·Â±Ø¸â€šØ¸â€¦ Ø·Â§Ø¸â€žØ·Â¹Ø¸â€¦Ø¸Ù¹Ø¸â€ž Ø¸â€žØ¸â€žØ·Â£Ø¸Æ’Ø·Â³Ø·Â³
+
+@csrf_exempt
+
+def get_customer_id_for_access(request):
+
+    if request.method != "POST":
+
+        return JsonResponse({"error": "POST only"}, status=405)
+
+
+
+    try:
+
+        data = json.loads(request.body.decode("utf-8"))
+
+        access_row_id = data.get("access_row_id")
+
+
+
+        if not access_row_id:
+
+            return JsonResponse({"error": "Missing access_row_id"}, status=400)
+
+
+
+        pt = PointsTransaction.objects.filter(
+
+            access_id=access_row_id
+
+        ).select_related("customer").first()
+
+
+
+        if not pt or not pt.customer_id:
+
+            return JsonResponse({"error": "Not found"}, status=404)
+
+
+
+        return JsonResponse({
+
+            "access_row_id": access_row_id,
+
+            "customer_id": pt.customer_id
+
+        })
+
+
+
+    except Exception as e:
+
+        return JsonResponse({"error": str(e)}, status=500)
+
+#Ø¸â€žØ¸â€žØ·Â§Ø·Â´Ø·Â¹Ø·Â§Ø·Â±Ø·Â§Ø·Ú¾
+
+from django.http import JsonResponse
+
+from django.utils import timezone
+
+from django.views.decorators.csrf import csrf_exempt
+
+from .models import SystemNotification, AccountingClient
+
+from django.db.models import Q
+
+from django.db import models
+
+@csrf_exempt
+
+def accounting_notifications(request):
+
+    access_id = request.GET.get("access_id")
+
+
+
+    if not access_id:
+
+        return JsonResponse({"error": "access_id required"}, status=400)
+
+
+
+    try:
+
+        AccountingClient.objects.get(access_id=access_id)
+
+    except AccountingClient.DoesNotExist:
+
+        return JsonResponse({"error": "invalid access_id"}, status=403)
+
+
+
+    now = timezone.now()
+
+
+
+    notifications = (
+
+        SystemNotification.objects
+
+        .filter(channel__in=["accounting", "both"])
+
+        .filter(
+
+            Q(expires_at__isnull=True) |
+
+            Q(expires_at__gt=now)
+
+        )
+
+        .order_by("id")
+
+    )
+
+
+
+    data = []
+
+
+
+    for n in notifications:
+
+        data.append({
+
+            "id": n.id,
+
+            "title": n.title,
+
+            "message": n.message,
+
+            "severity": n.severity,
+
+            "created_at": n.created_at.isoformat(),
+
+            "target_store_id": n.target_store_id,  # Ã¢Â­Ú¯ Ø¸â€¦Ø¸â€¡Ø¸â€¦ Ø¸â€žØ¸â€žØ·Â¥Ø¸Æ’Ø·Â³Ø·Â³
+
+        })
+
+
+
+    return JsonResponse(
+
+        {"notifications": data},
+
+        json_dumps_params={"ensure_ascii": False}
+
+    )
+
+
+
+#Ø¸â€žØ·Â§Ø·Â®Ø·Ú¾Ø·Â¨Ø·Â§Ø·Â± Ø¸â€¦Ø¸â€  Ø·Â§Ø¸Æ’Ø·Â³Ø·Â³ Ø·Â§Ø·Â°Ø·Â§ Ø·Â§Ø¸â€žØ·Â­Ø·Â³Ø·Â§Ø·Â¨ Ø¸Ù¾Ø·Â¹Ø·Â§Ø¸â€ž
+
+from django.http import JsonResponse
+
+from accounts.models import Store
+
+
+
+def merchant_status(request, merchant_id):
+
+    store = Store.objects.filter(id=merchant_id).first()
+
+
+
+    if not store:
+
+        return JsonResponse(
+
+            {"error": "Store not found"},
+
+            status=404
+
+        )
+
+
+
+    return JsonResponse({
+
+        "id": store.id,
+
+        "is_active": store.is_active,
+
+    })
+
+#Ø¸â€žØ¸â€žØ·Ú¾Ø·Â­Ø·Â¯Ø¸Ù¹Ø·Â«
+
+# views.py
+
+from django.http import JsonResponse
+
+from .models import AppUpdate
+
+
+
+def check_update(request):
+
+    app = AppUpdate.objects.get(app_name="alaman")
+
+    return JsonResponse({
+
+        "version": app.version,
+
+        "prices_version": app.prices_version,
+
+    })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -521,12 +841,12 @@ def merchant_delete_sync_export_api(request, merchant_id):
         return JsonResponse(
             {
                 "status": "blocked",
-                "error": "تم تفريغ بيانات المتجر. فعّل إعادة إرسال كامل البيانات من إعدادات برنامج الأكسس ثم أعد المحاولة.",
+                "error": "Êã ÊÝÑíÛ ÈíÇäÇÊ ÇáãÊÌÑ. ÝÚøá ÅÚÇÏÉ ÅÑÓÇá ßÇãá ÇáÈíÇäÇÊ ãä ÅÚÏÇÏÇÊ ÈÑäÇãÌ ÇáÃßÓÓ Ëã ÃÚÏ ÇáãÍÇæáÉ.",
                 "merchant_id": merchant_id,
                 "store_was_reset": True,
                 "warning_code": "STORE_RESET_RESEND_REQUIRED",
                 "warning_message": (
-                    "تم تفريغ بيانات المتجر. قبل المزامنة، فعّل إعادة إرسال كامل البيانات من إعدادات برنامج الأكسس ثم أعد المحاولة."
+                    "Êã ÊÝÑíÛ ÈíÇäÇÊ ÇáãÊÌÑ. ÞÈá ÇáãÒÇãäÉ¡ ÝÚøá ÅÚÇÏÉ ÅÑÓÇá ßÇãá ÇáÈíÇäÇÊ ãä ÅÚÏÇÏÇÊ ÈÑäÇãÌ ÇáÃßÓÓ Ëã ÃÚÏ ÇáãÍÇæáÉ."
                 ),
             },
             status=409,
@@ -640,14 +960,14 @@ def _apply_delete_sync_from_access(merchant_id):
     }
 
     table_to_model = {
-        "أسماء العملاء": "accounts.Customer",
-        "الموردون": "accounts.Supplier",
+        "ÃÓãÇÁ ÇáÚãáÇÁ": "accounts.Customer",
+        "ÇáãæÑÏæä": "accounts.Supplier",
         "almontg": "products.Category",
-        "الأصناف": "products.Product",
+        "ÇáÃÕäÇÝ": "products.Product",
         "fatoraaam": "orders.Order",
-        "فاتورة": "orders.OrderItem",
+        "ÝÇÊæÑÉ": "orders.OrderItem",
         "cashback": "accounts.PointsTransaction",
-        "الصرفيات": "dashboard.Expense",
+        "ÇáÕÑÝíÇÊ": "dashboard.Expense",
     }
 
     rows = DeleteSync.objects.filter(source_flag=1).order_by("id")
@@ -765,5 +1085,9 @@ def merchant_delete_sync_confirm_api(request):
         DeleteSync.objects.filter(id__in=ids).delete()
 
     return JsonResponse({"status": "ok", "deleted": len(ids)})
+
+
+
+
 
 
