@@ -224,6 +224,10 @@ def create_product_from_access(request):
             active=True
         )
 
+        # هذا المنتج وارد من الأكسس، لذلك لا يجب اعتباره "تعديل محلي" للتصدير.
+        if access_id not in (None, 0, ""):
+            Product.objects.filter(id=product.id, store=store).update(update_time=None)
+
         return JsonResponse({
             "status": "created",
             "id": product.id
