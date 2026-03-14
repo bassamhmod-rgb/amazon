@@ -669,6 +669,8 @@ def order_create(request, store_slug):
             return redirect("dashboard:order_create", store_slug=store.slug)
 
         status = "confirmed"
+        discount_value = _to_decimal(request.POST.get("discount", 0))
+        payment_value = _to_decimal(request.POST.get("payment", 0))
 
         # 3) إنشاء الطلب
         order = Order.objects.create(
@@ -676,8 +678,8 @@ def order_create(request, store_slug):
             transaction_type=transaction_type,
             customer=customer if transaction_type == "sale" else None,
             supplier=supplier if transaction_type == "purchase" else None,
-            discount=request.POST.get("discount", 0),
-            payment=request.POST.get("payment", 0),
+            discount=discount_value,
+            payment=payment_value,
             status=status,
         )
 
@@ -727,6 +729,11 @@ def order_create(request, store_slug):
             for _, (product, price) in purchase_product_prices.items():
                 apply_purchase_price_to_empty_sales(product, price)
                 fix_missing_buy_price_for_product(product)
+
+        # للزبون العام: اعتبر الفاتورة مدفوعة بالكامل تلقائياً.
+        if transaction_type == "sale" and customer and (customer.name or "").strip() == "زبون عام":
+            order.payment = order.net_total
+            order.save(update_fields=["payment"])
 
         # 5) ⭐ إضافة النقاط (الكاش باك) — فقط عند البيع
         if transaction_type == "sale" and customer:

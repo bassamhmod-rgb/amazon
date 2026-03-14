@@ -1,4 +1,4 @@
-from django.db.models import F, Sum, DecimalField, Q
+from django.db.models import F, Sum, DecimalField, Q, Exists, OuterRef
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from orders.models import Order, OrderItem
@@ -81,18 +81,23 @@ def merchant_orders_updates_api(request, merchant_id):
     if not store:
         return JsonResponse([], safe=False)
 
-    # فواتير مرتبطة بالمحاسبة وصار عليها تعديل، أو انضاف فيها سطر جديد لم يُربط بعد.
+    # فواتير مرتبطة بالمحاسبة وصار عليها تعديل، أو فيها عناصر مرتبطة بحاجة تحديث.
+    pending_items_qs = OrderItem.objects.filter(order_id=OuterRef("pk")).filter(
+        Q(update_time__isnull=False) |
+        Q(access_id__isnull=True) |
+        Q(access_id=0)
+    )
+
     orders = (
         Order.objects.filter(
             store=store,
             status="confirmed",
             accounting_invoice_number__isnull=False
         )
+        .annotate(has_pending_items=Exists(pending_items_qs))
         .filter(
             Q(update_time__isnull=False) |
-            Q(items__update_time__isnull=False) |
-            Q(items__access_id__isnull=True) |
-            Q(items__access_id=0)
+            Q(has_pending_items=True)
         )
         .distinct()
         .order_by("created_at")
@@ -156,7 +161,7 @@ def set_invoice_number(request):
         order_id = data.get("order_id")
         invoice_number = data.get("invoice_number")
 
-        if not order_id or not invoice_number:
+        if order_id in (None, "") or invoice_number in (None, ""):
             return JsonResponse({"error": "Missing data"}, status=400)
 
         order = Order.objects.get(id=order_id)

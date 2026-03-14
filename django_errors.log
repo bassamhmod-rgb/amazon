@@ -4194,3 +4194,61 @@ Internal Server Error: /accounts/api/create_customer_from_access/
 "POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
 Internal Server Error: /accounts/api/create_customer_from_access/
 "POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /orders/api/create_order_from_access/
+"POST /orders/api/create_order_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_from_access/
+"POST /orders/api/create_order_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /accounts/api/create_customer_from_access/
+"POST /accounts/api/create_customer_from_access/ HTTP/1.1" 500 64
+Internal Server Error: /dashboard/Alaman/orders/add/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 733, in order_create
+    order.payment = order.net_total
+  File "e:\my\amazon_syria\src\orders\models.py", line 202, in net_total
+    return self.items_total - self.discount
+TypeError: unsupported operand type(s) for -: 'decimal.Decimal' and 'str'
+"POST /dashboard/Alaman/orders/add/ HTTP/1.1" 500 145
+Internal Server Error: /dashboard/Alaman/orders/add/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 733, in order_create
+    order.payment = order.net_total
+  File "e:\my\amazon_syria\src\orders\models.py", line 202, in net_total
+    return self.items_total - self.discount
+TypeError: unsupported operand type(s) for -: 'decimal.Decimal' and 'str'
+"POST /dashboard/Alaman/orders/add/ HTTP/1.1" 500 77942
