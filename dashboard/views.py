@@ -108,8 +108,11 @@ def dashboard_home(request, store_slug):
         is_seen_by_store=False
     ).count()
 
+    orders_qs = Order.objects.filter(store=store)
+    orders_count = orders_qs.count()
+
     # آخر الطلبات (10 فقط)
-    orders = Order.objects.filter(store=store).order_by("-created_at")[:10]
+    orders = orders_qs.order_by("-created_at")[:10]
 
     # عدد أو قائمة المنتجات
     products = Product.objects.filter(store=store)
@@ -117,6 +120,7 @@ def dashboard_home(request, store_slug):
     return render(request, "dashboard/dashboard_home.html", {
         "store": store,
         "orders": orders,
+        "orders_count": orders_count,
         "products": products,
 
         # 🔥 مهم جداً للـ sidebar 
