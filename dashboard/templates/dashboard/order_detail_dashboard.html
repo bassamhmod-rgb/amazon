@@ -231,7 +231,7 @@
     </div>
 
     <!-- 🎁 الكاش باك -->
-    {% if order.transaction_type == "sale" and not has_cashback %}
+    {% if order.status == "pending" and order.transaction_type == "sale" and order.customer and not has_cashback %}
     <form method="post" action="{% url 'dashboard:confirm_order' store.slug order.id %}">
         {% csrf_token %}
         <div class="card p-3 mb-4 shadow-sm border-success">
@@ -253,12 +253,17 @@
 
     <!-- الأزرار -->
     <div class="d-flex gap-2 order-actions">
-        {% if order.status == "pending" and has_cashback %}
-            <a href="{% url 'dashboard:confirm_order' store.slug order.id %}" class="btn btn-success">
-                ✔ تأكيد الطلب
-            </a>
+        {% if order.status == "pending" %}
+            {% if order.transaction_type == "sale" and order.customer and not has_cashback %}
+            {% else %}
+                <form method="post" action="{% url 'dashboard:confirm_order' store.slug order.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                    ✔ تأكيد الطلب
+                    </button>
+                </form>
+            {% endif %}
         {% endif %}
-
         <form method="post" action="{% url 'dashboard:delete_order' store.slug order.id %}">
             {% csrf_token %}
             <button type="submit" class="btn btn-danger"

@@ -14,6 +14,7 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from products.models import ProductDetails ,Product, ProductGallery, ProductBarcode
 from products.utils import fix_missing_buy_price_for_product, apply_purchase_price_to_empty_sales
 # --- استيراد المودلز من التطبيقات المختلفة ---
@@ -567,10 +568,14 @@ def order_detail_dashboard(request, store_slug, order_id):
     })
 
 #تأكيد الطلب
+@require_POST
 @login_required
 def confirm_order(request, store_slug, order_id):
     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
     order = get_object_or_404(Order, id=order_id, store=store)
+
+    if order.status != "pending":
+        return redirect("dashboard:order_detail_dashboard", store_slug=store.slug, order_id=order.id)
 
     # تأكيد الطلب
     order.status = "confirmed"
