@@ -147,7 +147,27 @@ def create_product_from_access(request):
         return JsonResponse({"error": "POST only"}, status=405)
 
     try:
-        data = json.loads(request.body.decode("utf-8"))
+        try:
+            body_text = request.body.decode("utf-8")
+        except UnicodeDecodeError:
+            return JsonResponse(
+                {"error": "تعذر قراءة البيانات (UTF-8). تأكد من ترميز الطلب."},
+                status=400,
+            )
+
+        try:
+            data = json.loads(body_text)
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {
+                    "error": (
+                        "بيانات JSON غير صالحة. غالبًا يوجد محرف غير مُهَرَّب داخل النص "
+                        '(مثل علامة " في اسم الصنف: 15.6"). '
+                        'الحل: إرسال JSON صحيح (استخدم \\\" داخل النص) أو استبدالها بـ ″.'
+                    )
+                },
+                status=400,
+            )
 
         merchant_id = data.get("store")
         access_id = data.get("access_id")
@@ -173,7 +193,13 @@ def create_product_from_access(request):
         if access_id in ("", None):
             access_id = None
         else:
-            access_id = int(access_id)
+            try:
+                access_id = int(access_id)
+            except (TypeError, ValueError):
+                return JsonResponse(
+                    {"error": "access_id غير صالح (يجب أن يكون رقمًا)."},
+                    status=400,
+                )
 
         # تحديث صريح حسب access_id (رقم سجل أكسس) إن وجد.
         if access_id is not None:
