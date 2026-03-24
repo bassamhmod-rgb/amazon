@@ -2300,7 +2300,8 @@ def inventory_list(request, store_slug):
                 output_field=DecimalField(max_digits=14, decimal_places=2)
             )
         )
-        .order_by("-id")
+        # ترتيب تصاعدي حسب اسم الصنف (مع id لضمان ثبات الترتيب عند تكرار الأسماء)
+        .order_by("name", "id")
     )
 
     if qty_filter == "gt0":
