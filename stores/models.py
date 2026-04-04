@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.utils.text import slugify
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 from decimal import Decimal
 
 class Store(models.Model):
@@ -77,10 +77,24 @@ class Store(models.Model):
         if not self.slug:
             self.slug = slugify(self.name)
 
+        update_fields = kwargs.get("update_fields")
+        should_process_logo = bool(self.logo)
+        if update_fields is not None and "logo" not in update_fields:
+            should_process_logo = False
+        elif self.pk and self.logo:
+            old_logo_name = (
+                Store.objects.filter(pk=self.pk).values_list("logo", flat=True).first()
+            )
+            if old_logo_name == self.logo.name:
+                should_process_logo = False
+
         super().save(*args, **kwargs)
 
+        if should_process_logo:
+            self._process_logo_image()
+
         # تعديل الصورة بدون قص
-        if self.logo:
+        if False and self.logo:
             img = Image.open(self.logo.path).convert("RGBA")
 
             TARGET_W, TARGET_H = 1280, 509
@@ -109,6 +123,35 @@ class Store(models.Model):
     @property
     def formatted_description(self):
         return f"🌟 {self.description}"
+
+    def _process_logo_image(self):
+        if not self.logo:
+            return
+
+        try:
+            logo_path = self.logo.path
+        except Exception:
+            return
+
+        try:
+            with Image.open(logo_path).convert("RGBA") as img:
+                target_width, target_height = 1280, 509
+                img.thumbnail((target_width, target_height), Image.LANCZOS)
+
+                background = Image.new(
+                    "RGBA", (target_width, target_height), (255, 255, 255, 255)
+                )
+                x = (target_width - img.width) // 2
+                y = (target_height - img.height) // 2
+                background.paste(img, (x, y), img)
+
+                background.convert("RGB").save(
+                    logo_path,
+                    quality=90,
+                    optimize=True,
+                )
+        except (FileNotFoundError, UnidentifiedImageError, OSError, ValueError):
+            return
 
     def __str__(self):
         return self.name
