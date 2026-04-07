@@ -54,6 +54,7 @@ def update_store_codes_from_access(request):
         return JsonResponse({
             "status": "updated",
             "store_id": store.id,
+            "slug": store.slug,
             "mobile": mobile
         })
 
