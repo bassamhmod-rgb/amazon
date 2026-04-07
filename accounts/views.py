@@ -260,7 +260,7 @@ def csrf_failure(request, reason=""):
         request,
         "انتهت الجلسة، يرجى إعادة المحاولة."
     )
-    return redirect("accounts:merchant_login")
+    return redirect("accounts:login")
 
 
 

@@ -1,5 +1,6 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
+from django.views.decorators.cache import never_cache
 from . import views
 from .views import customer_logout
 from . import views_api
@@ -9,7 +10,7 @@ from .views_api import accounting_notifications
 app_name = "accounts"
 
 urlpatterns = [
-    path("login/", auth_views.LoginView.as_view(template_name="accounts/login.html"), name="login"),
+    path("login/", never_cache(auth_views.LoginView.as_view(template_name="accounts/login.html")), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("redirect/", views.merchant_redirect, name="redirect"),
 
