@@ -911,8 +911,8 @@ def orders_list(request, store_slug):
     if transaction_type:
         orders = orders.filter(transaction_type=transaction_type)
 
-    # ترتيب حسب رقم الطلب (الأحدث أولاً)
-    orders = orders.order_by("-id")
+    # ترتيب حسب التاريخ (الأحدث أولاً)
+    orders = orders.order_by("-created_at", "-id")
 
     # 🟢 عدد الطلبات الجديدة (لسّا is_seen_by_store = False)
     new_orders_count = Order.objects.filter(
