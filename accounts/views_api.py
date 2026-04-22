@@ -16,6 +16,8 @@ from django.db.models import Q
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
+from core.access_dedupe import dedupe_keep_oldest_for_value
+
 #Ø·Ú¾Ø·ÂµØ·Â¯Ø¸Ù¹Ø·Â±
 
 # Ø·Ú¾Ø·ÂµØ·Â¯Ø¸Ù¹Ø·Â± Ø·Â§Ø¸â€žØ·Â¹Ø¸â€¦Ø¸â€žØ·Â§Ø·ØŒ Ø¸â€¦Ø¸â€  Ø·Â§Ø¸â€žØ¸â€¦Ø·Ú¾Ø·Â¬Ø·Â± Ø·Â¥Ø¸â€žØ¸â€° Ø·Â§Ø¸â€žØ·Â£Ø¸Æ’Ø·Â³Ø·Â³
@@ -564,26 +566,84 @@ def create_cashback_from_access(request, merchant_id):
 
 
 
+        try:
+            access_id_int = int(access_id) if access_id not in ("", None) else None
+        except (TypeError, ValueError):
+            access_id_int = None
+        if access_id_int == 0:
+            access_id_int = None
+
+        if access_id_int is not None:
+            base_qs = PointsTransaction.objects.filter(customer__store=store)
+            existing = (
+                base_qs.filter(access_id=access_id_int)
+                .order_by("id")
+                .first()
+            )
+            if existing:
+                PointsTransaction.objects.filter(id=existing.id).update(
+                    customer=customer,
+                    customer_name=customer_name,
+                    transaction_type="add",
+                    access_id=access_id_int,
+                    points=amount_value,
+                    note=note,
+                    created_at=created_at,
+                    update_time=None,
+                )
+                dedupe_keep_oldest_for_value(
+                    base_qs,
+                    field_name="access_id",
+                    value=access_id_int,
+                )
+                _clear_store_reset_marker(store.id)
+                return JsonResponse({
+                    "status": "updated",
+                    "points_id": existing.id,
+                    "id": existing.id,
+                })
+
         pt = PointsTransaction.objects.create(
             customer=customer,
-            access_id=int(access_id) if access_id not in ("", None) else None,
+            customer_name=customer_name,
+            transaction_type="add",
+            access_id=access_id_int,
             points=amount_value,
-            created_at=created_at,
-            note=note
+            note=note,
         )
 
         # Imported from Access: do not mark as locally updated.
-        PointsTransaction.objects.filter(id=pt.id).update(update_time=None)
+        PointsTransaction.objects.filter(id=pt.id).update(
+            created_at=created_at,
+            update_time=None,
+        )
+
+        if access_id_int is not None:
+            base_qs = PointsTransaction.objects.filter(customer__store=store)
+            _, keep_id = dedupe_keep_oldest_for_value(
+                base_qs,
+                field_name="access_id",
+                value=access_id_int,
+            )
+            if keep_id and keep_id != pt.id:
+                PointsTransaction.objects.filter(id=keep_id).update(
+                    customer=customer,
+                    customer_name=customer_name,
+                    transaction_type="add",
+                    access_id=access_id_int,
+                    points=amount_value,
+                    note=note,
+                    created_at=created_at,
+                    update_time=None,
+                )
+                pt.id = keep_id
 
         # Ù‹Úºâ€â€˜ Ø¸â€ Ø·Â±Ø·Â¬Ø¸â€˜Ø·Â¹ ID Ø·Â³Ø·Â¬Ø¸â€ž Ø·Â§Ø¸â€žØ¸â€ Ø¸â€šØ·Â§Ø·Â·
         _clear_store_reset_marker(store.id)
         return JsonResponse({
             "status": "created",
-
             "points_id": pt.id,
-
             "id": pt.id,
-
         })
 
 

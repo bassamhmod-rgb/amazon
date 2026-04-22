@@ -10,6 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from stores.models import Store
 from .models import Expense, ExpenseType, ExpenseReason
 from accounts.models import DeleteSync
+from core.access_dedupe import dedupe_keep_oldest_for_value
 
 
 def _clear_store_reset_marker(store_id):
@@ -129,7 +130,11 @@ def create_expense_from_access(request, merchant_id):
                 access_id_int = None
 
             if access_id_int is not None:
-                by_access = Expense.objects.filter(store=store, access_id=access_id_int).first()
+                by_access = (
+                    Expense.objects.filter(store=store, access_id=access_id_int)
+                    .order_by("id")
+                    .first()
+                )
                 if by_access:
                     Expense.objects.filter(id=by_access.id, store=store).update(
                         amount=amount_dec,
@@ -138,6 +143,11 @@ def create_expense_from_access(request, merchant_id):
                         expense_reason=expense_reason,
                         notes=notes or "",
                         update_time=None,
+                    )
+                    dedupe_keep_oldest_for_value(
+                        Expense.objects.filter(store=store),
+                        field_name="access_id",
+                        value=access_id_int,
                     )
                     _clear_store_reset_marker(store.id)
                     return JsonResponse({
@@ -156,6 +166,24 @@ def create_expense_from_access(request, merchant_id):
             expense_reason=expense_reason,
             notes=notes or "",
         )
+
+        if access_id_int is not None:
+            _, keep_id = dedupe_keep_oldest_for_value(
+                Expense.objects.filter(store=store),
+                field_name="access_id",
+                value=access_id_int,
+            )
+            if keep_id and keep_id != expense.id:
+                Expense.objects.filter(id=keep_id, store=store).update(
+                    amount=amount_dec,
+                    date=final_date,
+                    expense_type=expense_type,
+                    expense_reason=expense_reason,
+                    notes=notes or "",
+                    update_time=None,
+                    access_id=access_id_int,
+                )
+                expense.id = keep_id
 
         _clear_store_reset_marker(store.id)
         return JsonResponse({

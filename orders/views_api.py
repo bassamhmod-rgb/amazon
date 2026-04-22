@@ -9,6 +9,8 @@ import json
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 
+from core.access_dedupe import dedupe_keep_oldest_for_value
+
 #تصدير
 # ================================
 # API: جلب الطلبات غير المرسلة للمحاسبة
@@ -247,11 +249,20 @@ def create_order_from_access(request):
         if not store:
             return JsonResponse({"error": "store not found"}, status=404)
 
+        try:
+            invoice_no_int = int(invoice_no) if invoice_no not in ("", None) else None
+        except (TypeError, ValueError):
+            invoice_no_int = None
+
         # ✅ منع التكرار: إذا الفاتورة موجودة نحدّثها بدل رفضها
-        existing_order = Order.objects.filter(
-            accounting_invoice_number=invoice_no,
-            store=store
-        ).first()
+        existing_order = (
+            Order.objects.filter(
+                accounting_invoice_number=invoice_no_int,
+                store=store
+            )
+            .order_by("id")
+            .first()
+        )
 
         # ✅ تحديد نوع العملية
         transaction_type = "sale" if noaf == -1 else "purchase"
@@ -284,6 +295,11 @@ def create_order_from_access(request):
             existing_order.status = "confirmed"
             existing_order._skip_update_time_touch = True
             existing_order.save()
+            dedupe_keep_oldest_for_value(
+                Order.objects.filter(store=store),
+                field_name="accounting_invoice_number",
+                value=invoice_no_int,
+            )
             return JsonResponse({
                 "status": "updated",
                 "order_id": existing_order.id,
@@ -292,7 +308,7 @@ def create_order_from_access(request):
 
         order = Order(
             store=store,
-            accounting_invoice_number=invoice_no,
+            accounting_invoice_number=invoice_no_int,
             customer=customer,
             supplier=supplier,
             created_at=created_at,
@@ -307,10 +323,17 @@ def create_order_from_access(request):
         order._skip_update_time_touch = True
         order.save()
 
+        _, keep_id = dedupe_keep_oldest_for_value(
+            Order.objects.filter(store=store),
+            field_name="accounting_invoice_number",
+            value=invoice_no_int,
+        )
+        order_id_for_response = keep_id if keep_id else order.id
+
         return JsonResponse({
             "status": "created",
-            "order_id": order.id,
-            "id": order.id,
+            "order_id": order_id_for_response,
+            "id": order_id_for_response,
         })
 
     except Exception as e:
@@ -348,18 +371,28 @@ def create_order_item_from_access(request):
 
         # تحديث السطر المرتبط بـ access_id إن وجد، وإلا نضيفه.
         if access_id is not None:
-            existing_item = OrderItem.objects.filter(
-                order=order,
-                access_id=access_id
-            ).first()
+            store_items_qs = OrderItem.objects.filter(order__store=order.store)
+            existing_item = (
+                store_items_qs.filter(access_id=access_id)
+                .select_related("order")
+                .order_by("id")
+                .first()
+            )
             if existing_item:
                 existing_item.product = product
                 existing_item.quantity = quantity
                 existing_item.direction = direction
                 existing_item.buy_price = buy_price
                 existing_item.price = price
+                if existing_item.order_id != order.id:
+                    existing_item.order = order
                 existing_item._skip_update_time_touch = True
                 existing_item.save()
+                dedupe_keep_oldest_for_value(
+                    store_items_qs,
+                    field_name="access_id",
+                    value=access_id,
+                )
                 return JsonResponse({
                     "status": "updated",
                     "order_item_id": existing_item.id,
@@ -393,6 +426,25 @@ def create_order_item_from_access(request):
         )
         order_item._skip_update_time_touch = True
         order_item.save()
+
+        if access_id is not None:
+            _, keep_id = dedupe_keep_oldest_for_value(
+                OrderItem.objects.filter(order__store=order.store),
+                field_name="access_id",
+                value=access_id,
+            )
+            if keep_id and keep_id != order_item.id:
+                OrderItem.objects.filter(id=keep_id).update(
+                    order=order,
+                    access_id=access_id,
+                    product=product,
+                    quantity=quantity,
+                    direction=direction,
+                    buy_price=buy_price,
+                    price=price,
+                    update_time=None,
+                )
+                order_item.id = keep_id
 
         return JsonResponse({
             "status": "created",
