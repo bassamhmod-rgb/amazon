@@ -19,6 +19,14 @@ def update_store_codes_from_access(request):
 
         if not mobile:
             return JsonResponse({"error": "mobile required"}, status=400)
+        if not number and not sna:
+            return JsonResponse(
+                {
+                    "status": "invalid_payload",
+                    "message": "number أو sna مطلوب (لا يمكن أن يكونا فارغين معاً)"
+                },
+                status=400
+            )
 
         store = Store.objects.filter(mobile=mobile).first()
         if not store:
@@ -35,26 +43,30 @@ def update_store_codes_from_access(request):
             )
 
         # ✅ نفس الشغل القديم تمامًا
+        update_fields = []
         if number:
             store.rkmdb = number
+            update_fields.append("rkmdb")
         if sna:
             store.rkmtb = sna
+            update_fields.append("rkmtb")
         if access_id in ("", None):
             access_id = None
         else:
             access_id = int(access_id)
 
-        update_fields = ["rkmdb", "rkmtb"]
         if access_id is not None:
             store.access_id = access_id
             update_fields.append("access_id")
 
-        store.save(update_fields=update_fields)
+        store.save(update_fields=update_fields or None)
 
         return JsonResponse({
             "status": "updated",
             "store_id": store.id,
             "slug": store.slug,
+            "rkmdb": store.rkmdb,
+            "rkmtb": store.rkmtb,
             "mobile": mobile
         })
 
