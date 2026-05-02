@@ -129,6 +129,9 @@ button.btn-primary {
 .product-name {
     font-weight: 700;
     margin-top: 0.2rem;
+    /* Prevent long unbroken names (e.g. "AAAAAA...") from overflowing the card */
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .product-price {
