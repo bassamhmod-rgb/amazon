@@ -10,7 +10,8 @@ from .views_api import accounting_notifications
 app_name = "accounts"
 
 urlpatterns = [
-    path("login/", never_cache(auth_views.LoginView.as_view(template_name="accounts/login.html")), name="login"),
+    path("login/", never_cache(views.login_view), name="login"),
+    path("<slug:store_slug>/login/", never_cache(views.store_login_view), name="store_login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("redirect/", views.merchant_redirect, name="redirect"),
 
@@ -23,8 +24,12 @@ urlpatterns = [
 #لل api
     path("api/customers/<int:merchant_id>/", views_api.merchant_customers_api),
     path("api/suppliers/<int:merchant_id>/", views_api.merchant_suppliers_api),
+    path("api/warehouses/<int:merchant_id>/", views_api.merchant_warehouses_api),
+    path("api/store-users/<int:merchant_id>/", views_api.merchant_store_users_api),
     path("api/customers/confirm/", views_api.merchant_customers_confirm_api),
     path("api/suppliers/confirm/", views_api.merchant_suppliers_confirm_api),
+    path("api/warehouses/confirm/", views_api.merchant_warehouses_confirm_api),
+    path("api/store-users/confirm/", views_api.merchant_store_users_confirm_api),
     path(
         "api/create_customer_from_access/",
         views_api.create_customer_from_access,
@@ -34,6 +39,16 @@ urlpatterns = [
         "api/create_supplier_from_access/",
         views_api.create_supplier_from_access,
         name="create_supplier_from_access"
+    ),
+    path(
+        "api/create_warehouse_from_access/",
+        views_api.create_warehouse_from_access,
+        name="create_warehouse_from_access",
+    ),
+    path(
+        "api/create_store_user_from_access/",
+        views_api.create_store_user_from_access,
+        name="create_store_user_from_access",
     ),
     path(
         "api/merchant/<int:merchant_id>/points/export/",

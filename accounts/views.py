@@ -2,11 +2,14 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.db import models
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login
 from stores.models import Store
 from accounts.models import Customer, normalize_phone_number
 from accounts.models import PointsTransaction
 from django.db.models import Sum
 from django.urls import reverse
+from .forms import StoreAwareLoginForm
+from .models import StoreUser
 
 # إنشاء حساب زبون جديد
 def customer_register(request, store_slug):
@@ -87,10 +90,106 @@ def customer_login(request, store_slug):
     })
 
 
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect("accounts:redirect")
+
+    if request.method == "POST":
+        form = StoreAwareLoginForm(request.POST)
+        if form.is_valid():
+            store = form.cleaned_data["store"]
+            username = (form.cleaned_data["username"] or "").strip()
+            password = form.cleaned_data["password"]
+
+            # 1) Try merchant (Django User)
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                if not Store.objects.filter(pk=store.pk, owner=user).exists():
+                    messages.error(request, "لا تملك صلاحية على هذا المتجر.")
+                else:
+                    login(request, user)
+                    request.session.pop("store_user_id", None)
+                    return redirect("dashboard:home", store_slug=store.slug)
+            else:
+                # 2) Try StoreUser within selected store
+                su = StoreUser.objects.filter(store=store, identifier__iexact=username).first()
+                if not su or not su.is_active or not su.check_password(password):
+                    messages.error(request, "بيانات الدخول غير صحيحة.")
+                else:
+                    if not su.auth_user_id:
+                        su.save()
+                    if not su.auth_user_id:
+                        messages.error(request, "لم يتم إعداد حساب المستخدم بعد. يرجى تعيين كلمة مرور.")
+                    else:
+                        # keep session pointing to StoreUser
+                        request.session["store_user_id"] = su.id
+                        login(request, su.auth_user)
+                        return redirect("dashboard:home", store_slug=store.slug)
+    else:
+        initial = {}
+        store_slug = request.GET.get("store")
+        if store_slug:
+            store = Store.objects.filter(slug=store_slug).first()
+            if store:
+                initial["store"] = store
+        form = StoreAwareLoginForm(initial=initial)
+
+    return render(request, "accounts/login.html", {"form": form})
+
+
+def store_login_view(request, store_slug):
+    store = get_object_or_404(Store, slug=store_slug, is_active=True)
+    next_url = request.POST.get("next") if request.method == "POST" else request.GET.get("next")
+    if not next_url:
+        next_url = reverse("dashboard:home", kwargs={"store_slug": store.slug})
+
+    if request.user.is_authenticated:
+        return redirect(next_url)
+
+    if request.method != "POST":
+        # Store page login is handled by modal; redirect to global login with store preselected
+        return redirect(f"{reverse('accounts:login')}?store={store.slug}&next={next_url}")
+
+    username = (request.POST.get("username") or "").strip()
+    password = request.POST.get("password") or ""
+
+    # 1) Try merchant (Django User)
+    user = authenticate(request, username=username, password=password)
+    if user is not None:
+        if not Store.objects.filter(pk=store.pk, owner=user).exists():
+            messages.error(request, "لا تملك صلاحية على هذا المتجر.")
+            return redirect(f"/store/{store.slug}/")
+        login(request, user)
+        request.session.pop("store_user_id", None)
+        return redirect(next_url)
+
+    # 2) Try StoreUser within this store
+    su = StoreUser.objects.filter(store=store, identifier__iexact=username).first()
+    if not su or not su.is_active or not su.check_password(password):
+        messages.error(request, "بيانات الدخول غير صحيحة.")
+        return redirect(f"/store/{store.slug}/")
+
+    if not su.auth_user_id:
+        su.save()
+    if not su.auth_user_id:
+        messages.error(request, "لم يتم إعداد حساب المستخدم بعد. يرجى تعيين كلمة مرور.")
+        return redirect(f"/store/{store.slug}/")
+
+    request.session["store_user_id"] = su.id
+    login(request, su.auth_user)
+    return redirect(next_url)
+
+
 # تحويل التاجر مباشرة إلى متجره
 def merchant_redirect(request):
     if not request.user.is_authenticated:
         return redirect("accounts:login")
+
+    store_user_id = request.session.get("store_user_id")
+    if store_user_id:
+        su = StoreUser.objects.filter(pk=store_user_id, auth_user=request.user).select_related("store").first()
+        if su:
+            return redirect("stores:store_front", slug=su.store.slug)
 
     store = Store.objects.filter(owner=request.user).first()
 

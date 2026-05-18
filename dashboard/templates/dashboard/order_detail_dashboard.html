@@ -129,6 +129,29 @@
 
     <h3 class="mb-4">تفاصيل الطلب #{{ order.id }}</h3>
 
+    <div class="alert alert-light border py-2 px-3 mb-3 d-flex flex-wrap gap-3 align-items-center">
+        <div>
+            <strong>المستخدم:</strong>
+            {% if order.created_by_store_user %}
+                {{ order.created_by_store_user.name }}
+            {% elif order.created_by %}
+                {{ order.created_by.username }}
+            {% else %}
+                -
+            {% endif %}
+        </div>
+        <div>
+            <strong>المستودع:</strong>
+            {% if order.warehouse %}
+                {{ order.warehouse.name }}
+            {% elif order.created_by_store_user and order.created_by_store_user.warehouse %}
+                {{ order.created_by_store_user.warehouse.name }}
+            {% else %}
+                -
+            {% endif %}
+        </div>
+    </div>
+
     <!-- معلومات عامة -->
     <div class="card p-3 mb-4 shadow-sm border-0">
         <div class="row g-3">

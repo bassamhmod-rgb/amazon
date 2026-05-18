@@ -4,9 +4,9 @@ from django.views.decorators.csrf import csrf_exempt
 
 from accounts.models import Customer
 
-from stores.models import Store
+from stores.models import Store, Warehouse
 
-from accounts.models import Supplier
+from accounts.models import Supplier, StoreUser
 
 from .models import PointsTransaction, DeleteSync
 from django.shortcuts import get_object_or_404
@@ -15,6 +15,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.db.models import Q
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+import time
 
 from core.access_dedupe import dedupe_keep_oldest_for_value
 
@@ -121,6 +122,88 @@ def merchant_suppliers_api(request, merchant_id):
         "suppliers": list(suppliers)
 
     })
+
+
+@csrf_exempt
+def merchant_warehouses_api(request, merchant_id):
+    """
+    API: تصدير المستودعات للتزامن مع Access (على نمط الموردين).
+    """
+
+    store = Store.objects.filter(id=merchant_id).first()
+    if not store:
+        return JsonResponse({"error": "Merchant not found"}, status=404)
+
+    warehouses = Warehouse.objects.filter(store=store).filter(
+        Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
+    ).values(
+        "id",
+        "name",
+        "address",
+        "phone",
+        "percentage",
+        "access_id",
+        "update_time",
+    )
+
+    data = []
+    for w in warehouses:
+        data.append(
+            {
+                **w,
+                # Access table mndob aliases
+                "rkm": w.get("access_id"),
+                "asm": w.get("name"),
+                "enwan": w.get("address"),
+                "hatf": w.get("phone"),
+                "nsbahsm": w.get("percentage"),
+            }
+        )
+
+    return JsonResponse({"merchant_id": merchant_id, "warehouses": data})
+
+
+@csrf_exempt
+def merchant_store_users_api(request, merchant_id):
+    """
+    API: تصدير المستخدمين للتزامن مع Access (على نمط الموردين).
+    """
+
+    store = Store.objects.filter(id=merchant_id).first()
+    if not store:
+        return JsonResponse({"error": "Merchant not found"}, status=404)
+
+    qs = StoreUser.objects.filter(store=store).filter(
+        Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
+    ).select_related("warehouse")
+
+    data = []
+    for u in qs:
+        warehouse_access_id = (
+            u.warehouse.access_id
+            if u.warehouse_id and u.warehouse and u.warehouse.access_id not in (None, 0, "")
+            else None
+        )
+        data.append(
+            {
+                "id": u.id,
+                "store_user_id": u.id,
+                "name": u.name,
+                "asm": u.name,
+                "identifier": u.identifier,
+                "password": "",
+                "rkmmror": "",
+                "has_password": bool(u.password),
+                "warehouse_access_id": warehouse_access_id,
+                "rkmmstwda": warehouse_access_id,
+                "warehouse_id": u.warehouse_id,
+                "access_id": u.access_id,
+                "rkm": u.access_id,
+                "update_time": u.update_time,
+            }
+        )
+
+    return JsonResponse({"merchant_id": merchant_id, "store_users": data})
 
 
 
@@ -271,6 +354,36 @@ def merchant_suppliers_confirm_api(request):
         )
 
 
+
+    return JsonResponse({"status": "ok"})
+
+
+@csrf_exempt
+def merchant_warehouses_confirm_api(request):
+    import json
+
+    data = json.loads(request.body)
+
+    for item in data:
+        Warehouse.objects.filter(id=int(item["warehouse_id"])).update(
+            access_id=int(item["access_id"]),
+            update_time=None,
+        )
+
+    return JsonResponse({"status": "ok"})
+
+
+@csrf_exempt
+def merchant_store_users_confirm_api(request):
+    import json
+
+    data = json.loads(request.body)
+
+    for item in data:
+        StoreUser.objects.filter(id=int(item["store_user_id"])).update(
+            access_id=int(item["access_id"]),
+            update_time=None,
+        )
 
     return JsonResponse({"status": "ok"})
 
@@ -473,6 +586,235 @@ def create_supplier_from_access(request):
             "supplier_id": supplier.id,
             "id": supplier.id,
         })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+def _safe_str(value):
+    if value in ("", None):
+        return None
+    return str(value).strip()
+
+
+def _next_warehouse_identifier(store):
+    max_numeric = 0
+    for ident in Warehouse.objects.filter(store=store).values_list("identifier", flat=True):
+        if not ident or str(ident).lower() == "main":
+            continue
+        try:
+            n = int(str(ident).strip())
+        except Exception:
+            continue
+        max_numeric = max(max_numeric, n)
+    if max_numeric:
+        return str(max_numeric + 1)
+    return f"wh-{int(time.time())}"
+
+
+@csrf_exempt
+def create_warehouse_from_access(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+
+        merchant_id = data.get("store")
+
+        # Access table mndob mappings (keep backward-compatible keys too):
+        # - rkm -> access_id
+        # - asm -> name
+        # - enwan -> address
+        # - hatf -> phone
+        # - nsbahsm -> percentage
+        access_id = data.get("access_id", data.get("rkm", None))
+        name = (data.get("name") or data.get("asm") or "").strip()
+        address = _safe_str(data.get("address", data.get("enwan", None)))
+        phone = _safe_str(data.get("phone", data.get("hatf", None)))
+        percentage = data.get("percentage", data.get("nsbahsm", None))
+
+        if not merchant_id or not name:
+            return JsonResponse({"error": "Missing required fields"}, status=400)
+
+        store = Store.objects.filter(id=merchant_id).first()
+        if not store:
+            return JsonResponse({"error": "Merchant not found"}, status=404)
+
+        if access_id in ("", None):
+            access_id = None
+        else:
+            access_id = int(access_id)
+
+        if percentage in ("", None):
+            percentage_value = None
+        else:
+            try:
+                percentage_value = Decimal(str(percentage).strip().replace(",", "."))
+            except (InvalidOperation, ValueError, TypeError):
+                return JsonResponse({"error": "Invalid percentage"}, status=400)
+
+        # Update main warehouse by fixed name (no duplicates allowed).
+        if name == Warehouse.MAIN_WAREHOUSE_NAME:
+            main_wh = Warehouse.objects.filter(store=store, is_main=True).first()
+            if main_wh:
+                update_data = {"address": address, "phone": phone, "update_time": None}
+                if percentage_value is not None:
+                    update_data["percentage"] = percentage_value
+                if access_id is not None and main_wh.access_id in (None, 0, ""):
+                    update_data["access_id"] = access_id
+                Warehouse.objects.filter(id=main_wh.id, store=store).update(**update_data)
+                _clear_store_reset_marker(store.id)
+                return JsonResponse({"status": "updated", "warehouse_id": main_wh.id, "id": main_wh.id})
+
+        if access_id is not None:
+            by_access = Warehouse.objects.filter(store=store, access_id=access_id).first()
+            if by_access:
+                update_data = {"name": name, "address": address, "phone": phone, "update_time": None}
+                if percentage_value is not None:
+                    update_data["percentage"] = percentage_value
+                Warehouse.objects.filter(id=by_access.id, store=store).update(**update_data)
+                _clear_store_reset_marker(store.id)
+                return JsonResponse({"status": "updated", "warehouse_id": by_access.id, "id": by_access.id})
+
+        existing = Warehouse.objects.filter(store=store, name=name).first()
+        if existing:
+            update_data = {"address": address, "phone": phone, "update_time": None}
+            if access_id is not None and existing.access_id in (None, 0, ""):
+                update_data["access_id"] = access_id
+            if percentage_value is not None:
+                update_data["percentage"] = percentage_value
+            Warehouse.objects.filter(id=existing.id, store=store).update(**update_data)
+            _clear_store_reset_marker(store.id)
+            return JsonResponse({"status": "exists", "warehouse_id": existing.id, "id": existing.id})
+
+        identifier = str(access_id) if access_id is not None else _next_warehouse_identifier(store)
+        warehouse = Warehouse.objects.create(
+            store=store,
+            access_id=access_id,
+            identifier=identifier,
+            name=name,
+            address=address,
+            phone=phone,
+            percentage=percentage_value if percentage_value is not None else Decimal("0.00"),
+        )
+
+        _clear_store_reset_marker(store.id)
+        return JsonResponse({"status": "created", "warehouse_id": warehouse.id, "id": warehouse.id})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@csrf_exempt
+def create_store_user_from_access(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+
+        merchant_id = data.get("store")
+
+        # Access table mror mappings (keep backward-compatible keys too):
+        # - asm -> name
+        # - rkmmror -> password
+        # - rkmmstwda -> warehouse_access_id
+        access_id = data.get("access_id", data.get("rkm", None))
+        name = (data.get("name") or data.get("asm") or "").strip()
+        identifier = (data.get("identifier") or "").strip()
+        password = data.get("password", data.get("rkmmror", None))
+
+        warehouse_access_id = data.get("warehouse_access_id", data.get("rkmmstwda", None))
+        warehouse_id = data.get("warehouse_id")
+
+        # If Access doesn't send an identifier, fall back to access_id (or name).
+        if not identifier:
+            if access_id not in ("", None):
+                identifier = str(access_id).strip()
+            else:
+                identifier = name
+
+        if not merchant_id or not name or not identifier:
+            return JsonResponse({"error": "Missing required fields"}, status=400)
+
+        store = Store.objects.filter(id=merchant_id).first()
+        if not store:
+            return JsonResponse({"error": "Merchant not found"}, status=404)
+
+        if access_id in ("", None):
+            access_id = None
+        else:
+            access_id = int(access_id)
+
+        target_warehouse = None
+        if warehouse_access_id not in ("", None):
+            try:
+                target_warehouse = Warehouse.objects.filter(
+                    store=store, access_id=int(warehouse_access_id)
+                ).first()
+            except (ValueError, TypeError):
+                target_warehouse = None
+        if not target_warehouse and warehouse_id not in ("", None):
+            try:
+                target_warehouse = Warehouse.objects.filter(store=store, id=int(warehouse_id)).first()
+            except (ValueError, TypeError):
+                target_warehouse = None
+
+        if access_id is not None:
+            by_access = StoreUser.objects.filter(store=store, access_id=access_id).first()
+            if by_access:
+                password_hash = None
+                if password not in ("", None):
+                    if isinstance(password, str) and password.startswith("pbkdf2_"):
+                        password_hash = password
+                    else:
+                        by_access.set_password(str(password))
+                        password_hash = by_access.password
+
+                StoreUser.objects.filter(id=by_access.id, store=store).update(
+                    name=name,
+                    identifier=identifier,
+                    warehouse_id=target_warehouse.id if target_warehouse else None,
+                    password=password_hash if password_hash is not None else by_access.password,
+                    update_time=None,
+                )
+                _clear_store_reset_marker(store.id)
+                return JsonResponse({"status": "updated", "store_user_id": by_access.id, "id": by_access.id})
+
+        existing = StoreUser.objects.filter(store=store, identifier__iexact=identifier).first()
+        if existing:
+            update_data = {
+                "name": name,
+                "warehouse_id": target_warehouse.id if target_warehouse else None,
+                "update_time": None,
+            }
+            if access_id is not None and existing.access_id in (None, 0, ""):
+                update_data["access_id"] = access_id
+            if password not in ("", None):
+                if isinstance(password, str) and password.startswith("pbkdf2_"):
+                    update_data["password"] = password
+                else:
+                    existing.set_password(str(password))
+                    update_data["password"] = existing.password
+            StoreUser.objects.filter(id=existing.id, store=store).update(**update_data)
+            _clear_store_reset_marker(store.id)
+            return JsonResponse({"status": "exists", "store_user_id": existing.id, "id": existing.id})
+
+        new_user = StoreUser(
+            store=store,
+            access_id=access_id,
+            name=name,
+            identifier=identifier,
+            warehouse=target_warehouse,
+        )
+        if password not in ("", None):
+            if isinstance(password, str) and password.startswith("pbkdf2_"):
+                new_user.password = password
+            else:
+                new_user.set_password(str(password))
+        new_user.save()
+
+        _clear_store_reset_marker(store.id)
+        return JsonResponse({"status": "created", "store_user_id": new_user.id, "id": new_user.id})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 @csrf_exempt

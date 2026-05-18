@@ -1,8 +1,8 @@
 ﻿from django.db import models
 from django.contrib.auth.models import User
 
-from stores.models import Store, StorePaymentMethod
-from accounts.models import Customer
+from stores.models import Store, StorePaymentMethod, Warehouse
+from accounts.models import Customer, StoreUser
 from django.utils import timezone
 import time
 
@@ -39,6 +39,28 @@ def _touch_update_time(instance, kwargs):
 class Order(models.Model):
     is_seen_by_store = models.BooleanField(default=False)
     update_time = models.BigIntegerField(blank=True, null=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_orders",
+    )
+    created_by_store_user = models.ForeignKey(
+        StoreUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_orders_store",
+        help_text="رقم المستخدم الداخلي (StoreUser.id) الذي أنشأ الطلب ليتطابق مع الرقم الذي يصل إلى Access.",
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
+    )
 
     customer = models.ForeignKey(
         Customer,
@@ -208,6 +230,13 @@ class Order(models.Model):
 class OrderItem(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
+    warehouse = models.ForeignKey(
+        "stores.Warehouse",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="order_items",
+    )
     order = models.ForeignKey(
         Order,
         on_delete=models.CASCADE,

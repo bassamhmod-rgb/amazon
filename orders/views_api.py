@@ -2,14 +2,41 @@ from django.db.models import F, Sum, DecimalField, Q, Exists, OuterRef
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from orders.models import Order, OrderItem
-from stores.models import Store
-from accounts.models import Customer, Supplier
+from stores.models import Store, Warehouse
+from accounts.models import Customer, Supplier, StoreUser
 from products.models import Product
 import json
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 
 from core.access_dedupe import dedupe_keep_oldest_for_value
+
+
+def _resolve_warehouse_from_access_payload(data, store):
+    if not isinstance(data, dict):
+        return Warehouse.objects.filter(store=store, is_main=True).first()
+
+    raw = (
+        data.get("warehouse_access_id")
+        or data.get("warehouse")
+        or data.get("rkmnkl")
+        or data.get("rkmnklk")
+        or data.get("rkmnlk")
+    )
+
+    if raw in ("", None, 0, "0"):
+        return Warehouse.objects.filter(store=store, is_main=True).first()
+
+    try:
+        warehouse_access_id = int(raw)
+    except (TypeError, ValueError):
+        return Warehouse.objects.filter(store=store, is_main=True).first()
+
+    wh = Warehouse.objects.filter(store=store, access_id=warehouse_access_id).first()
+    if wh:
+        return wh
+
+    return Warehouse.objects.filter(store=store, is_main=True).first()
 
 #تصدير
 # ================================
@@ -33,7 +60,7 @@ def merchant_orders_api(request, merchant_id):
     result = []
 
     for order in orders:
-        items = OrderItem.objects.filter(order=order)
+        items = OrderItem.objects.filter(order=order).select_related("product", "warehouse")
 
         # حساب إجمالي الفاتورة من التفاصيل
         items_total = items.aggregate(
@@ -56,6 +83,7 @@ def merchant_orders_api(request, merchant_id):
             "payment": float(order.payment or 0),
             "discount": float(order.discount or 0),      # ✅ الحسم
             "created_at": order.created_at.strftime("%Y-%m-%d"),
+            "created_by_store_user": order.created_by_store_user_id,
             "party_name": (
                 order.customer.name if order.customer
                 else order.supplier.name if order.supplier
@@ -68,6 +96,7 @@ def merchant_orders_api(request, merchant_id):
                     "quantity": float(item.quantity),
                     "price": float(item.price),
                     "buy_price": float(item.buy_price or 0),
+                    "warehouse": (item.warehouse.access_id if item.warehouse else None),
                     "direction": item.direction
                 }
                 for item in items
@@ -108,7 +137,7 @@ def merchant_orders_updates_api(request, merchant_id):
     result = []
 
     for order in orders:
-        items = OrderItem.objects.filter(order=order)
+        items = OrderItem.objects.filter(order=order).select_related("product", "warehouse")
 
         items_total = items.aggregate(
             sum=Sum(
@@ -129,6 +158,7 @@ def merchant_orders_updates_api(request, merchant_id):
             "payment": float(order.payment or 0),
             "discount": float(order.discount or 0),
             "created_at": order.created_at.strftime("%Y-%m-%d"),
+            "created_by_store_user": order.created_by_store_user_id,
             "party_name": (
                 order.customer.name if order.customer
                 else order.supplier.name if order.supplier
@@ -141,6 +171,7 @@ def merchant_orders_updates_api(request, merchant_id):
                     "quantity": float(item.quantity),
                     "price": float(item.price),
                     "buy_price": float(item.buy_price or 0),
+                    "warehouse": (item.warehouse.access_id if item.warehouse else None),
                     "direction": item.direction
                 }
                 for item in items
@@ -232,11 +263,21 @@ def create_order_from_access(request):
         return JsonResponse({"error": "POST only"}, status=405)
 
     try:
-        data = json.loads(request.body.decode("utf-8"))
+        try:
+            payload = request.body.decode("utf-8")
+        except UnicodeDecodeError:
+            # Access/VBA clients may send cp1256-encoded JSON.
+            payload = request.body.decode("cp1256", errors="strict")
+        data = json.loads(payload)
 
         merchant_id = data.get("store")
         invoice_no = data.get("rkmfatora")  # ID من Access
         name = data.get("asm", "").strip()
+        sales_user_name = (
+            data.get("asmbaea")
+            or data.get("asmbaie")  # legacy/mistyped key fallback
+            or ""
+        ).strip()
         noaf = int(data.get("noaf"))
         created_at_str = data.get("tarek")
         amount = data.get("egmale", 0)
@@ -248,6 +289,21 @@ def create_order_from_access(request):
         store = Store.objects.filter(id=merchant_id).first()
         if not store:
             return JsonResponse({"error": "store not found"}, status=404)
+
+        warehouse = _resolve_warehouse_from_access_payload(data, store)
+
+        created_by_store_user = None
+        sales_user_name_present = bool(sales_user_name)
+        if sales_user_name_present:
+            key = sales_user_name.strip().lower()
+            # If Access sends manager, keep the field empty as requested.
+            if key in {"المدير", "المدير العام", "admin"}:
+                created_by_store_user = None
+            else:
+                created_by_store_user = StoreUser.objects.filter(
+                    store=store,
+                    name__iexact=sales_user_name,
+                ).first()
 
         try:
             invoice_no_int = int(invoice_no) if invoice_no not in ("", None) else None
@@ -285,12 +341,16 @@ def create_order_from_access(request):
         if existing_order:
             existing_order.customer = customer
             existing_order.supplier = supplier
+            existing_order.warehouse = warehouse
             existing_order.created_at = created_at
             existing_order.amount = amount
             existing_order.document_kind = document_kind
             existing_order.transaction_type = transaction_type
             existing_order.payment = payment
             existing_order.discount = discount
+            if sales_user_name_present:
+                # Set explicitly (can be None) to support clearing when Access sends manager.
+                existing_order.created_by_store_user = created_by_store_user
             existing_order.is_seen_by_store = True
             existing_order.status = "confirmed"
             existing_order._skip_update_time_touch = True
@@ -311,12 +371,14 @@ def create_order_from_access(request):
             accounting_invoice_number=invoice_no_int,
             customer=customer,
             supplier=supplier,
+            warehouse=warehouse,
             created_at=created_at,
             amount=amount,
             document_kind=document_kind,
             transaction_type=transaction_type,
             payment=payment,
             discount=discount,
+            created_by_store_user=created_by_store_user,
             is_seen_by_store=True,
             status="confirmed",
         )
@@ -345,7 +407,11 @@ def create_order_item_from_access(request):
         return JsonResponse({"error": "POST only"}, status=405)
 
     try:
-        data = json.loads(request.body.decode("utf-8"))
+        try:
+            payload = request.body.decode("utf-8")
+        except UnicodeDecodeError:
+            payload = request.body.decode("cp1256", errors="strict")
+        data = json.loads(payload)
 
         order_id = data.get("order_id")
         access_id = data.get("access_id")
@@ -354,6 +420,8 @@ def create_order_item_from_access(request):
         order = Order.objects.filter(id=order_id).first()
         if not order:
             return JsonResponse({"error": "order not found"})
+
+        warehouse = _resolve_warehouse_from_access_payload(data, order.store) or order.warehouse
 
         product = Product.objects.filter(store=order.store, name=product_name).first()
         if not product:
@@ -384,6 +452,7 @@ def create_order_item_from_access(request):
                 existing_item.direction = direction
                 existing_item.buy_price = buy_price
                 existing_item.price = price
+                existing_item.warehouse = warehouse
                 if existing_item.order_id != order.id:
                     existing_item.order = order
                 existing_item._skip_update_time_touch = True
@@ -423,6 +492,7 @@ def create_order_item_from_access(request):
             direction=direction,
             buy_price=buy_price,
             price=price,
+            warehouse=warehouse,
         )
         order_item._skip_update_time_touch = True
         order_item.save()
@@ -442,6 +512,7 @@ def create_order_item_from_access(request):
                     direction=direction,
                     buy_price=buy_price,
                     price=price,
+                    warehouse=warehouse,
                     update_time=None,
                 )
                 order_item.id = keep_id

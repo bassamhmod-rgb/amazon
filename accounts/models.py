@@ -1,8 +1,11 @@
 ﻿from django.db import models
-from stores.models import Store
+from stores.models import Store, Warehouse
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.contrib.auth.hashers import check_password as django_check_password, make_password
+from django.contrib.auth.models import User
+from django.db import IntegrityError, transaction
 import time
 
 
@@ -22,6 +25,122 @@ def normalize_phone_number(value):
     if not phone:
         return ""
     return phone.lstrip("0") or "0"
+
+
+def default_store_user_permissions():
+    return {
+        "sales_orders": False,
+        "purchase_orders": False,
+        "products": False,
+    }
+
+
+class StoreUser(models.Model):
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="store_users")
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
+
+    auth_user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="store_user_profile",
+    )
+
+    identifier = models.CharField(max_length=50)
+    name = models.CharField(max_length=150)
+
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="store_users",
+    )
+
+    password = models.CharField(max_length=128, blank=True, default="")
+    permissions = models.JSONField(default=default_store_user_permissions)
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store", "name"],
+                name="unique_store_user_name_per_store",
+            ),
+            models.UniqueConstraint(
+                fields=["store", "identifier"],
+                name="unique_store_user_identifier_per_store",
+            ),
+        ]
+        ordering = ["store_id", "name"]
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        super().save(*args, **kwargs)
+        if self.auth_user_id:
+            self._sync_auth_user()
+        else:
+            self._ensure_auth_user()
+        return None
+
+    def __str__(self):
+        return f"{self.store} - {self.name} ({self.identifier})"
+
+    def set_password(self, raw_password):
+        self.password = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        if not self.password:
+            return False
+        return django_check_password(raw_password, self.password)
+
+    def _build_auth_username(self):
+        ident = (self.identifier or "").strip().replace(" ", "_")
+        return f"su:{self.store_id}:{ident}".lower()[:150]
+
+    def _ensure_auth_user(self):
+        if self.auth_user_id or not self.password:
+            return
+
+        username = self._build_auth_username()
+        try:
+            with transaction.atomic():
+                self.auth_user = User.objects.create(
+                    username=username,
+                    password=self.password,
+                    is_active=self.is_active,
+                )
+        except IntegrityError:
+            # IntegrityError inside an atomic block marks the transaction as broken until rollback.
+            # Use a fresh atomic block for the fallback username.
+            with transaction.atomic():
+                self.auth_user = User.objects.create(
+                    username=f"{username}:{self.pk}",
+                    password=self.password,
+                    is_active=self.is_active,
+                )
+
+        StoreUser.objects.filter(pk=self.pk).update(auth_user=self.auth_user)
+
+    def _sync_auth_user(self):
+        auth_user = User.objects.filter(pk=self.auth_user_id).first()
+        if not auth_user:
+            return
+
+        update_fields = []
+        if self.password and auth_user.password != self.password:
+            auth_user.password = self.password
+            update_fields.append("password")
+        if auth_user.is_active != self.is_active:
+            auth_user.is_active = self.is_active
+            update_fields.append("is_active")
+
+        if update_fields:
+            auth_user.save(update_fields=update_fields)
 
 class Customer(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE)

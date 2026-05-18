@@ -1,12 +1,13 @@
-import time
+﻿import time
 
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
-from accounts.models import Customer, DeleteSync, PointsTransaction, Supplier
+from accounts.models import Customer, DeleteSync, PointsTransaction, Supplier, StoreUser
 from dashboard.models import Expense
 from orders.models import Order, OrderItem
 from products.models import Category, Product
+from stores.models import Warehouse
 
 
 def _log_store_delete(instance, access_record_id, access_table_name):
@@ -67,3 +68,13 @@ def log_points_delete(sender, instance, **kwargs):
 @receiver(pre_delete, sender=Expense)
 def log_expense_delete(sender, instance, **kwargs):
     _log_store_delete(instance, instance.access_id, "الصرفيات")
+
+
+@receiver(pre_delete, sender=Warehouse)
+def log_warehouse_delete(sender, instance, **kwargs):
+    _log_store_delete(instance, instance.access_id, "mndob")
+
+
+@receiver(pre_delete, sender=StoreUser)
+def log_store_user_delete(sender, instance, **kwargs):
+    _log_store_delete(instance, instance.access_id, "mror")

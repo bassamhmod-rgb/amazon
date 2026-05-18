@@ -3,6 +3,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponse
+from django.http import Http404
 import csv
 import codecs
 import io
@@ -20,9 +21,11 @@ from products.utils import fix_missing_buy_price_for_product, apply_purchase_pri
 # --- استيراد المودلز من التطبيقات المختلفة ---
 from products.models import Category, Product
 from products.forms import CategoryForm, ProductForm
-from stores.models import Store, StorePaymentMethod
+from stores.models import Store, StorePaymentMethod, Warehouse
+from stores.forms import WarehouseForm
 from orders.models import Order, OrderItem
-from accounts.models import PointsTransaction, AccountingClient, SystemNotification, DeleteSync
+from accounts.models import PointsTransaction, AccountingClient, SystemNotification, DeleteSync, StoreUser
+from accounts.store_user_forms import StoreUserForm
 from cart.models import Cart
 from loyalty.models import LoyaltyPoints
 
@@ -54,6 +57,179 @@ from stores.models import Store
 from products.models import Product, Category
 from orders.models import OrderItem
 
+
+def _current_warehouse_for_request(request, store):
+    store_user_id = request.session.get("store_user_id")
+    if store_user_id:
+        su = (
+            StoreUser.objects.filter(pk=store_user_id, store=store, is_active=True)
+            .select_related("warehouse")
+            .first()
+        )
+        if su and su.warehouse_id:
+            return su.warehouse
+    return Warehouse.objects.filter(store=store, is_main=True).first()
+
+
+def _get_store_for_dashboard(request, store_slug):
+    store = Store.objects.filter(slug=store_slug).first()
+    if not store:
+        raise Http404
+
+    if store.owner_id == request.user.id:
+        return store
+
+    store_user_id = request.session.get("store_user_id")
+    if store_user_id:
+        su = StoreUser.objects.filter(
+            pk=store_user_id,
+            auth_user=request.user,
+            store=store,
+            is_active=True,
+        ).first()
+        if su:
+            return store
+
+    raise Http404
+
+
+def _is_store_owner(request, store):
+    return store.owner_id == request.user.id
+
+
+def _enforce_order_owner_for_store_user(request, store, order, store_slug):
+    if _is_store_owner(request, store):
+        return None
+    # store user: only allowed to access own orders
+    if order.created_by_id != request.user.id:
+        messages.error(request, "لا تملك صلاحية تعديل/عرض فواتير مستخدم آخر.")
+        return redirect("dashboard:orders_list", store_slug=store_slug)
+    return None
+
+
+@login_required
+def warehouses_list(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    warehouses = Warehouse.objects.filter(store=store).order_by("-is_main", "name", "id")
+    return render(
+        request,
+        "dashboard/warehouses_list.html",
+        {"store": store, "warehouses": warehouses},
+    )
+
+
+@login_required
+def warehouse_create(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    if request.method == "POST":
+        form = WarehouseForm(request.POST)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.store = store
+            obj.save()
+            messages.success(request, "تم إضافة المستودع.")
+            return redirect("dashboard:warehouses_list", store_slug=store.slug)
+    else:
+        form = WarehouseForm()
+    return render(
+        request,
+        "dashboard/warehouse_form.html",
+        {"store": store, "form": form, "title": "إضافة مستودع"},
+    )
+
+
+@login_required
+def warehouse_update(request, store_slug, warehouse_id):
+    store = _get_store_for_dashboard(request, store_slug)
+    warehouse = get_object_or_404(Warehouse, pk=warehouse_id, store=store)
+    if request.method == "POST":
+        form = WarehouseForm(request.POST, instance=warehouse)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "تم تعديل المستودع.")
+            return redirect("dashboard:warehouses_list", store_slug=store.slug)
+    else:
+        form = WarehouseForm(instance=warehouse)
+    return render(
+        request,
+        "dashboard/warehouse_form.html",
+        {"store": store, "form": form, "warehouse": warehouse, "title": "تعديل مستودع"},
+    )
+
+
+@login_required
+@require_POST
+def warehouse_delete(request, store_slug, warehouse_id):
+    store = _get_store_for_dashboard(request, store_slug)
+    warehouse = get_object_or_404(Warehouse, pk=warehouse_id, store=store)
+    try:
+        warehouse.delete()
+        messages.success(request, "تم حذف المستودع.")
+    except Exception as exc:
+        messages.error(request, str(exc))
+    return redirect("dashboard:warehouses_list", store_slug=store.slug)
+
+
+@login_required
+def store_users_list(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    users = StoreUser.objects.filter(store=store).order_by("name", "id")
+    return render(
+        request,
+        "dashboard/store_users_list.html",
+        {"store": store, "users": users},
+    )
+
+
+@login_required
+def store_user_create(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    warehouses_qs = Warehouse.objects.filter(store=store).order_by("-is_main", "name", "id")
+    if request.method == "POST":
+        form = StoreUserForm(request.POST, warehouses_qs=warehouses_qs)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.store = store
+            obj.save()
+            messages.success(request, "تم إضافة المستخدم.")
+            return redirect("dashboard:store_users_list", store_slug=store.slug)
+    else:
+        form = StoreUserForm(warehouses_qs=warehouses_qs)
+    return render(
+        request,
+        "dashboard/store_user_form.html",
+        {"store": store, "form": form, "title": "إضافة مستخدم"},
+    )
+
+
+@login_required
+def store_user_update(request, store_slug, user_id):
+    store = _get_store_for_dashboard(request, store_slug)
+    obj = get_object_or_404(StoreUser, pk=user_id, store=store)
+    warehouses_qs = Warehouse.objects.filter(store=store).order_by("-is_main", "name", "id")
+    if request.method == "POST":
+        form = StoreUserForm(request.POST, instance=obj, warehouses_qs=warehouses_qs)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "تم تعديل المستخدم.")
+            return redirect("dashboard:store_users_list", store_slug=store.slug)
+    else:
+        form = StoreUserForm(instance=obj, warehouses_qs=warehouses_qs)
+    return render(
+        request,
+        "dashboard/store_user_form.html",
+        {"store": store, "form": form, "obj": obj, "title": "تعديل مستخدم"},
+    )
+
+
+@login_required
+@require_POST
+def store_user_delete(request, store_slug, user_id):
+    store = _get_store_for_dashboard(request, store_slug)
+    obj = get_object_or_404(StoreUser, pk=user_id, store=store)
+    obj.delete()
+    messages.success(request, "تم حذف المستخدم.")
+    return redirect("dashboard:store_users_list", store_slug=store.slug)
 
 
 def _is_store_access_linked(store):
@@ -100,7 +276,7 @@ HIDDEN_CATEGORY_NAMES_IN_LISTS = [
 
 @login_required
 def dashboard_home(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     # 🔴 عدد الطلبات الجديدة (اللي لسا ما شافها صاحب المتجر)
     new_orders_count = Order.objects.filter(
@@ -132,7 +308,7 @@ def dashboard_home(request, store_slug):
 # 🔹 قائمة المنتجات مع بحث + تصفية + Pagination
 @login_required
 def products_list(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     movement_expr = ExpressionWrapper(
         F("order_items__quantity") * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
         output_field=DecimalField(max_digits=12, decimal_places=2)
@@ -209,7 +385,7 @@ def products_list(request, store_slug):
 # 🔹 إضافة منتج جديد
 @login_required
 def product_create(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
         form = ProductForm(request.POST, request.FILES, store=store)
@@ -264,7 +440,7 @@ def product_create(request, store_slug):
 # 🔹 تعديل منتج
 @login_required
 def product_update(request, store_slug, product_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     product = get_object_or_404(Product, id=product_id, store=store)
 
     if request.method == "POST":
@@ -365,7 +541,7 @@ def product_delete(request, store_slug, product_id):
 
 #تفاصيل المنتج
 def product_detail(request, store_slug, product_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     product = get_object_or_404(Product, id=product_id, store=store)
 
     return render(request, 'dashboard/product_detail.html', {
@@ -376,7 +552,7 @@ def product_detail(request, store_slug, product_id):
 #ادارة الفئات
 #عرض
 def categories_list(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     categories = Category.objects.filter(store=store).exclude(name__in=HIDDEN_CATEGORY_NAMES_IN_LISTS)
 
     return render(request, 'dashboard/categories_list.html', {
@@ -387,7 +563,7 @@ def categories_list(request, store_slug):
 # اضافة
 @login_required
 def add_category(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
         name = request.POST.get("name")
@@ -413,7 +589,7 @@ def add_category(request, store_slug):
 
 @login_required
 def edit_category(request, store_slug, category_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     category = get_object_or_404(Category, id=category_id, store=store)
 
     if request.method == "POST":
@@ -449,14 +625,14 @@ def edit_category(request, store_slug, category_id):
 #حذف فئة
 @login_required
 # def delete_category(request, store_slug, category_id):
-#     store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+#     store = _get_store_for_dashboard(request, store_slug)
 #     category = get_object_or_404(Category, id=category_id, store=store)
 
 #     # حذف مباشر بدون صفحة
 #     category.delete()
 #     return redirect("dashboard:categories_list", store_slug=store.slug)
 def delete_category(request, store_slug, category_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     category = get_object_or_404(Category, id=category_id, store=store)
 
     if request.method == "POST":
@@ -495,8 +671,11 @@ def delete_category(request, store_slug, category_id):
 #حذف
 @login_required
 def delete_order(request, store_slug, order_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     order = get_object_or_404(Order, id=order_id, store=store)
+    denied = _enforce_order_owner_for_store_user(request, store, order, store_slug)
+    if denied:
+        return denied
 
     if request.method == "POST":
         order.delete()
@@ -511,8 +690,11 @@ def delete_order(request, store_slug, order_id):
 #تفاصيل الطلب
 @login_required
 def order_detail_dashboard(request, store_slug, order_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     order = get_object_or_404(Order, id=order_id, store=store)
+    denied = _enforce_order_owner_for_store_user(request, store, order, store_slug)
+    if denied:
+        return denied
 
     # ⭐ حساب النسبة والمبلغ المقترَح للدفع المسبق
     required_percent = store.payment_required_percentage or 0
@@ -575,8 +757,11 @@ def order_detail_dashboard(request, store_slug, order_id):
 @require_POST
 @login_required
 def confirm_order(request, store_slug, order_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     order = get_object_or_404(Order, id=order_id, store=store)
+    denied = _enforce_order_owner_for_store_user(request, store, order, store_slug)
+    if denied:
+        return denied
 
     if order.status != "pending":
         return redirect("dashboard:order_detail_dashboard", store_slug=store.slug, order_id=order.id)
@@ -648,7 +833,7 @@ def _to_decimal(val, default="0"):
 
 @login_required
 def order_create(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
 
@@ -680,10 +865,24 @@ def order_create(request, store_slug):
         status = "confirmed"
         discount_value = _to_decimal(request.POST.get("discount", 0))
         payment_value = _to_decimal(request.POST.get("payment", 0))
+        warehouse = _current_warehouse_for_request(request, store)
 
         # 3) إنشاء الطلب
+        store_user = None
+        store_user_id = request.session.get("store_user_id")
+        if store_user_id:
+            store_user = StoreUser.objects.filter(
+                id=store_user_id,
+                store=store,
+                auth_user=request.user,
+                is_active=True,
+            ).first()
+
         order = Order.objects.create(
             store=store,
+            warehouse=warehouse,
+            created_by=request.user,
+            created_by_store_user=store_user,
             transaction_type=transaction_type,
             customer=customer if transaction_type == "sale" else None,
             supplier=supplier if transaction_type == "purchase" else None,
@@ -718,6 +917,7 @@ def order_create(request, store_slug):
                     quantity=qty,
                     direction=-1,
                     buy_price=buy_price,
+                    warehouse=order.warehouse,
                 )
 
                 # الربح = (سعر البيع - سعر الشراء) * الكمية
@@ -731,6 +931,7 @@ def order_create(request, store_slug):
                     quantity=qty,
                     direction=1,
                     buy_price=price,
+                    warehouse=order.warehouse,
                 )
                 purchase_product_prices[product.id] = (product, price)
 
@@ -780,8 +981,11 @@ def order_create(request, store_slug):
 # تعديل الطلب (بيع + شراء) — بدون حقول supplier
 @login_required
 def order_update(request, store_slug, order_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     order = get_object_or_404(Order, id=order_id, store=store)
+    denied = _enforce_order_owner_for_store_user(request, store, order, store_slug)
+    if denied:
+        return denied
     new_orders_count = Order.objects.filter(store=store, is_seen_by_store=False).count()
 
     if request.method == "POST":
@@ -804,6 +1008,9 @@ def order_update(request, store_slug, order_id):
             supplier_id = request.POST.get("supplier_id")
             order.supplier_id = supplier_id if supplier_id else None
             order.customer = None  # ← مهم جداً
+
+        if not order.warehouse_id:
+            order.warehouse = _current_warehouse_for_request(request, store)
 
         order.save()
 
@@ -846,12 +1053,14 @@ def order_update(request, store_slug, order_id):
                     existing_item.direction != direction or
                     existing_item.buy_price != buy_price
                 )
-                if changed:
+                if changed or (order.warehouse_id and existing_item.warehouse_id is None):
                     existing_item.product = product
                     existing_item.price = price
                     existing_item.quantity = qty
                     existing_item.direction = direction
                     existing_item.buy_price = buy_price
+                    if order.warehouse_id and existing_item.warehouse_id is None:
+                        existing_item.warehouse_id = order.warehouse_id
                     existing_item.save()
             else:
                 new_item = OrderItem.objects.create(
@@ -861,6 +1070,7 @@ def order_update(request, store_slug, order_id):
                     quantity=qty,
                     direction=direction,
                     buy_price=buy_price,
+                    warehouse=order.warehouse,
                 )
                 kept_item_ids.add(new_item.id)
 
@@ -890,7 +1100,7 @@ def order_update(request, store_slug, order_id):
 # قائمة الطلبات
 @login_required
 def orders_list(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     status = request.GET.get("status", "")
     order_id = request.GET.get("order_id", "")
@@ -1014,7 +1224,7 @@ def search_suppliers(request, store_slug):
 #العرض
 @login_required
 def notices_list(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     notices = Order.objects.filter(
         store=store,
@@ -1057,7 +1267,7 @@ def notices_list(request, store_slug):
 #للفلترة
 @login_required
 def notices_filter(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     notices = Order.objects.filter(
         store=store,
@@ -1099,7 +1309,7 @@ from decimal import Decimal, InvalidOperation
 @login_required
 @login_required
 def notice_create(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
         # ===== نوع العملية =====
@@ -1150,6 +1360,16 @@ def notice_create(request, store_slug):
             return redirect("dashboard:notice_create", store_slug=store.slug)
 
         # ===== إنشاء الإشعار =====
+        store_user = None
+        store_user_id = request.session.get("store_user_id")
+        if store_user_id:
+            store_user = StoreUser.objects.filter(
+                id=store_user_id,
+                store=store,
+                auth_user=request.user,
+                is_active=True,
+            ).first()
+
         Order.objects.create(
             store=store,
             document_kind=2,
@@ -1160,6 +1380,8 @@ def notice_create(request, store_slug):
             discount=Decimal("0"),
             payment=payment,
             status="confirmed",
+            created_by=request.user,
+            created_by_store_user=store_user,
         )
 
         messages.success(request, "تم إنشاء الإشعار بنجاح.")
@@ -1172,7 +1394,7 @@ def notice_create(request, store_slug):
 
 @login_required
 def notice_delete(request, store_slug, notice_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     notice = get_object_or_404(
         Order,
@@ -1190,7 +1412,7 @@ def notice_delete(request, store_slug, notice_id):
 
 @login_required
 def expenses_list(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     expense_types = ExpenseType.objects.filter(store=store).order_by("name")
     expense_reasons = ExpenseReason.objects.filter(store=store).order_by("name")
@@ -1287,7 +1509,7 @@ def expenses_list(request, store_slug):
 
 @login_required
 def expense_edit(request, store_slug, expense_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     expense = get_object_or_404(Expense, id=expense_id, store=store)
 
     expense_types = ExpenseType.objects.filter(store=store).order_by("name")
@@ -1339,7 +1561,7 @@ def expense_edit(request, store_slug, expense_id):
 
 @login_required
 def expense_delete(request, store_slug, expense_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     expense = get_object_or_404(Expense, id=expense_id, store=store)
 
     if request.method == "POST":
@@ -1351,7 +1573,7 @@ def expense_delete(request, store_slug, expense_id):
 
 @login_required
 def expense_settings(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -1433,7 +1655,7 @@ def expense_settings(request, store_slug):
 
 @login_required
 def suppliers_list(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     suppliers = Supplier.objects.filter(store=store).exclude(name__in=HIDDEN_SUPPLIER_NAMES_IN_LISTS)
     q = (request.GET.get("q") or "").strip()
     if q:
@@ -1454,7 +1676,7 @@ def suppliers_list(request, store_slug):
 
 @login_required
 def customers_list(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     customers = Customer.objects.filter(store=store).exclude(name__in=HIDDEN_CUSTOMER_NAMES_IN_LISTS)
     q = (request.GET.get("q") or "").strip()
     if q:
@@ -1475,7 +1697,7 @@ def customers_list(request, store_slug):
 
 @login_required
 def customer_create(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
         name = request.POST.get("name")
@@ -1508,7 +1730,7 @@ def customer_create(request, store_slug):
 
 @login_required
 def customer_update(request, store_slug, customer_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     customer = get_object_or_404(Customer, id=customer_id, store=store)
 
     if request.method == "POST":
@@ -1565,7 +1787,7 @@ def customer_update(request, store_slug, customer_id):
 
 @login_required
 def delete_customer(request, store_slug, customer_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     customer = get_object_or_404(Customer, id=customer_id, store=store)
 
     if request.method == "POST":
@@ -1661,7 +1883,7 @@ def points_page(request, store_slug):
 
 @login_required
 def delete_points_transaction(request, store_slug, transaction_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     transaction = get_object_or_404(
         PointsTransaction,
@@ -1783,7 +2005,7 @@ def store_settings(request, store_slug):
 
 @login_required
 def reset_store_data(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     if request.method != "POST":
         return redirect(f"/dashboard/{store.slug}/settings/")
@@ -1800,6 +2022,11 @@ def _perform_store_reset(request, store):
         return redirect(f"/dashboard/{store.slug}/settings/")
 
     with transaction.atomic():
+        main_warehouse_id = (
+            Warehouse.objects.filter(store=store, is_main=True)
+            .values_list("id", flat=True)
+            .first()
+        )
         delete_sync_targets = {
             "accounts.Supplier": list(Supplier.objects.filter(store=store).values_list("id", flat=True)),
             "accounts.Customer": list(Customer.objects.filter(store=store).values_list("id", flat=True)),
@@ -1813,6 +2040,10 @@ def _perform_store_reset(request, store):
                 PointsTransaction.objects.filter(customer__store=store).values_list("id", flat=True)
             ),
             "dashboard.Expense": list(Expense.objects.filter(store=store).values_list("id", flat=True)),
+            "stores.Warehouse": list(
+                Warehouse.objects.filter(store=store).exclude(id=main_warehouse_id).values_list("id", flat=True)
+            ),
+            "accounts.StoreUser": list(StoreUser.objects.filter(store=store).values_list("id", flat=True)),
         }
 
         Order.objects.filter(store=store).delete()
@@ -1830,6 +2061,10 @@ def _perform_store_reset(request, store):
         Expense.objects.filter(store=store).delete()
         ExpenseReason.objects.filter(store=store).delete()
         ExpenseType.objects.filter(store=store).delete()
+
+        # Clear store users and warehouses, but keep the main warehouse record.
+        StoreUser.objects.filter(store=store).delete()
+        Warehouse.objects.filter(store=store).exclude(id=main_warehouse_id).delete()
 
         AccountingClient.objects.filter(store=store).delete()
         SystemNotification.objects.filter(target_store=store).delete()
@@ -1857,11 +2092,14 @@ def _perform_store_reset(request, store):
             access_table_name=DeleteSync.RESET_MARKER_TABLE,
         )
 
-    messages.success(request, "تم تفريغ بيانات المتجر بنجاح (مع الاحتفاظ ببيانات المتجر).")
+    messages.success(
+        request,
+        "تم تفريغ بيانات المتجر بنجاح (مع الاحتفاظ ببيانات المتجر والمستودع الرئيسي).",
+    )
     return redirect(f"/dashboard/{store.slug}/settings/")
 
 def balances_report(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     customers = list(Customer.objects.filter(store=store).order_by("name"))
     suppliers = list(Supplier.objects.filter(store=store).order_by("name"))
@@ -1942,7 +2180,7 @@ def balances_report(request, store_slug):
 
 @login_required
 def profits_report(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     negative_stock_count = (
         Product.objects
@@ -2059,7 +2297,7 @@ def profits_report(request, store_slug):
 
 @login_required
 def supplier_create(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
@@ -2098,7 +2336,7 @@ def supplier_create(request, store_slug):
 
 @login_required
 def supplier_update(request, store_slug, supplier_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     supplier = get_object_or_404(Supplier, id=supplier_id, store=store)
 
     if request.method == "POST":
@@ -2165,7 +2403,7 @@ def supplier_update(request, store_slug, supplier_id):
 #حذف مورد
 @login_required
 def delete_supplier(request, store_slug, supplier_id):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
     supplier = get_object_or_404(Supplier, id=supplier_id, store=store)
 
     if request.method == "POST":
@@ -2200,7 +2438,7 @@ def delete_supplier(request, store_slug, supplier_id):
 import json
 @login_required
 def cashback_preview(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     data = json.loads(request.body)
     total_cashback = Decimal("0")
@@ -2240,7 +2478,7 @@ from django.db.models.functions import Coalesce, Cast
 
 @login_required
 def inventory_list(request, store_slug):
-    store = get_object_or_404(Store, slug=store_slug, owner=request.user)
+    store = _get_store_for_dashboard(request, store_slug)
 
     # 🔹 آخر سعر شراء لكل منتج
     last_buy_price_qs = OrderItem.objects.filter(
@@ -2438,3 +2676,4 @@ def inventory_list(request, store_slug):
     }
 
     return render(request, "dashboard/inventory_list.html", context)
+

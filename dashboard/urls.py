@@ -14,6 +14,34 @@ urlpatterns = [
     path("<slug:store_slug>/products/<int:product_id>/delete/", views.product_delete, name="product_delete"),
     path("products/gallery/<int:image_id>/delete/", views.delete_gallery_image, name="delete_gallery_image"),
 
+    # 🏬 المستودعات
+    path("<slug:store_slug>/products/warehouses/", views.warehouses_list, name="warehouses_list"),
+    path("<slug:store_slug>/products/warehouses/add/", views.warehouse_create, name="warehouse_create"),
+    path(
+        "<slug:store_slug>/products/warehouses/<int:warehouse_id>/edit/",
+        views.warehouse_update,
+        name="warehouse_update",
+    ),
+    path(
+        "<slug:store_slug>/products/warehouses/<int:warehouse_id>/delete/",
+        views.warehouse_delete,
+        name="warehouse_delete",
+    ),
+
+    # 👤 المستخدمين
+    path("<slug:store_slug>/products/users/", views.store_users_list, name="store_users_list"),
+    path("<slug:store_slug>/products/users/add/", views.store_user_create, name="store_user_create"),
+    path(
+        "<slug:store_slug>/products/users/<int:user_id>/edit/",
+        views.store_user_update,
+        name="store_user_update",
+    ),
+    path(
+        "<slug:store_slug>/products/users/<int:user_id>/delete/",
+        views.store_user_delete,
+        name="store_user_delete",
+    ),
+
 # ادارة الفئات
     path('<slug:store_slug>/categories/', views.categories_list, name='categories_list'),
     path('<slug:store_slug>/categories/add/', views.add_category, name='add_category'),

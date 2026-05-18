@@ -1,6 +1,7 @@
 #للاشعارات
 from django.contrib import admin
-from .models import AccountingClient, SystemNotification
+from .models import AccountingClient, SystemNotification, StoreUser
+
 
 @admin.register(AccountingClient)
 class AccountingClientAdmin(admin.ModelAdmin):
@@ -84,3 +85,10 @@ class AppUpdateAdmin(admin.ModelAdmin):
     )
 
     readonly_fields = ("updated_at",)
+
+
+@admin.register(StoreUser)
+class StoreUserAdmin(admin.ModelAdmin):
+    list_display = ("name", "store", "identifier", "warehouse", "is_active", "update_time", "access_id")
+    search_fields = ("name", "identifier", "store__name", "warehouse__name")
+    list_filter = ("store", "warehouse", "is_active")

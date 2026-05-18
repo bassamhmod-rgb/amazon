@@ -4392,3 +4392,437 @@ Internal Server Error: /orders/api/create_order_from_access/
 "POST /orders/api/create_order_from_access/ HTTP/1.1" 500 56
 Internal Server Error: /orders/api/create_order_from_access/
 "POST /orders/api/create_order_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /dashboard/Alaman/products/warehouses/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 61, in render
+    return self.template.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 175, in render
+    return self._render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 167, in _render
+    return self.nodelist.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 1005, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 1005, in <listcomp>
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 966, in render_annotated
+    return self.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader_tags.py", line 132, in render
+    compiled_parent = self.get_parent(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader_tags.py", line 129, in get_parent
+    return self.find_template(parent, context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader_tags.py", line 107, in find_template
+    template, origin = context.template.engine.find_template(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 161, in find_template
+    raise TemplateDoesNotExist(name, tried=tried)
+django.template.exceptions.TemplateDoesNotExist: dashboard/base.html
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 216, in warehouses_list
+    return render(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 62, in render_to_string
+    return template.render(context, request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 63, in render
+    reraise(exc, self.backend)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 84, in reraise
+    raise new from exc
+django.template.exceptions.TemplateDoesNotExist: dashboard/base.html
+"GET /dashboard/Alaman/products/warehouses/ HTTP/1.1" 500 145
+Internal Server Error: /dashboard/Alaman/products/warehouses/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 61, in render
+    return self.template.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 175, in render
+    return self._render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 167, in _render
+    return self.nodelist.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 1005, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 1005, in <listcomp>
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 966, in render_annotated
+    return self.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader_tags.py", line 132, in render
+    compiled_parent = self.get_parent(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader_tags.py", line 129, in get_parent
+    return self.find_template(parent, context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader_tags.py", line 107, in find_template
+    template, origin = context.template.engine.find_template(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 161, in find_template
+    raise TemplateDoesNotExist(name, tried=tried)
+django.template.exceptions.TemplateDoesNotExist: dashboard/base.html
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 216, in warehouses_list
+    return render(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 62, in render_to_string
+    return template.render(context, request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 63, in render
+    reraise(exc, self.backend)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 84, in reraise
+    raise new from exc
+django.template.exceptions.TemplateDoesNotExist: dashboard/base.html
+"GET /dashboard/Alaman/products/warehouses/ HTTP/1.1" 500 139383
+Internal Server Error: /dashboard/Alaman/orders/1982/edit/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\sqlite3\base.py", line 328, in execute
+    return super().execute(query, params)
+sqlite3.OperationalError: no such column: orders_order.warehouse_id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 925, in order_update
+    order = get_object_or_404(Order, id=order_id, store=store)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 85, in get_object_or_404
+    return queryset.get(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 633, in get
+    num = len(clone)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 380, in __len__
+    self._fetch_all()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1881, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 91, in __iter__
+    results = compiler.execute_sql(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1562, in execute_sql
+    cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 102, in execute
+    return super().execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 67, in execute
+    return self._execute_with_wrappers(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 80, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\sqlite3\base.py", line 328, in execute
+    return super().execute(query, params)
+django.db.utils.OperationalError: no such column: orders_order.warehouse_id
+"GET /dashboard/Alaman/orders/1982/edit/ HTTP/1.1" 500 150879
+Internal Server Error: /dashboard/Alaman/orders/1982/edit/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\sqlite3\base.py", line 328, in execute
+    return super().execute(query, params)
+sqlite3.OperationalError: no such column: orders_order.warehouse_id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 925, in order_update
+    order = get_object_or_404(Order, id=order_id, store=store)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 85, in get_object_or_404
+    return queryset.get(*args, **kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 633, in get
+    num = len(clone)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 380, in __len__
+    self._fetch_all()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1881, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 91, in __iter__
+    results = compiler.execute_sql(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1562, in execute_sql
+    cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 102, in execute
+    return super().execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 67, in execute
+    return self._execute_with_wrappers(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 80, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\sqlite3\base.py", line 328, in execute
+    return super().execute(query, params)
+django.db.utils.OperationalError: no such column: orders_order.warehouse_id
+"GET /dashboard/Alaman/orders/1982/edit/ HTTP/1.1" 500 150742
+Internal Server Error: /dashboard/Alaman/orders/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\sqlite3\base.py", line 328, in execute
+    return super().execute(query, params)
+sqlite3.OperationalError: no such column: orders_order.created_by_store_user_id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1145, in orders_list
+    return render(request, "dashboard/orders_list.html", context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 62, in render_to_string
+    return template.render(context, request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 61, in render
+    return self.template.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 175, in render
+    return self._render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 167, in _render
+    return self.nodelist.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 1005, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 1005, in <listcomp>
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 966, in render_annotated
+    return self.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\defaulttags.py", line 194, in render
+    len_values = len(values)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 380, in __len__
+    self._fetch_all()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1881, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 91, in __iter__
+    results = compiler.execute_sql(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1562, in execute_sql
+    cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 102, in execute
+    return super().execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 67, in execute
+    return self._execute_with_wrappers(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 80, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\sqlite3\base.py", line 328, in execute
+    return super().execute(query, params)
+django.db.utils.OperationalError: no such column: orders_order.created_by_store_user_id
+"GET /dashboard/Alaman/orders/?order_id=1986&status=&transaction_type= HTTP/1.1" 500 189507
+Internal Server Error: /dashboard/Alaman/orders/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\sqlite3\base.py", line 328, in execute
+    return super().execute(query, params)
+sqlite3.OperationalError: no such column: orders_order.created_by_store_user_id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 1145, in orders_list
+    return render(request, "dashboard/orders_list.html", context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 62, in render_to_string
+    return template.render(context, request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 61, in render
+    return self.template.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 175, in render
+    return self._render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 167, in _render
+    return self.nodelist.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 1005, in render
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 1005, in <listcomp>
+    return SafeString("".join([node.render_annotated(context) for node in self]))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\base.py", line 966, in render_annotated
+    return self.render(context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\defaulttags.py", line 194, in render
+    len_values = len(values)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 380, in __len__
+    self._fetch_all()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 1881, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\query.py", line 91, in __iter__
+    results = compiler.execute_sql(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\models\sql\compiler.py", line 1562, in execute_sql
+    cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 102, in execute
+    return super().execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 67, in execute
+    return self._execute_with_wrappers(
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 80, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\db\backends\sqlite3\base.py", line 328, in execute
+    return super().execute(query, params)
+django.db.utils.OperationalError: no such column: orders_order.created_by_store_user_id
+"GET /dashboard/Alaman/orders/?order_id=1986&status=&transaction_type= HTTP/1.1" 500 189644
+Internal Server Error: /dashboard/Alaman/dashboard/order/1989/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 741, in order_detail_dashboard
+    return render(request, "dashboard/order_detail_dashboard.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc7 in position 3462: invalid continuation byte
+"GET /dashboard/Alaman/dashboard/order/1989/ HTTP/1.1" 500 138610
+Internal Server Error: /dashboard/Alaman/dashboard/order/1989/
+Traceback (most recent call last):
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\contrib\auth\decorators.py", line 23, in _wrapper_view
+    return view_func(request, *args, **kwargs)
+  File "e:\my\amazon_syria\src\dashboard\views.py", line 741, in order_detail_dashboard
+    return render(request, "dashboard/order_detail_dashboard.html", {
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\shortcuts.py", line 24, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\backends\django.py", line 33, in get_template
+    return Template(self.engine.get_template(template_name), self)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 175, in get_template
+    template, origin = self.find_template(template_name)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\engine.py", line 157, in find_template
+    template = loader.get_template(name, skip=skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\base.py", line 23, in get_template
+    contents = self.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\cached.py", line 26, in get_contents
+    return origin.loader.get_contents(origin)
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\site-packages\django\template\loaders\filesystem.py", line 23, in get_contents
+    return fp.read()
+  File "C:\Users\Bassam\AppData\Local\Programs\Python\Python39\lib\codecs.py", line 322, in decode
+    (result, consumed) = self._buffer_decode(data, self.errors, final)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc7 in position 3462: invalid continuation byte
+"GET /dashboard/Alaman/dashboard/order/1989/ HTTP/1.1" 500 138610
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /accounts/api/create_store_user_from_access/
+"POST /accounts/api/create_store_user_from_access/ HTTP/1.1" 500 121
+Internal Server Error: /accounts/api/create_store_user_from_access/
+"POST /accounts/api/create_store_user_from_access/ HTTP/1.1" 500 121
+Internal Server Error: /accounts/api/create_store_user_from_access/
+"POST /accounts/api/create_store_user_from_access/ HTTP/1.1" 500 121
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56
+Internal Server Error: /orders/api/create_order_item_from_access/
+"POST /orders/api/create_order_item_from_access/ HTTP/1.1" 500 56

@@ -40,7 +40,8 @@
         }
 
         /* ⬇️ جعل الحقول بنفس طول زر الدخول ونفس الحواف */
-        .login-container input {
+        .login-container input,
+        .login-container select {
             width: 100%;
             border-radius: 12px !important;
             padding: .65rem 1rem !important;
@@ -105,7 +106,21 @@
 
             <form method="post">
                 {% csrf_token %}
-                {{ form.as_p }}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <label for="{{ form.store.id_for_label }}">{{ form.store.label }}</label>
+                {{ form.store }}
+                {% for error in form.store.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+
+                <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+                {{ form.username }}
+                {% for error in form.username.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+
+                <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+                {{ form.password }}
+                {% for error in form.password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
 
                 <button type="submit" class="login-btn">
                     تسجيل الدخول

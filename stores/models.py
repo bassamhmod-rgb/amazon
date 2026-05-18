@@ -1,10 +1,24 @@
-from django.db import models
+﻿from django.db import models
 from django.contrib.auth.models import User
+from django.db.models import Q
 from django.utils.text import slugify
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from PIL import Image, ImageOps, UnidentifiedImageError
 from decimal import Decimal
+from django.core.validators import MaxValueValidator, MinValueValidator
+import time
+
+
+def _touch_update_time(instance, kwargs):
+    if hasattr(instance, "access_id") and getattr(instance, "access_id", None) in (None, 0, ""):
+        return
+    instance.update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("update_time")
+        kwargs["update_fields"] = update_fields
 
 class Store(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
@@ -155,6 +169,81 @@ class Store(models.Model):
 
     def __str__(self):
         return self.name
+
+# المستودعات
+class Warehouse(models.Model):
+    MAIN_WAREHOUSE_NAME = "المستودع الرئيسي"
+
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="warehouses")
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
+
+    is_main = models.BooleanField(default=False)
+
+    identifier = models.CharField(
+        max_length=50,
+        help_text="معرف/رقم المستودع ضمن التاجر",
+    )
+    name = models.CharField(max_length=200)
+    address = models.TextField(blank=True, null=True)
+    phone = models.CharField(max_length=30, blank=True, null=True)
+
+    percentage = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(Decimal("100.00"))],
+        help_text="نسبة (مثال: 5 = 5%)",
+    )
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store", "identifier"],
+                name="unique_warehouse_identifier_per_store",
+            ),
+            models.UniqueConstraint(
+                fields=["store", "name"],
+                name="unique_warehouse_name_per_store",
+            ),
+            models.UniqueConstraint(
+                fields=["store"],
+                condition=Q(is_main=True),
+                name="unique_main_warehouse_per_store",
+            ),
+            models.CheckConstraint(
+                check=Q(is_main=False) | Q(name="المستودع الرئيسي"),
+                name="main_warehouse_name_fixed",
+            ),
+        ]
+        ordering = ["store_id", "name"]
+
+    def clean(self):
+        if self.is_main and self.name and self.name != self.MAIN_WAREHOUSE_NAME:
+            raise ValidationError({"name": f'اسم المستودع الرئيسي يجب أن يكون "{self.MAIN_WAREHOUSE_NAME}".'})
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        if self.is_main:
+            if self.pk:
+                old_name = (
+                    Warehouse.objects.filter(pk=self.pk).values_list("name", flat=True).first()
+                )
+                if old_name == self.MAIN_WAREHOUSE_NAME and self.name != self.MAIN_WAREHOUSE_NAME:
+                    raise ValidationError("لا يمكن تعديل اسم المستودع الرئيسي.")
+            self.name = self.MAIN_WAREHOUSE_NAME
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.is_main:
+            raise ValidationError("لا يمكن حذف المستودع الرئيسي.")
+        return super().delete(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.store} - {self.name} ({self.identifier})"
 #طرق الدفع
 class StorePaymentMethod(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
@@ -192,3 +281,4 @@ class StorePaymentMethod(models.Model):
 
     def __str__(self):
         return f"{self.store.name} – {self.name}"
+
