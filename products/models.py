@@ -54,6 +54,18 @@ class Product(models.Model):
     description = models.TextField(blank=True)
 
     price = models.DecimalField(max_digits=8, decimal_places=2)
+    price2 = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True)
+    price3 = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True)
+
+    unit2 = models.CharField(max_length=100, default="", blank=True)
+    unit2_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True)
+    unit2_pieces = models.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        default=0,
+        blank=True,
+        help_text="عدد القطع ضمن الوحدة الثانية",
+    )
     show_price = models.BooleanField(default=True)
 
     buy_price = models.DecimalField(
@@ -185,3 +197,7 @@ class ProductBarcode(models.Model):
 
     def __str__(self):
         return f"{self.product.name} - {self.value}"
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        return super().save(*args, **kwargs)

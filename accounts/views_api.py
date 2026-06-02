@@ -1335,16 +1335,20 @@ def merchant_delete_sync_import_api(request, merchant_id):
 
 
 def _apply_delete_sync_from_access(merchant_id):
-    from accounts.models import Customer, Supplier
+    from accounts.models import Customer, StoreUser, Supplier
     from dashboard.models import Expense
     from orders.models import Order, OrderItem
-    from products.models import Category, Product
+    from products.models import Category, Product, ProductBarcode
+    from stores.models import Warehouse
 
     model_map = {
         "accounts.Customer": Customer,
         "accounts.Supplier": Supplier,
+        "accounts.StoreUser": StoreUser,
         "products.Category": Category,
         "products.Product": Product,
+        "products.ProductBarcode": ProductBarcode,
+        "stores.Warehouse": Warehouse,
         "orders.Order": Order,
         "orders.OrderItem": OrderItem,
         "accounts.PointsTransaction": PointsTransaction,
@@ -1353,8 +1357,11 @@ def _apply_delete_sync_from_access(merchant_id):
     short_to_full = {
         "Customer": "accounts.Customer",
         "Supplier": "accounts.Supplier",
+        "StoreUser": "accounts.StoreUser",
         "Category": "products.Category",
         "Product": "products.Product",
+        "ProductBarcode": "products.ProductBarcode",
+        "Warehouse": "stores.Warehouse",
         "Order": "orders.Order",
         "OrderItem": "orders.OrderItem",
         "PointsTransaction": "accounts.PointsTransaction",
@@ -1365,6 +1372,9 @@ def _apply_delete_sync_from_access(merchant_id):
         "ÃÓãÇÁ ÇáÚãáÇÁ": "accounts.Customer",
         "ÇáãæÑÏæä": "accounts.Supplier",
         "almontg": "products.Category",
+        "mror": "accounts.StoreUser",
+        "mndob": "stores.Warehouse",
+        "rmz": "products.ProductBarcode",
         "ÇáÃÕäÇÝ": "products.Product",
         "fatoraaam": "orders.Order",
         "ÝÇÊæÑÉ": "orders.OrderItem",

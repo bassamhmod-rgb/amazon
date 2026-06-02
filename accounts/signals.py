@@ -6,7 +6,7 @@ from django.dispatch import receiver
 from accounts.models import Customer, DeleteSync, PointsTransaction, Supplier, StoreUser
 from dashboard.models import Expense
 from orders.models import Order, OrderItem
-from products.models import Category, Product
+from products.models import Category, Product, ProductBarcode
 from stores.models import Warehouse
 
 
@@ -44,6 +44,11 @@ def log_category_delete(sender, instance, **kwargs):
 @receiver(pre_delete, sender=Product)
 def log_product_delete(sender, instance, **kwargs):
     _log_store_delete(instance, instance.access_id, "الأصناف")
+
+
+@receiver(pre_delete, sender=ProductBarcode)
+def log_product_barcode_delete(sender, instance, **kwargs):
+    _log_store_delete(instance, instance.access_id, "rmz")
 
 
 @receiver(pre_delete, sender=Order)

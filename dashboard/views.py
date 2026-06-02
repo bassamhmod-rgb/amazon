@@ -449,17 +449,43 @@ def product_update(request, store_slug, product_id):
             product = form.save()
 
             # 🔦 تحديث ال
-            ProductBarcode.objects.filter(product=product).delete()
-            barcodes = request.POST.getlist("barcode_value")
-            seen_codes = set()
-            for code in barcodes:
-                code = code.strip()
-                if code and code not in seen_codes:
-                    ProductBarcode.objects.create(
-                        product=product,
-                        value=code
-                    )
-                    seen_codes.add(code)
+            existing_barcodes = list(
+                ProductBarcode.objects.filter(product=product).only("id", "value", "access_id")
+            )
+            existing_values = {b.value for b in existing_barcodes if (b.value or "").strip()}
+
+            submitted_values = set()
+            for code in request.POST.getlist("barcode_value"):
+                code = (code or "").strip()
+                if code:
+                    submitted_values.add(code)
+
+            to_delete = set(existing_values - submitted_values)
+            to_add = set(submitted_values - existing_values)
+
+            # If the user "edited" a barcode (change value), the UI only gives us values,
+            # not row IDs. In that case we'd otherwise delete+create, which would drop
+            # access_id and break sync. Best-effort: convert 1:1 delete/add pairs into
+            # in-place updates (preserving access_id) whenever possible.
+            if to_delete and to_add:
+                # Prefer updating rows that already have an access_id.
+                candidates = [b for b in existing_barcodes if b.value in to_delete and b.access_id not in (None, 0, "")]
+                fallback_candidates = [b for b in existing_barcodes if b.value in to_delete]
+                update_targets = candidates if candidates else fallback_candidates
+
+                while update_targets and to_delete and to_add:
+                    barcode = update_targets.pop(0)
+                    if barcode.value not in to_delete:
+                        continue
+                    new_value = to_add.pop()
+                    to_delete.remove(barcode.value)
+                    barcode.value = new_value
+                    barcode.save(update_fields=["value"])
+
+            if to_delete:
+                ProductBarcode.objects.filter(product=product, value__in=list(to_delete)).delete()
+            for code in to_add:
+                ProductBarcode.objects.create(product=product, value=code)
 
             # 🔥 تحديث المواصفات (نحذف القديم ونضيف الجديد)
             ProductDetails.objects.filter(product=product).delete()
@@ -2032,6 +2058,9 @@ def _perform_store_reset(request, store):
             "accounts.Customer": list(Customer.objects.filter(store=store).values_list("id", flat=True)),
             "products.Category": list(Category.objects.filter(store=store).values_list("id", flat=True)),
             "products.Product": list(Product.objects.filter(store=store).values_list("id", flat=True)),
+            "products.ProductBarcode": list(
+                ProductBarcode.objects.filter(product__store=store).values_list("id", flat=True)
+            ),
             "orders.Order": list(Order.objects.filter(store=store).values_list("id", flat=True)),
             "orders.OrderItem": list(
                 OrderItem.objects.filter(order__store=store).values_list("id", flat=True)
