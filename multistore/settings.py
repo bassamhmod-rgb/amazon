@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
 
     "core",
-    "accounts",
+    "accounts.apps.AccountsConfig",
     "stores",
     "products",
     "cart",
@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     "loyalty",
     "dashboard",
     'rest_framework',
-    "mobile_sync",
+    "mobile_sync.apps.MobileSyncConfig",
 
 ]
 
