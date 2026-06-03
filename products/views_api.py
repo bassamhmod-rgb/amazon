@@ -368,19 +368,33 @@ def create_barcode_from_access(request):
         merchant_id = data.get("store")
         access_id = data.get("access_id")
         product_id = data.get("product_id")
+        product_access_id = data.get("product_access_id")
         barkod = (data.get("barkod") or "").strip()
 
-        if not merchant_id or not product_id or not barkod:
+        if not merchant_id or (product_id in ("", None) and product_access_id in ("", None)) or not barkod:
             return JsonResponse({"error": "بيانات ناقصة"}, status=400)
 
         store = Store.objects.filter(id=merchant_id).first()
         if not store:
             return JsonResponse({"error": "Merchant not found"}, status=404)
 
-        # product_id هنا يجب أن يكون معرف المنتج في المتجر (Store PK)
-        product = Product.objects.filter(id=int(product_id), store=store).first()
+        # نحاول أولاً بالـ PK المحلي، ثم نرجع لـ access_id لأن أرقام Access تختلف عن أرقام المتجر على السيرفر.
+        product = None
+        if product_id not in ("", None):
+            try:
+                product = Product.objects.filter(id=int(product_id), store=store).first()
+            except (TypeError, ValueError):
+                product = None
+        if not product and product_access_id not in ("", None):
+            try:
+                product = Product.objects.filter(store=store, access_id=int(product_access_id)).first()
+            except (TypeError, ValueError):
+                product = None
         if not product:
-            return JsonResponse({"error": "Product not found"}, status=404)
+            return JsonResponse(
+                {"error": "Product not found", "product_id": product_id, "product_access_id": product_access_id},
+                status=404,
+            )
 
         if access_id in ("", None):
             access_id = None
