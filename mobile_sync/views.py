@@ -1,7 +1,14 @@
 import time
+import json
+import time
+from urllib.parse import quote
 from decimal import Decimal
 
 from django.contrib.auth import authenticate
+from django.contrib.auth import login as auth_login
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.shortcuts import redirect
+from django.urls import reverse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -15,6 +22,10 @@ from products.models import ProductBarcode
 from stores.models import Store
 from accounts.models import StoreUser
 from django.db import transaction
+
+
+STORE_WEB_LOGIN_SIGNER_SALT = "mobile_sync.store_web_login"
+STORE_WEB_LOGIN_MAX_AGE_SECONDS = 300
 
 
 def _now_minute():
@@ -677,6 +688,121 @@ def store_user_login(request):
             },
         }
     )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def store_web_login(request):
+    payload = request.data if isinstance(request.data, dict) else None
+    if not payload:
+        return Response({"detail": "Invalid JSON payload"}, status=status.HTTP_400_BAD_REQUEST)
+
+    merchant_id = _to_int(payload.get("merchant_id"))
+    identifier = _to_str(payload.get("identifier")).strip()
+    password = _to_str(payload.get("password"))
+
+    if merchant_id is None:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not identifier:
+        return Response({"detail": "identifier is required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not password:
+        return Response({"detail": "password is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    if not store.is_active:
+        return Response({"detail": "Store is inactive"}, status=status.HTTP_409_CONFLICT)
+
+    owner_candidate = authenticate(username=identifier, password=password)
+    ticket_payload = None
+
+    if owner_candidate is not None and owner_candidate == store.owner:
+        ticket_payload = {
+            "kind": "owner",
+            "store_id": store.id,
+            "user_id": owner_candidate.id,
+        }
+    else:
+        user = StoreUser.objects.filter(store=store, identifier__iexact=identifier).first()
+        if not user:
+            return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        if not user.is_active:
+            return Response({"detail": "User is inactive"}, status=status.HTTP_409_CONFLICT)
+        if not user.check_password(password):
+            return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+        ticket_payload = {
+            "kind": "store_user",
+            "store_id": store.id,
+            "store_user_id": user.id,
+        }
+
+    signer = TimestampSigner(salt=STORE_WEB_LOGIN_SIGNER_SALT)
+    ticket = signer.sign(json.dumps(ticket_payload, separators=(",", ":")))
+    open_path = reverse("mobile_sync:store_web_login_open")
+    open_url = request.build_absolute_uri(f"{open_path}?ticket={quote(ticket)}")
+
+    return Response(
+        {
+            "status": "ok",
+            "open_url": open_url,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def store_web_login_open(request):
+    ticket = _to_str(request.query_params.get("ticket")).strip()
+    if not ticket:
+        return Response({"detail": "ticket is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    signer = TimestampSigner(salt=STORE_WEB_LOGIN_SIGNER_SALT)
+    try:
+        raw_payload = signer.unsign(ticket, max_age=STORE_WEB_LOGIN_MAX_AGE_SECONDS)
+        payload = json.loads(raw_payload)
+    except SignatureExpired:
+        return Response({"detail": "ticket expired"}, status=status.HTTP_410_GONE)
+    except (BadSignature, json.JSONDecodeError, TypeError, ValueError):
+        return Response({"detail": "invalid ticket"}, status=status.HTTP_400_BAD_REQUEST)
+
+    kind = _to_str(payload.get("kind"))
+    store_id = _to_int(payload.get("store_id"))
+    if store_id is None:
+        return Response({"detail": "invalid ticket payload"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=store_id).first()
+    if not store or not store.is_active:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    next_url = reverse("stores:store_front", kwargs={"slug": store.slug})
+
+    if kind == "owner":
+        user_id = _to_int(payload.get("user_id"))
+        if user_id is None:
+            return Response({"detail": "invalid ticket payload"}, status=status.HTTP_400_BAD_REQUEST)
+        if store.owner_id != user_id:
+            return Response({"detail": "invalid ticket payload"}, status=status.HTTP_400_BAD_REQUEST)
+        auth_login(request, store.owner)
+        request.session.pop("store_user_id", None)
+        return redirect(next_url)
+
+    if kind == "store_user":
+        store_user_id = _to_int(payload.get("store_user_id"))
+        if store_user_id is None:
+            return Response({"detail": "invalid ticket payload"}, status=status.HTTP_400_BAD_REQUEST)
+        user = StoreUser.objects.filter(id=store_user_id, store=store, is_active=True).first()
+        if not user:
+            return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        if not user.auth_user_id:
+            user.save()
+        if not user.auth_user_id:
+            return Response({"detail": "User auth account is missing"}, status=status.HTTP_409_CONFLICT)
+        auth_login(request, user.auth_user)
+        request.session["store_user_id"] = user.id
+        return redirect(next_url)
+
+    return Response({"detail": "invalid ticket payload"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(["POST"])
