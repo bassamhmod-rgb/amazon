@@ -11,6 +11,7 @@ from products.models import Category
 from products.models import Product
 from products.models import ProductBarcode
 from stores.models import Store
+from accounts.models import StoreUser
 from django.db import transaction
 
 
@@ -288,6 +289,40 @@ def ping(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def stores_pull(request):
+    since = request.query_params.get("since")
+
+    qs = Store.objects.filter(is_active=True).order_by("id")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(update_time__gt=since_int)
+
+    data = [
+        {
+            "id": s.id,
+            "name": s.name,
+            "slug": s.slug,
+            "mobile": s.mobile or "",
+            "access_id": s.access_id,
+            "is_active": s.is_active,
+            "update_time": s.update_time or 0,
+        }
+        for s in qs.only("id", "name", "slug", "mobile", "access_id", "is_active", "update_time")
+    ]
+
+    return Response(
+        {
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def products_pull(request):
     merchant_id = request.query_params.get("merchant_id")
     since = request.query_params.get("since")
@@ -366,6 +401,113 @@ def products_pull(request):
             "merchant_id": merchant_id_int,
             "items": data,
             "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def store_users_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    qs = StoreUser.objects.filter(store_id=merchant_id_int).order_by("id")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(update_time__gt=since_int)
+
+    data = [
+        {
+            "id": u.id,
+            "store_id": u.store_id,
+            "identifier": u.identifier,
+            "name": u.name,
+            "warehouse_id": u.warehouse_id,
+            "access_id": u.access_id,
+            "is_active": u.is_active,
+            "has_password": bool(u.password),
+            "update_time": u.update_time or 0,
+        }
+        for u in qs.select_related("warehouse").only(
+            "id",
+            "store_id",
+            "identifier",
+            "name",
+            "warehouse_id",
+            "access_id",
+            "is_active",
+            "password",
+            "update_time",
+        )
+    ]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def store_user_login(request):
+    payload = request.data if isinstance(request.data, dict) else None
+    if not payload:
+        return Response({"detail": "Invalid JSON payload"}, status=status.HTTP_400_BAD_REQUEST)
+
+    merchant_id = _to_int(payload.get("merchant_id"))
+    identifier = _to_str(payload.get("identifier")).strip()
+    password = _to_str(payload.get("password"))
+
+    if merchant_id is None:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not identifier:
+        return Response({"detail": "identifier is required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not password:
+        return Response({"detail": "password is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    if not store.is_active:
+        return Response({"detail": "Store is inactive"}, status=status.HTTP_409_CONFLICT)
+
+    user = StoreUser.objects.filter(store=store, identifier__iexact=identifier).first()
+    if not user:
+        return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+    if not user.is_active:
+        return Response({"detail": "User is inactive"}, status=status.HTTP_409_CONFLICT)
+    if not user.check_password(password):
+        return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    return Response(
+        {
+            "status": "ok",
+            "store": {
+                "id": store.id,
+                "name": store.name,
+                "slug": store.slug,
+                "is_active": store.is_active,
+            },
+            "user": {
+                "id": user.id,
+                "identifier": user.identifier,
+                "name": user.name,
+                "is_active": user.is_active,
+            },
         }
     )
 

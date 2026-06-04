@@ -2,7 +2,9 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
 from mobile_sync.models import MobileDeleteSync
+from accounts.models import StoreUser
 from products.models import Category, Product, ProductBarcode
+from stores.models import Store
 
 
 def _resolve_merchant_id(instance):
@@ -39,9 +41,19 @@ def log_category_delete(sender, instance, **kwargs):
     _log_mobile_delete(instance, instance.access_id, "almontg")
 
 
+@receiver(pre_delete, sender=Store)
+def log_store_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "stores")
+
+
 @receiver(pre_delete, sender=Product)
 def log_product_delete(sender, instance, **kwargs):
     _log_mobile_delete(instance, instance.access_id, "products")
+
+
+@receiver(pre_delete, sender=StoreUser)
+def log_store_user_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "store_users")
 
 
 @receiver(pre_delete, sender=ProductBarcode)
