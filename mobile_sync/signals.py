@@ -2,7 +2,7 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
 from mobile_sync.models import MobileDeleteSync
-from accounts.models import StoreUser
+from accounts.models import Customer, StoreUser
 from products.models import Category, Product, ProductBarcode
 from stores.models import Store
 
@@ -54,6 +54,11 @@ def log_product_delete(sender, instance, **kwargs):
 @receiver(pre_delete, sender=StoreUser)
 def log_store_user_delete(sender, instance, **kwargs):
     _log_mobile_delete(instance, instance.access_id, "store_users")
+
+
+@receiver(pre_delete, sender=Customer)
+def log_customer_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "customers")
 
 
 @receiver(pre_delete, sender=ProductBarcode)

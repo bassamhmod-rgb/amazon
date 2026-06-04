@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from mobile_sync.models import MobileDeleteSync
+from accounts.models import Customer, normalize_phone_number
 from products.models import Category
 from products.models import Product
 from products.models import ProductBarcode
@@ -95,6 +96,20 @@ def _serialize_barcode(barcode):
         "product_id": barcode.product_id,
         "access_id": barcode.access_id,
         "update_time": barcode.update_time or 0,
+    }
+
+
+def _serialize_customer(customer):
+    return {
+        "id": customer.id,
+        "name": customer.name,
+        "phone": customer.phone,
+        "address": customer.address or "",
+        "note": customer.note or "",
+        "balance": float(customer.balance),
+        "opening_balance": float(customer.opening_balance),
+        "access_id": customer.access_id,
+        "update_time": customer.update_time or 0,
     }
 
 
@@ -231,6 +246,60 @@ def _apply_barcode_change(store, payload, server_id=None, product_resolver=None)
     return obj, "created"
 
 
+def _apply_customer_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    phone = normalize_phone_number(_to_str(payload.get("phone")).strip())
+    address = _to_str(payload.get("address")).strip()
+    note = _to_str(payload.get("note")).strip()
+    access_id = _to_int(payload.get("access_id"))
+    if not name and not phone:
+        raise ValueError("Customer name or phone is required")
+
+    if not name:
+        name = phone
+
+    now_minute = _now_minute()
+    obj = None
+    if server_id:
+        obj = Customer.objects.filter(id=server_id, store=store).first()
+    if not obj and access_id not in (None, 0, ""):
+        obj = Customer.objects.filter(store=store, access_id=access_id).first()
+    if not obj and phone:
+        obj = Customer.objects.filter(store=store, phone=phone).first()
+    if not obj:
+        obj = Customer.objects.filter(store=store, name=name).first()
+
+    update_fields = {
+        "name": name,
+        "phone": phone,
+        "address": address,
+        "note": note,
+        "balance": Decimal(str(_to_float(payload.get("balance"), 0.0))),
+        "opening_balance": Decimal(str(_to_float(payload.get("opening_balance"), 0.0))),
+        "update_time": now_minute,
+    }
+    if access_id is not None:
+        update_fields["access_id"] = access_id
+
+    if obj:
+        Customer.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+
+    obj = Customer.objects.create(
+        store=store,
+        access_id=access_id,
+        name=name,
+        phone=phone,
+        address=address,
+        note=note,
+        balance=update_fields["balance"],
+        opening_balance=update_fields["opening_balance"],
+        update_time=now_minute,
+    )
+    return obj, "created"
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def categories_pull(request):
@@ -271,6 +340,56 @@ def categories_pull(request):
             "update_time": c.update_time or 0,
         }
         for c in qs.only("id", "name", "access_id", "update_time")
+    ]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def customers_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    qs = Customer.objects.filter(store_id=merchant_id_int).order_by("id")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(update_time__gt=since_int)
+
+    data = [
+        _serialize_customer(customer)
+        for customer in qs.only(
+            "id",
+            "name",
+            "phone",
+            "address",
+            "note",
+            "balance",
+            "opening_balance",
+            "access_id",
+            "update_time",
+        )
     ]
 
     return Response(
@@ -585,6 +704,7 @@ def sync_push(request):
     errors = []
     category_local_to_server = {}
     product_local_to_server = {}
+    customer_local_to_server = {}
 
     def resolve_category(server_id, local_id):
         if server_id not in (None, ""):
@@ -688,6 +808,21 @@ def sync_push(request):
                         "server_id": obj.id,
                         "update_time": obj.update_time or 0,
                     })
+                elif entity == "customer":
+                    obj, action = _apply_customer_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    if local_id not in (None, ""):
+                        customer_local_to_server[int(local_id)] = obj
+                    applied.append({
+                        "entity": "customer",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
 
             for item in deletes:
                 entity = str(item.get("entity", "")).lower()
@@ -735,6 +870,17 @@ def sync_push(request):
                         obj.delete()
                         applied.append({
                             "entity": "category",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "customer":
+                    obj = Customer.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "customer",
                             "action": "deleted",
                             "local_id": local_id,
                             "server_id": server_id,
