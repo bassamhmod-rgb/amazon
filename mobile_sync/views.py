@@ -1,6 +1,7 @@
 import time
 from decimal import Decimal
 
+from django.contrib.auth import authenticate
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -419,6 +420,10 @@ def store_users_pull(request):
     except (TypeError, ValueError):
         return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
 
+    store = Store.objects.select_related("owner").filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
     qs = StoreUser.objects.filter(store_id=merchant_id_int).order_by("id")
     if since not in (None, "", "0"):
         try:
@@ -427,7 +432,26 @@ def store_users_pull(request):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
         qs = qs.filter(update_time__gt=since_int)
 
-    data = [
+    data = []
+    if since in (None, "", "0"):
+        owner = store.owner
+        owner_name = (owner.get_full_name() or owner.username or store.name).strip()
+        data.append(
+            {
+                "id": -owner.id,
+                "store_id": store.id,
+                "identifier": owner.username,
+                "name": owner_name,
+                "warehouse_id": None,
+                "access_id": None,
+                "is_active": owner.is_active and store.is_active,
+                "has_password": owner.has_usable_password(),
+                "is_owner": True,
+                "update_time": store.update_time or 0,
+            }
+        )
+
+    data.extend(
         {
             "id": u.id,
             "store_id": u.store_id,
@@ -437,6 +461,7 @@ def store_users_pull(request):
             "access_id": u.access_id,
             "is_active": u.is_active,
             "has_password": bool(u.password),
+            "is_owner": False,
             "update_time": u.update_time or 0,
         }
         for u in qs.select_related("warehouse").only(
@@ -450,7 +475,7 @@ def store_users_pull(request):
             "password",
             "update_time",
         )
-    ]
+    )
 
     return Response(
         {
@@ -485,6 +510,28 @@ def store_user_login(request):
     if not store.is_active:
         return Response({"detail": "Store is inactive"}, status=status.HTTP_409_CONFLICT)
 
+    owner_candidate = authenticate(username=identifier, password=password)
+    if owner_candidate is not None and owner_candidate == store.owner:
+        owner_name = (owner_candidate.get_full_name() or owner_candidate.username or store.name).strip()
+        return Response(
+            {
+                "status": "ok",
+                "store": {
+                    "id": store.id,
+                    "name": store.name,
+                    "slug": store.slug,
+                    "is_active": store.is_active,
+                },
+                "user": {
+                    "id": -owner_candidate.id,
+                    "identifier": owner_candidate.username,
+                    "name": owner_name,
+                    "is_active": owner_candidate.is_active,
+                    "is_owner": True,
+                },
+            }
+        )
+
     user = StoreUser.objects.filter(store=store, identifier__iexact=identifier).first()
     if not user:
         return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -507,6 +554,7 @@ def store_user_login(request):
                 "identifier": user.identifier,
                 "name": user.name,
                 "is_active": user.is_active,
+                "is_owner": False,
             },
         }
     )
