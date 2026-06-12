@@ -93,6 +93,79 @@ def _get_store_for_dashboard(request, store_slug):
     raise Http404
 
 
+def _rebuild_missing_cashback(store):
+    generic_customer_name = "زبون عام"
+    cashback_percent = Decimal(store.cashback_percentage or 0)
+    created = 0
+    skipped_existing = 0
+    skipped_generic = 0
+    skipped_empty = 0
+    skipped_no_profit = 0
+
+    orders = (
+        Order.objects.filter(
+            store=store,
+            document_kind=1,
+            transaction_type="sale",
+            status="confirmed",
+        )
+        .select_related("customer")
+        .prefetch_related("items", "items__product")
+        .order_by("id")
+    )
+
+    for order in orders:
+        customer = order.customer
+        customer_name = (customer.name or "").strip() if customer else ""
+        if not customer or customer_name == generic_customer_name:
+            skipped_generic += 1
+            continue
+
+        note = f"كاش باك من طلب بيع رقم {order.id}"
+        if PointsTransaction.objects.filter(customer=customer, note=note).exists():
+            skipped_existing += 1
+            continue
+
+        total_profit = Decimal("0")
+        has_items = False
+        for item in order.items.all():
+            has_items = True
+            buy_price = item.buy_price
+            if buy_price in (None, ""):
+                buy_price = item.product.get_avg_buy_price() if item.product_id else Decimal("0")
+            total_profit += (Decimal(item.price or 0) - Decimal(buy_price or 0)) * Decimal(abs(item.quantity or 0))
+
+        if not has_items:
+            skipped_empty += 1
+            continue
+
+        if total_profit <= 0 or cashback_percent <= 0:
+            skipped_no_profit += 1
+            continue
+
+        cashback_value = (total_profit * cashback_percent / Decimal("100")).quantize(Decimal("0.01"))
+        if cashback_value <= 0:
+            skipped_no_profit += 1
+            continue
+
+        PointsTransaction.objects.create(
+            customer=customer,
+            customer_name=str(customer),
+            points=cashback_value,
+            transaction_type="add",
+            note=note,
+        )
+        created += 1
+
+    return {
+        "created": created,
+        "skipped_existing": skipped_existing,
+        "skipped_generic": skipped_generic,
+        "skipped_empty": skipped_empty,
+        "skipped_no_profit": skipped_no_profit,
+    }
+
+
 def _is_store_owner(request, store):
     return store.owner_id == request.user.id
 
@@ -1848,6 +1921,14 @@ def delete_customer(request, store_slug, customer_id):
 
 def points_page(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug)
+
+    if request.method == "POST" and request.POST.get("rebuild_missing_cashback") == "1":
+        summary = _rebuild_missing_cashback(store)
+        messages.success(
+            request,
+            f"تمت معالجة الكاش باك: أضيف {summary['created']}، موجود مسبقاً {summary['skipped_existing']}، زبون عام {summary['skipped_generic']}، بدون عناصر {summary['skipped_empty']}، بدون ربح {summary['skipped_no_profit']}.",
+        )
+        return redirect(f"/dashboard/{store_slug}/points/")
 
     customer_id = request.GET.get("customer")
     customer = None
