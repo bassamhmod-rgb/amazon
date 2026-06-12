@@ -826,6 +826,7 @@ def confirm_order(request, store_slug, order_id):
 
     return redirect("dashboard:order_detail_dashboard", store_slug=store.slug, order_id=order.id)
 
+
 #اضافة طلب من التاجر بيع او شراء
 
 

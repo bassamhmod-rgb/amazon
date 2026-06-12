@@ -157,6 +157,19 @@ def _sync_mobile_invoice_cashback(store, order, customer):
     status = "skipped"
     calculated_at = None
 
+    customer_name = (customer.name or "").strip() if customer else ""
+    if customer_name == "???? ???":
+        return {
+            "accounting_invoice_number": invoice_number,
+            "customer": customer,
+            "total_profit": total_profit.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+            "cashback_percentage": cashback_percentage.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+            "cashback_amount": cashback_amount,
+            "status": status,
+            "note": note if status == "calculated" else "????? ??? ??? ????? ???",
+            "calculated_at": calculated_at,
+        }
+
     if order.transaction_type == "sale" and customer and total_profit > 0 and cashback_percentage > 0:
         cashback_amount = (total_profit * cashback_percentage / Decimal("100")).quantize(
             Decimal("0.01"),
