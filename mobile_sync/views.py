@@ -1290,8 +1290,8 @@ def orders_push(request):
                     "server_order_id": order.id,
                     "server_update_time": order.update_time or 0,
                     "accounting_invoice_number": order.accounting_invoice_number,
-                    "cashback_status": cashback_entry.status,
-                    "cashback_amount": float(cashback_entry.cashback_amount or 0),
+                    "cashback_status": cashback_entry["status"],
+                    "cashback_amount": float(cashback_entry["cashback_amount"] or 0),
                     "items": created_items,
                 })
 
