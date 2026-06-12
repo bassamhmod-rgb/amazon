@@ -1262,6 +1262,10 @@ def orders_push(request):
                     price = _to_float(item_payload.get("price"), 0.0)
                     direction = _to_int(item_payload.get("direction"), -1)
                     buy_price = item_payload.get("buy_price")
+                    if transaction_type == "sale" and buy_price in (None, "", 0, "0", "0.0"):
+                        buy_price = product.get_avg_buy_price()
+                    elif transaction_type == "purchase" and buy_price in (None, "", 0, "0", "0.0"):
+                        buy_price = price
                     item_note = _to_str(item_payload.get("item_note"), "") or None
 
                     order_item = OrderItem(
