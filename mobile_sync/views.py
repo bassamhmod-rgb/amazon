@@ -2,7 +2,7 @@ import time
 import json
 import time
 from urllib.parse import quote
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.contrib.auth import authenticate
 from django.contrib.auth import login as auth_login
@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from mobile_sync.models import MobileDeleteSync
-from accounts.models import Customer, normalize_phone_number
+from accounts.models import Customer, normalize_phone_number, PointsTransaction
 from accounts.models import StoreUser
 from products.models import Category
 from products.models import Product
@@ -143,6 +143,71 @@ def _resolve_mobile_warehouse(store, warehouse_server_id):
 
     return Warehouse.objects.filter(store=store, is_main=True).first()
 
+
+def _sync_mobile_invoice_cashback(store, order, customer):
+    invoice_number = _to_int(order.accounting_invoice_number, order.id)
+    note = f"كاش باك من طلب بيع رقم {invoice_number}"
+    total_profit = Decimal("0")
+
+    for item in order.items.all():
+        total_profit += Decimal(str(item.profit or 0))
+
+    cashback_percentage = Decimal(str(store.cashback_percentage or 0))
+    cashback_amount = Decimal("0")
+    status = "skipped"
+    calculated_at = None
+
+    if order.transaction_type == "sale" and customer and total_profit > 0 and cashback_percentage > 0:
+        cashback_amount = (total_profit * cashback_percentage / Decimal("100")).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+        status = "calculated"
+        calculated_at = timezone.now()
+
+        if cashback_amount > 0:
+            existing_points = (
+                PointsTransaction.objects.filter(
+                    customer=customer,
+                    transaction_type="add",
+                    note=note,
+                )
+                .order_by("id")
+                .first()
+            )
+            if existing_points:
+                PointsTransaction.objects.filter(id=existing_points.id).update(
+                    customer=customer,
+                    customer_name=customer.name,
+                    transaction_type="add",
+                    points=cashback_amount,
+                    note=note,
+                    created_at=order.created_at or timezone.now(),
+                    update_time=None,
+                )
+            else:
+                points_transaction = PointsTransaction.objects.create(
+                    customer=customer,
+                    customer_name=customer.name,
+                    transaction_type="add",
+                    points=cashback_amount,
+                    note=note,
+                )
+                PointsTransaction.objects.filter(id=points_transaction.id).update(
+                    created_at=order.created_at or timezone.now(),
+                    update_time=None,
+                )
+
+    return {
+        "accounting_invoice_number": invoice_number,
+        "customer": customer,
+        "total_profit": total_profit.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+        "cashback_percentage": cashback_percentage.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+        "cashback_amount": cashback_amount,
+        "status": status,
+        "note": note if status == "calculated" else "الكاش باك غير محسوب بعد",
+        "calculated_at": calculated_at,
+    }
 
 def _apply_category_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
@@ -1218,11 +1283,15 @@ def orders_push(request):
                         "server_update_time": order_item.update_time or 0,
                     })
 
+                cashback_entry = _sync_mobile_invoice_cashback(store, order, customer)
+
                 applied.append({
                     "local_order_id": local_order_id,
                     "server_order_id": order.id,
                     "server_update_time": order.update_time or 0,
                     "accounting_invoice_number": order.accounting_invoice_number,
+                    "cashback_status": cashback_entry.status,
+                    "cashback_amount": float(cashback_entry.cashback_amount or 0),
                     "items": created_items,
                 })
 
