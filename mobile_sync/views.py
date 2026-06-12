@@ -146,7 +146,7 @@ def _resolve_mobile_warehouse(store, warehouse_server_id):
 
 def _sync_mobile_invoice_cashback(store, order, customer):
     invoice_number = _to_int(order.accounting_invoice_number, order.id)
-    note = f"كاش باك من طلب بيع رقم {invoice_number}"
+    note = f"\u0643\u0627\u0634 \u0628\u0627\u0643 \u0645\u0646 \u0637\u0644\u0628 \u0628\u064a\u0639 \u0631\u0642\u0645 {order.id}"
     total_profit = Decimal("0")
 
     for item in order.items.all():
@@ -166,7 +166,7 @@ def _sync_mobile_invoice_cashback(store, order, customer):
             "cashback_percentage": cashback_percentage.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
             "cashback_amount": cashback_amount,
             "status": status,
-            "note": note if status == "calculated" else "????? ??? ??? ????? ???",
+        "note": note if status == "calculated" else "????? ??? ??? ????? ???",
             "calculated_at": calculated_at,
         }
 
@@ -218,7 +218,7 @@ def _sync_mobile_invoice_cashback(store, order, customer):
         "cashback_percentage": cashback_percentage.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
         "cashback_amount": cashback_amount,
         "status": status,
-        "note": note if status == "calculated" else "الكاش باك غير محسوب بعد",
+        "note": note if status == "calculated" else "????? ??? ??? ????? ???",
         "calculated_at": calculated_at,
     }
 
