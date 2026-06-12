@@ -16,11 +16,13 @@ from rest_framework import status
 
 from mobile_sync.models import MobileDeleteSync
 from accounts.models import Customer, normalize_phone_number
+from accounts.models import StoreUser
 from products.models import Category
 from products.models import Product
 from products.models import ProductBarcode
+from orders.models import Order, OrderItem
 from stores.models import Store
-from accounts.models import StoreUser
+from stores.models import Warehouse
 from django.db import transaction
 
 
@@ -122,6 +124,22 @@ def _serialize_customer(customer):
         "access_id": customer.access_id,
         "update_time": customer.update_time or 0,
     }
+
+
+def _resolve_mobile_warehouse(store, warehouse_server_id):
+    if warehouse_server_id in (None, "", 0, "0"):
+        return Warehouse.objects.filter(store=store, is_main=True).first()
+
+    try:
+        warehouse_id = int(warehouse_server_id)
+    except (TypeError, ValueError):
+        return Warehouse.objects.filter(store=store, is_main=True).first()
+
+    warehouse = Warehouse.objects.filter(id=warehouse_id, store=store).first()
+    if warehouse:
+        return warehouse
+
+    return Warehouse.objects.filter(store=store, is_main=True).first()
 
 
 def _apply_category_change(store, payload, server_id=None):
@@ -1011,6 +1029,200 @@ def sync_push(request):
                             "local_id": local_id,
                             "server_id": server_id,
                         })
+
+        return Response({"status": "ok", "applied": applied, "errors": errors})
+    except Exception as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def orders_push(request):
+    payload = request.data if isinstance(request.data, dict) else None
+    if not payload:
+        return Response({"detail": "Invalid JSON payload"}, status=status.HTTP_400_BAD_REQUEST)
+
+    merchant_id = _to_int(payload.get("merchant_id"))
+    orders_payload = payload.get("orders", [])
+    if merchant_id is None:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not isinstance(orders_payload, list):
+        return Response({"detail": "orders must be a list"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id).first()
+    if not store:
+        return Response({"detail": "Merchant not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    applied = []
+    errors = []
+
+    def resolve_customer(order_payload):
+        server_id = _to_int(order_payload.get("customer_server_id"))
+        customer_phone = _to_str(order_payload.get("customer_phone")).strip()
+        customer_name = _to_str(order_payload.get("customer_name")).strip()
+
+        if server_id is not None:
+            customer = Customer.objects.filter(id=server_id, store=store).first()
+            if customer:
+                return customer
+
+        if customer_phone:
+            customer = Customer.objects.filter(store=store, phone=customer_phone).first()
+            if customer:
+                return customer
+
+        if customer_name:
+            customer = Customer.objects.filter(store=store, name=customer_name).first()
+            if customer:
+                return customer
+
+        return None
+
+    def resolve_store_user(order_payload):
+        server_id = _to_int(order_payload.get("created_by_store_user_id"))
+        if server_id is None:
+            return None
+        return StoreUser.objects.filter(id=server_id, store=store).first()
+
+    def resolve_product(item_payload):
+        product_server_id = _to_int(item_payload.get("product_server_id"))
+        product_name = _to_str(item_payload.get("product_name")).strip()
+
+        if product_server_id is not None:
+            product = Product.objects.filter(id=product_server_id, store=store).first()
+            if product:
+                return product
+
+        if product_name:
+            product = Product.objects.filter(store=store, name=product_name).first()
+            if product:
+                return product
+
+        return None
+
+    try:
+        with transaction.atomic():
+            for order_payload in orders_payload:
+                if not isinstance(order_payload, dict):
+                    errors.append({"detail": "Invalid order payload"})
+                    continue
+
+                local_order_id = _to_int(order_payload.get("local_order_id"))
+                accounting_invoice_number = _to_int(order_payload.get("accounting_invoice_number"))
+                if accounting_invoice_number is None:
+                    accounting_invoice_number = local_order_id
+                if accounting_invoice_number is None:
+                    errors.append({"detail": "Missing accounting_invoice_number", "order": order_payload})
+                    continue
+
+                customer = resolve_customer(order_payload)
+                store_user = resolve_store_user(order_payload)
+                warehouse = _resolve_mobile_warehouse(store, order_payload.get("warehouse_server_id"))
+
+                transaction_type = _to_str(order_payload.get("transaction_type"), "sale") or "sale"
+                status_value = _to_str(order_payload.get("status"), "confirmed") or "confirmed"
+                if status_value == "completed":
+                    status_value = "confirmed"
+
+                created_at_raw = order_payload.get("created_at")
+                created_at = None
+                if created_at_raw:
+                    created_at = parse_datetime(str(created_at_raw))
+                if created_at is None:
+                    created_at = timezone.now()
+
+                discount = _to_float(order_payload.get("discount"), 0.0)
+                payment = _to_float(order_payload.get("payment"), 0.0)
+                amount = _to_float(order_payload.get("amount"), 0.0)
+                is_seen_by_store = _to_bool(order_payload.get("is_seen_by_store"), True)
+                items_payload = order_payload.get("items", [])
+                if not isinstance(items_payload, list):
+                    errors.append({"detail": "items must be a list", "local_order_id": local_order_id})
+                    continue
+
+                prepared_items = []
+                for item_payload in items_payload:
+                    if not isinstance(item_payload, dict):
+                        continue
+
+                    product = resolve_product(item_payload)
+                    if product is None:
+                        errors.append({
+                            "detail": "product not found",
+                            "local_order_id": local_order_id,
+                            "item": item_payload,
+                        })
+                        prepared_items = None
+                        break
+
+                    prepared_items.append((item_payload, product))
+
+                if prepared_items is None:
+                    continue
+
+                order = (
+                    Order.objects.filter(store=store, accounting_invoice_number=accounting_invoice_number)
+                    .select_related("customer", "supplier", "warehouse", "created_by_store_user")
+                    .first()
+                )
+                if order is None:
+                    order = Order(store=store, accounting_invoice_number=accounting_invoice_number)
+
+                order.customer = customer if transaction_type == "sale" else None
+                order.supplier = None
+                order.created_by_store_user = store_user
+                order.warehouse = warehouse
+                order.transaction_type = transaction_type
+                order.status = status_value
+                order.discount = Decimal(str(discount))
+                order.payment = Decimal(str(payment))
+                order.amount = Decimal(str(amount))
+                order.payment_type = _to_str(order_payload.get("payment_type"), "") or None
+                order.payment_method_name = _to_str(order_payload.get("payment_method_name"), "") or None
+                order.payment_recipient_name = _to_str(order_payload.get("payment_recipient_name"), "") or None
+                order.payment_account_info = _to_str(order_payload.get("payment_account_info"), "") or None
+                order.payment_additional_info = _to_str(order_payload.get("payment_additional_info"), "") or None
+                order.shipping_address = _to_str(order_payload.get("shipping_address"), "") or None
+                order.is_seen_by_store = is_seen_by_store
+                order.created_at = created_at
+                order._skip_update_time_touch = True
+                order.save()
+
+                order.items.all().delete()
+                created_items = []
+                for item_payload, product in prepared_items:
+                    quantity = _to_float(item_payload.get("quantity"), 1.0)
+                    price = _to_float(item_payload.get("price"), 0.0)
+                    direction = _to_int(item_payload.get("direction"), -1)
+                    buy_price = item_payload.get("buy_price")
+                    item_note = _to_str(item_payload.get("item_note"), "") or None
+
+                    order_item = OrderItem(
+                        order=order,
+                        product=product,
+                        quantity=Decimal(str(quantity)),
+                        price=Decimal(str(price)),
+                        direction=direction if direction is not None else -1,
+                        buy_price=None if buy_price in (None, "") else Decimal(str(_to_float(buy_price))),
+                        warehouse=warehouse,
+                        access_id=None,
+                    )
+                    order_item._skip_update_time_touch = True
+                    order_item.save()
+
+                    created_items.append({
+                        "local_item_id": _to_int(item_payload.get("local_item_id")),
+                        "server_item_id": order_item.id,
+                        "server_update_time": order_item.update_time or 0,
+                    })
+
+                applied.append({
+                    "local_order_id": local_order_id,
+                    "server_order_id": order.id,
+                    "server_update_time": order.update_time or 0,
+                    "accounting_invoice_number": order.accounting_invoice_number,
+                    "items": created_items,
+                })
 
         return Response({"status": "ok", "applied": applied, "errors": errors})
     except Exception as exc:

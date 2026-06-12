@@ -15,4 +15,5 @@ urlpatterns = [
     path("barcodes/", views.barcodes_pull, name="barcodes_pull"),
     path("deletes/", views.deletes_pull, name="deletes_pull"),
     path("sync/push/", views.sync_push, name="sync_push"),
+    path("orders/push/", views.orders_push, name="orders_push"),
 ]
