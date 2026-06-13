@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.templatetags.static import static
 from io import BytesIO
 from PIL import Image, ImageDraw
+from accounts.models import StoreUser
 
 def store_list(request):
     stores = Store.objects.filter(is_active=True)
@@ -26,6 +27,18 @@ def store_front(request, slug):
 
     # ✔ التاجر الحقيقي فقط
     is_owner = request.user.is_authenticated and request.user == store.owner
+    store_user_id = request.session.get("store_user_id")
+    is_store_user = bool(
+        request.user.is_authenticated
+        and store_user_id
+        and StoreUser.objects.filter(
+            pk=store_user_id,
+            auth_user=request.user,
+            store=store,
+            is_active=True,
+        ).exists()
+    )
+    can_access_dashboard = is_owner or is_store_user
 
     # ✔ الزبون المسجل دخول
     customer = None
@@ -123,6 +136,7 @@ def store_front(request, slug):
         "store": store,
         "products": products,
         "is_owner": is_owner,
+        "can_access_dashboard": can_access_dashboard,
         "customer": customer,
         "balance": balance,
         "cart_count": cart_count,

@@ -316,7 +316,7 @@ button.btn-primary {
                     </li>
                     {% endif %}
 
-                    {% if is_owner %}
+                    {% if can_access_dashboard %}
                     <li>
                         <a class="dropdown-item" href="/dashboard/{{ store.slug }}/">
                             &#9881; لوحة التحكم
@@ -348,7 +348,7 @@ button.btn-primary {
                 </a>
             {% endif %}
             
-            {% if is_owner %}
+            {% if can_access_dashboard %}
                 <a href="/dashboard/{{ store.slug }}/" class="btn btn-outline-danger d-none d-md-inline">
                     &#9881; لوحة التحكم
                 </a>
@@ -380,7 +380,7 @@ button.btn-primary {
                          role="button"
                          tabindex="0">{{ store.slug }}</div>
                     <ul class="dropdown-menu text-end">
-                        {% if is_owner %}
+                        {% if can_access_dashboard %}
                         <li>
                             <a class="dropdown-item" href="/dashboard/{{ store.slug }}/">&#9881; لوحة التحكم</a>
                         </li>
