@@ -10,14 +10,22 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
+        migrations.RemoveField(
             model_name='appupdate',
             name='prices_version',
-            field=models.PositiveIntegerField(),
         ),
-        migrations.AlterField(
+        migrations.RemoveField(
             model_name='appupdate',
             name='version',
-            field=models.PositiveIntegerField(),
+        ),
+        migrations.AddField(
+            model_name='appupdate',
+            name='version',
+            field=models.PositiveIntegerField(default=0),
+        ),
+        migrations.AddField(
+            model_name='appupdate',
+            name='prices_version',
+            field=models.PositiveIntegerField(default=0),
         ),
     ]
