@@ -1240,11 +1240,15 @@ def orders_push(request):
                 if prepared_items is None:
                     continue
 
-                order = (
-                    Order.objects.filter(store=store, accounting_invoice_number=accounting_invoice_number)
-                    .select_related("customer", "supplier", "warehouse", "created_by_store_user")
-                    .first()
-                )
+                order_qs = Order.objects.filter(
+                    store=store,
+                    accounting_invoice_number=accounting_invoice_number,
+                ).select_related("customer", "supplier", "warehouse", "created_by_store_user")
+                if store_user is None:
+                    order_qs = order_qs.filter(created_by_store_user__isnull=True)
+                else:
+                    order_qs = order_qs.filter(created_by_store_user=store_user)
+                order = order_qs.first()
                 if order is None:
                     order = Order(store=store, accounting_invoice_number=accounting_invoice_number)
 

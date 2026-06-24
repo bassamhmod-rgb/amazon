@@ -8,7 +8,6 @@ from products.models import Product
 import json
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
-
 from core.access_dedupe import dedupe_keep_oldest_for_value
 
 
@@ -310,15 +309,16 @@ def create_order_from_access(request):
         except (TypeError, ValueError):
             invoice_no_int = None
 
-        # ✅ منع التكرار: إذا الفاتورة موجودة نحدّثها بدل رفضها
-        existing_order = (
-            Order.objects.filter(
-                accounting_invoice_number=invoice_no_int,
-                store=store
-            )
-            .order_by("id")
-            .first()
+        # ✅ الفاتورة تميَّز داخل نفس المتجر برقم المصدر + المستخدم الذي أنشأها.
+        existing_order_qs = Order.objects.filter(
+            store=store,
+            accounting_invoice_number=invoice_no_int,
         )
+        if created_by_store_user is None:
+            existing_order_qs = existing_order_qs.filter(created_by_store_user__isnull=True)
+        else:
+            existing_order_qs = existing_order_qs.filter(created_by_store_user=created_by_store_user)
+        existing_order = existing_order_qs.order_by("id").first()
 
         # ✅ تحديد نوع العملية
         transaction_type = "sale" if noaf == -1 else "purchase"
@@ -355,11 +355,6 @@ def create_order_from_access(request):
             existing_order.status = "confirmed"
             existing_order._skip_update_time_touch = True
             existing_order.save()
-            dedupe_keep_oldest_for_value(
-                Order.objects.filter(store=store),
-                field_name="accounting_invoice_number",
-                value=invoice_no_int,
-            )
             return JsonResponse({
                 "status": "updated",
                 "order_id": existing_order.id,
@@ -385,17 +380,10 @@ def create_order_from_access(request):
         order._skip_update_time_touch = True
         order.save()
 
-        _, keep_id = dedupe_keep_oldest_for_value(
-            Order.objects.filter(store=store),
-            field_name="accounting_invoice_number",
-            value=invoice_no_int,
-        )
-        order_id_for_response = keep_id if keep_id else order.id
-
         return JsonResponse({
             "status": "created",
-            "order_id": order_id_for_response,
-            "id": order_id_for_response,
+            "order_id": order.id,
+            "id": order.id,
         })
 
     except Exception as e:
