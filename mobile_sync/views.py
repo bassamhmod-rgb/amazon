@@ -701,13 +701,14 @@ def store_users_pull(request):
 
     data = []
     if since in (None, "", "0"):
+        owner_profile = _ensure_owner_store_user(store)
         owner = store.owner
-        owner_name = (owner.get_full_name() or owner.username or store.name).strip()
+        owner_name = (owner_profile.name if owner_profile else owner.get_full_name() or owner.username or store.name).strip()
         data.append(
             {
-                "id": -owner.id,
+                "id": owner_profile.id if owner_profile else owner.id,
                 "store_id": store.id,
-                "identifier": owner.username,
+                "identifier": owner_profile.identifier if owner_profile else owner.username,
                 "name": owner_name,
                 "warehouse_id": None,
                 "access_id": None,
@@ -779,7 +780,8 @@ def store_user_login(request):
 
     owner_candidate = authenticate(username=identifier, password=password)
     if owner_candidate is not None and owner_candidate == store.owner:
-        owner_name = (owner_candidate.get_full_name() or owner_candidate.username or store.name).strip()
+        owner_profile = _ensure_owner_store_user(store, owner_candidate.get_full_name() or owner_candidate.username or store.name)
+        owner_name = (owner_profile.name if owner_profile else owner_candidate.get_full_name() or owner_candidate.username or store.name).strip()
         return Response(
             {
                 "status": "ok",
@@ -790,8 +792,8 @@ def store_user_login(request):
                     "is_active": store.is_active,
                 },
                 "user": {
-                    "id": -owner_candidate.id,
-                    "identifier": owner_candidate.username,
+                    "id": owner_profile.id if owner_profile else owner_candidate.id,
+                    "identifier": owner_profile.identifier if owner_profile else owner_candidate.username,
                     "name": owner_name,
                     "is_active": owner_candidate.is_active,
                     "is_owner": True,
