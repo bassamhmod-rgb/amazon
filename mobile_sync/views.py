@@ -1160,9 +1160,24 @@ def orders_push(request):
 
     def resolve_store_user(order_payload):
         server_id = _to_int(order_payload.get("created_by_store_user_id"))
-        if server_id is None:
-            return None
-        return StoreUser.objects.filter(id=server_id, store=store).first()
+        if server_id is not None:
+            user = StoreUser.objects.filter(id=server_id, store=store).first()
+            if user:
+                return user
+
+            # The mobile app sends the owner as a negative id.
+            if server_id < 0:
+                owner_profile = getattr(store.owner, "store_user_profile", None)
+                if owner_profile and owner_profile.store_id == store.id:
+                    return owner_profile
+
+        created_by_name = _to_str(order_payload.get("created_by_store_user_name")).strip()
+        if created_by_name:
+            user = StoreUser.objects.filter(store=store, name__iexact=created_by_name).first()
+            if user:
+                return user
+
+        return None
 
     def resolve_product(item_payload):
         product_server_id = _to_int(item_payload.get("product_server_id"))
