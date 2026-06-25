@@ -25,7 +25,7 @@ from products.models import ProductBarcode
 from orders.models import Order, OrderItem
 from stores.models import Store
 from stores.models import Warehouse
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 
 STORE_WEB_LOGIN_SIGNER_SALT = "mobile_sync.store_web_login"
@@ -142,6 +142,45 @@ def _resolve_mobile_warehouse(store, warehouse_server_id):
         return warehouse
 
     return Warehouse.objects.filter(store=store, is_main=True).first()
+
+
+def _ensure_owner_store_user(store, owner_name=None):
+    owner = getattr(store, "owner", None)
+    if owner is None:
+        return None
+
+    owner_profile = getattr(owner, "store_user_profile", None)
+    if owner_profile and owner_profile.store_id == store.id:
+        return owner_profile
+
+    existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
+    if existing:
+        return existing
+
+    display_name = _to_str(owner_name).strip() or (owner.get_full_name() or owner.username or store.name).strip()
+    identifier = _to_str(owner.username).strip() or f"owner_{store.id}"
+
+    try:
+        with transaction.atomic():
+            return StoreUser.objects.create(
+                store=store,
+                auth_user=owner,
+                identifier=identifier,
+                name=display_name,
+                is_active=owner.is_active and store.is_active,
+            )
+    except IntegrityError:
+        with transaction.atomic():
+            existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
+            if existing:
+                return existing
+            return StoreUser.objects.create(
+                store=store,
+                auth_user=owner,
+                identifier=f"{identifier}_{store.id}",
+                name=f"{display_name} ({store.id})",
+                is_active=owner.is_active and store.is_active,
+            )
 
 
 def _sync_mobile_invoice_cashback(store, order, customer):
@@ -1167,15 +1206,15 @@ def orders_push(request):
 
             # The mobile app sends the owner as a negative id.
             if server_id < 0:
-                owner_profile = getattr(store.owner, "store_user_profile", None)
-                if owner_profile and owner_profile.store_id == store.id:
-                    return owner_profile
+                return _ensure_owner_store_user(store, order_payload.get("created_by_store_user_name"))
 
         created_by_name = _to_str(order_payload.get("created_by_store_user_name")).strip()
         if created_by_name:
             user = StoreUser.objects.filter(store=store, name__iexact=created_by_name).first()
             if user:
                 return user
+            if created_by_name.lower() in {"المدير", "المدير العام", "admin"}:
+                return _ensure_owner_store_user(store, created_by_name)
 
         return None
 
