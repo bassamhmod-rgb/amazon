@@ -1223,6 +1223,23 @@ def orders_push(request):
 
         return None
 
+    def resolve_created_by_user(order_payload, store_user):
+        server_id = _to_int(order_payload.get("created_by_store_user_id"))
+        created_by_name = _to_str(order_payload.get("created_by_store_user_name")).strip().lower()
+        is_admin_creator = server_id is not None and server_id < 0
+        is_admin_creator = is_admin_creator or created_by_name in {"المدير", "المدير العام", "admin"}
+        owner_id = getattr(store, "owner_id", None)
+
+        if store_user and store_user.auth_user_id:
+            if store_user.auth_user_id == owner_id:
+                return store.owner
+            return store_user.auth_user
+
+        if is_admin_creator:
+            return store.owner
+
+        return None
+
     def resolve_product(item_payload):
         product_server_id = _to_int(item_payload.get("product_server_id"))
         product_name = _to_str(item_payload.get("product_name")).strip()
@@ -1252,6 +1269,7 @@ def orders_push(request):
 
                 customer = resolve_customer(order_payload)
                 store_user = resolve_store_user(order_payload)
+                created_by_user = resolve_created_by_user(order_payload, store_user)
                 warehouse = _resolve_mobile_warehouse(store, order_payload.get("warehouse_server_id"))
 
                 transaction_type = _to_str(order_payload.get("transaction_type"), "sale") or "sale"
@@ -1321,7 +1339,7 @@ def orders_push(request):
 
                 order.customer = customer if transaction_type == "sale" else None
                 order.supplier = None
-                order.created_by = store_user.auth_user if store_user and store_user.auth_user_id else None
+                order.created_by = created_by_user
                 order.created_by_store_user = store_user
                 if sync_client_id:
                     order.mobile_sync_client_id = sync_client_id
