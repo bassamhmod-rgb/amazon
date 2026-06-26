@@ -1310,6 +1310,7 @@ def orders_push(request):
 
                 order.customer = customer if transaction_type == "sale" else None
                 order.supplier = None
+                order.created_by = store_user.auth_user if store_user and store_user.auth_user_id else None
                 order.created_by_store_user = store_user
                 order.warehouse = warehouse
                 order.transaction_type = transaction_type
