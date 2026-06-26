@@ -83,6 +83,17 @@ class Order(models.Model):
         on_delete=models.CASCADE,
         related_name="orders"
     )
+    mobile_sync_client_id = models.CharField(
+        max_length=80,
+        null=True,
+        blank=True,
+        help_text="معرف ثابت للتطبيق الذي أنشأ الفاتورة"
+    )
+    mobile_local_order_id = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="رقم الفاتورة المحلي داخل التطبيق"
+    )
     accounting_invoice_number = models.IntegerField(
         null=True,
         blank=True,

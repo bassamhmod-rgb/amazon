@@ -1247,6 +1247,7 @@ def orders_push(request):
                     continue
 
                 local_order_id = _to_int(order_payload.get("local_order_id"))
+                sync_client_id = _to_str(order_payload.get("sync_client_id")).strip() or None
                 accounting_invoice_number = _to_int(order_payload.get("accounting_invoice_number"))
 
                 customer = resolve_customer(order_payload)
@@ -1294,22 +1295,37 @@ def orders_push(request):
                 if prepared_items is None:
                     continue
 
-                order_qs = Order.objects.filter(
-                    store=store,
-                    accounting_invoice_number=accounting_invoice_number,
-                ).select_related("customer", "supplier", "warehouse", "created_by_store_user")
-                if store_user is None:
-                    order_qs = order_qs.filter(created_by_store_user__isnull=True)
+                if sync_client_id and local_order_id is not None:
+                    order_qs = Order.objects.filter(
+                        store=store,
+                        mobile_sync_client_id=sync_client_id,
+                        mobile_local_order_id=local_order_id,
+                    ).select_related("customer", "supplier", "warehouse", "created_by_store_user")
                 else:
-                    order_qs = order_qs.filter(created_by_store_user=store_user)
+                    order_qs = Order.objects.filter(
+                        store=store,
+                        accounting_invoice_number=accounting_invoice_number,
+                    ).select_related("customer", "supplier", "warehouse", "created_by_store_user")
+                    if store_user is None:
+                        order_qs = order_qs.filter(created_by_store_user__isnull=True)
+                    else:
+                        order_qs = order_qs.filter(created_by_store_user=store_user)
                 order = order_qs.first()
                 if order is None:
-                    order = Order(store=store, accounting_invoice_number=accounting_invoice_number)
+                    order = Order(
+                        store=store,
+                        accounting_invoice_number=accounting_invoice_number if not sync_client_id else None,
+                        mobile_sync_client_id=sync_client_id,
+                        mobile_local_order_id=local_order_id,
+                    )
 
                 order.customer = customer if transaction_type == "sale" else None
                 order.supplier = None
                 order.created_by = store_user.auth_user if store_user and store_user.auth_user_id else None
                 order.created_by_store_user = store_user
+                if sync_client_id:
+                    order.mobile_sync_client_id = sync_client_id
+                    order.mobile_local_order_id = local_order_id
                 order.warehouse = warehouse
                 order.transaction_type = transaction_type
                 order.status = status_value
