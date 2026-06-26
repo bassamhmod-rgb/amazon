@@ -1206,9 +1206,8 @@ def orders_push(request):
             if user:
                 return user
 
-            # The mobile app sends the owner as a negative id.
             if server_id < 0:
-                return _ensure_owner_store_user(store, order_payload.get("created_by_store_user_name"))
+                return None
 
         created_by_name = _to_str(order_payload.get("created_by_store_user_name")).strip()
         if created_by_name:
@@ -1216,7 +1215,7 @@ def orders_push(request):
             if user:
                 return user
             if created_by_name.lower() in {"المدير", "المدير العام", "admin"}:
-                return _ensure_owner_store_user(store, created_by_name)
+                return None
 
         return None
 
