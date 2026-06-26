@@ -1245,11 +1245,6 @@ def orders_push(request):
 
                 local_order_id = _to_int(order_payload.get("local_order_id"))
                 accounting_invoice_number = _to_int(order_payload.get("accounting_invoice_number"))
-                if accounting_invoice_number is None:
-                    accounting_invoice_number = local_order_id
-                if accounting_invoice_number is None:
-                    errors.append({"detail": "Missing accounting_invoice_number", "order": order_payload})
-                    continue
 
                 customer = resolve_customer(order_payload)
                 store_user = resolve_store_user(order_payload)
