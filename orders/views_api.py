@@ -37,6 +37,13 @@ def _resolve_warehouse_from_access_payload(data, store):
 
     return Warehouse.objects.filter(store=store, is_main=True).first()
 
+
+def _serialize_created_at_fields(dt):
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    dt = timezone.localtime(dt)
+    return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")
+
 #تصدير
 # ================================
 # API: جلب الطلبات غير المرسلة للمحاسبة
@@ -60,6 +67,7 @@ def merchant_orders_api(request, merchant_id):
 
     for order in orders:
         items = OrderItem.objects.filter(order=order).select_related("product", "warehouse")
+        created_date, created_time = _serialize_created_at_fields(order.created_at)
 
         # حساب إجمالي الفاتورة من التفاصيل
         items_total = items.aggregate(
@@ -81,7 +89,8 @@ def merchant_orders_api(request, merchant_id):
             "items_total": float(items_total),
             "payment": float(order.payment or 0),
             "discount": float(order.discount or 0),      # ✅ الحسم
-            "created_at": order.created_at.isoformat(sep=" "),
+            "created_at": created_date,
+            "wkt": created_time,
             "created_by_store_user": order.created_by_store_user_id,
             "party_name": (
                 order.customer.name if order.customer
@@ -137,6 +146,7 @@ def merchant_orders_updates_api(request, merchant_id):
 
     for order in orders:
         items = OrderItem.objects.filter(order=order).select_related("product", "warehouse")
+        created_date, created_time = _serialize_created_at_fields(order.created_at)
 
         items_total = items.aggregate(
             sum=Sum(
@@ -156,7 +166,8 @@ def merchant_orders_updates_api(request, merchant_id):
             "items_total": float(items_total),
             "payment": float(order.payment or 0),
             "discount": float(order.discount or 0),
-            "created_at": order.created_at.isoformat(sep=" "),
+            "created_at": created_date,
+            "wkt": created_time,
             "created_by_store_user": order.created_by_store_user_id,
             "party_name": (
                 order.customer.name if order.customer
