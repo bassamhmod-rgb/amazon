@@ -81,7 +81,7 @@ def merchant_orders_api(request, merchant_id):
             "items_total": float(items_total),
             "payment": float(order.payment or 0),
             "discount": float(order.discount or 0),      # ✅ الحسم
-            "created_at": order.created_at.strftime("%Y-%m-%d"),
+            "created_at": order.created_at.isoformat(sep=" "),
             "created_by_store_user": order.created_by_store_user_id,
             "party_name": (
                 order.customer.name if order.customer
@@ -156,7 +156,7 @@ def merchant_orders_updates_api(request, merchant_id):
             "items_total": float(items_total),
             "payment": float(order.payment or 0),
             "discount": float(order.discount or 0),
-            "created_at": order.created_at.strftime("%Y-%m-%d"),
+            "created_at": order.created_at.isoformat(sep=" "),
             "created_by_store_user": order.created_by_store_user_id,
             "party_name": (
                 order.customer.name if order.customer
