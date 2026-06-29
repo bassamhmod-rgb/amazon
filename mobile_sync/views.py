@@ -714,6 +714,7 @@ def store_users_pull(request):
                 "access_id": None,
                 "is_active": owner.is_active and store.is_active,
                 "has_password": owner.has_usable_password(),
+                "password": owner.password,
                 "is_owner": True,
                 "update_time": store.update_time or 0,
             }
@@ -729,6 +730,7 @@ def store_users_pull(request):
             "access_id": u.access_id,
             "is_active": u.is_active,
             "has_password": bool(u.password),
+            "password": u.password,
             "is_owner": False,
             "update_time": u.update_time or 0,
         }
