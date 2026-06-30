@@ -162,6 +162,22 @@
                     </details>
                 {% endif %}
 
+                {% if su.permissions.customer_balances %}
+                    <a href="{% url 'dashboard:balances_report' store.slug %}">
+                        👥 أرصدة العملاء
+                    </a>
+                {% endif %}
+
+                {% if su.permissions.receipt_notices %}
+                    <details class="sidebar-group">
+                        <summary class="sidebar-summary">💰 إشعارات القبض</summary>
+                        <div class="sidebar-submenu">
+                            <a href="{% url 'dashboard:notices_list' store.slug %}">قائمة الإشعارات</a>
+                            <a href="{% url 'dashboard:notice_create' store.slug %}">إضافة إشعار قبض</a>
+                        </div>
+                    </details>
+                {% endif %}
+
                 {% if su.permissions.sales_orders or su.permissions.purchase_orders %}
                     <details class="sidebar-group">
                         <summary class="sidebar-summary">📝 الطلبات</summary>

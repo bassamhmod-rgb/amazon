@@ -71,6 +71,31 @@ def _current_warehouse_for_request(request, store):
     return Warehouse.objects.filter(store=store, is_main=True).first()
 
 
+def _current_store_user_for_request(request, store):
+    store_user_id = request.session.get("store_user_id")
+    if not store_user_id:
+        return None
+    return (
+        StoreUser.objects.filter(
+            pk=store_user_id,
+            store=store,
+            auth_user=request.user,
+            is_active=True,
+        )
+        .select_related("warehouse")
+        .first()
+    )
+
+
+def _can_access_store_permission(request, store, permission_key):
+    if store.owner_id == request.user.id:
+        return True
+    store_user = _current_store_user_for_request(request, store)
+    if not store_user:
+        return False
+    return bool((store_user.permissions or {}).get(permission_key))
+
+
 def _get_store_for_dashboard(request, store_slug):
     store = Store.objects.filter(slug=store_slug).first()
     if not store:
@@ -1325,6 +1350,9 @@ def search_suppliers(request, store_slug):
 @login_required
 def notices_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    if not _can_access_store_permission(request, store, "receipt_notices"):
+        messages.error(request, "لا تملك صلاحية الوصول إلى الإشعارات.")
+        return redirect("dashboard:home", store_slug=store.slug)
 
     notices = Order.objects.filter(
         store=store,
@@ -1363,11 +1391,15 @@ def notices_list(request, store_slug):
         "notices": notices,
         "current_type": transaction_type,
         "current_keyword": keyword,
+        "can_create_notice": True,
+        "can_delete_notice": store.owner_id == request.user.id,
     })
 #للفلترة
 @login_required
 def notices_filter(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    if not _can_access_store_permission(request, store, "receipt_notices"):
+        return JsonResponse({"detail": "forbidden"}, status=403)
 
     notices = Order.objects.filter(
         store=store,
@@ -1410,6 +1442,11 @@ from decimal import Decimal, InvalidOperation
 @login_required
 def notice_create(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    if not _can_access_store_permission(request, store, "receipt_notices"):
+        messages.error(request, "لا تملك صلاحية إضافة إشعار قبض.")
+        return redirect("dashboard:home", store_slug=store.slug)
+
+    can_add_purchase_notice = store.owner_id == request.user.id
 
     if request.method == "POST":
         # ===== نوع العملية =====
@@ -1417,6 +1454,10 @@ def notice_create(request, store_slug):
 
         if transaction_type not in ["sale", "purchase"]:
             messages.error(request, "نوع الإشعار غير صالح.")
+            return redirect("dashboard:notice_create", store_slug=store.slug)
+
+        if transaction_type == "purchase" and not can_add_purchase_notice:
+            messages.error(request, "لا تملك صلاحية إضافة إشعار صرف.")
             return redirect("dashboard:notice_create", store_slug=store.slug)
 
         # ===== الطرف =====
@@ -1488,13 +1529,17 @@ def notice_create(request, store_slug):
         return redirect("dashboard:notices_list", store_slug=store.slug)
 
     return render(request, "dashboard/notice_create.html", {
-        "store": store
+        "store": store,
+        "can_add_purchase_notice": can_add_purchase_notice,
     })
 
 
 @login_required
 def notice_delete(request, store_slug, notice_id):
     store = _get_store_for_dashboard(request, store_slug)
+    if store.owner_id != request.user.id:
+        messages.error(request, "لا تملك صلاحية حذف الإشعارات.")
+        return redirect("dashboard:notices_list", store_slug=store.slug)
 
     notice = get_object_or_404(
         Order,
@@ -2211,6 +2256,9 @@ def _perform_store_reset(request, store):
 
 def balances_report(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    if not _can_access_store_permission(request, store, "customer_balances"):
+        messages.error(request, "لا تملك صلاحية الاطلاع على أرصدة العملاء.")
+        return redirect("dashboard:home", store_slug=store.slug)
 
     customers = list(Customer.objects.filter(store=store).order_by("name"))
     suppliers = list(Supplier.objects.filter(store=store).order_by("name"))

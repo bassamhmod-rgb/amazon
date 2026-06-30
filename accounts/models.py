@@ -32,6 +32,8 @@ def default_store_user_permissions():
         "sales_orders": False,
         "purchase_orders": False,
         "products": False,
+        "customer_balances": False,
+        "receipt_notices": False,
     }
 
 

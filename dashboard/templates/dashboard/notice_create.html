@@ -109,8 +109,13 @@
                     class="form-select" onchange="toggleTransactionFields()" required>
                 <option value="">اختر النوع</option>
                 <option value="sale">عميل</option>
-                <option value="purchase">مورد</option>
+                {% if can_add_purchase_notice %}
+                    <option value="purchase">مورد</option>
+                {% endif %}
             </select>
+            {% if not can_add_purchase_notice %}
+                <div class="form-text mt-2">هذه الصلاحية مخصصة لإشعار القبض فقط.</div>
+            {% endif %}
         </div>
 
         <!-- الطرف -->

@@ -14,6 +14,8 @@ class StoreUserForm(forms.ModelForm):
     sales_orders = forms.BooleanField(required=False, label="السماح بإدخال طلبات البيع")
     purchase_orders = forms.BooleanField(required=False, label="السماح بإدخال طلبات الشراء")
     products = forms.BooleanField(required=False, label="السماح بإدارة المنتجات")
+    customer_balances = forms.BooleanField(required=False, label="السماح بالاطلاع على أرصدة العملاء")
+    receipt_notices = forms.BooleanField(required=False, label="السماح بإضافة إشعار قبض")
 
     class Meta:
         model = StoreUser
@@ -44,6 +46,8 @@ class StoreUserForm(forms.ModelForm):
         self.fields["sales_orders"].initial = bool(perms.get("sales_orders"))
         self.fields["purchase_orders"].initial = bool(perms.get("purchase_orders"))
         self.fields["products"].initial = bool(perms.get("products"))
+        self.fields["customer_balances"].initial = bool(perms.get("customer_balances"))
+        self.fields["receipt_notices"].initial = bool(perms.get("receipt_notices"))
 
         for field in self.fields.values():
             if isinstance(field.widget, forms.CheckboxInput):
@@ -57,6 +61,8 @@ class StoreUserForm(forms.ModelForm):
             "sales_orders": bool(self.cleaned_data.get("sales_orders")),
             "purchase_orders": bool(self.cleaned_data.get("purchase_orders")),
             "products": bool(self.cleaned_data.get("products")),
+            "customer_balances": bool(self.cleaned_data.get("customer_balances")),
+            "receipt_notices": bool(self.cleaned_data.get("receipt_notices")),
         }
         raw_password = self.cleaned_data.get("raw_password")
         if raw_password:
