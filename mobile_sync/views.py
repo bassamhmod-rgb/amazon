@@ -677,7 +677,6 @@ def products_pull(request):
 @permission_classes([AllowAny])
 def store_users_pull(request):
     merchant_id = request.query_params.get("merchant_id")
-    since = request.query_params.get("since")
 
     if not merchant_id:
         return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -691,34 +690,31 @@ def store_users_pull(request):
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    qs = StoreUser.objects.filter(store_id=merchant_id_int).order_by("id")
-    if since not in (None, "", "0"):
-        try:
-            since_int = int(since)
-        except (TypeError, ValueError):
-            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+    qs = (
+        StoreUser.objects.filter(store_id=merchant_id_int)
+        .exclude(auth_user=store.owner)
+        .order_by("id")
+    )
 
-    data = []
-    if since in (None, "", "0"):
-        owner_profile = _ensure_owner_store_user(store)
-        owner = store.owner
-        owner_name = (owner_profile.name if owner_profile else owner.get_full_name() or owner.username or store.name).strip()
-        data.append(
-            {
-                "id": owner_profile.id if owner_profile else owner.id,
-                "store_id": store.id,
-                "identifier": owner_profile.identifier if owner_profile else owner.username,
-                "name": owner_name,
-                "warehouse_id": None,
-                "access_id": None,
-                "is_active": owner.is_active and store.is_active,
-                "has_password": owner.has_usable_password(),
-                "password": owner.password,
-                "is_owner": True,
-                "update_time": store.update_time or 0,
-            }
-        )
+    owner_profile = _ensure_owner_store_user(store)
+    owner = store.owner
+    owner_name = (
+        owner_profile.name if owner_profile else owner.get_full_name() or owner.username or store.name
+    ).strip()
+
+    data = [
+        {
+            "id": owner_profile.id if owner_profile else owner.id,
+            "store_id": store.id,
+            "identifier": owner_profile.identifier if owner_profile else owner.username,
+            "name": owner_name,
+            "warehouse_id": None,
+            "is_active": owner.is_active and store.is_active,
+            "has_password": owner.has_usable_password(),
+            "password": owner.password,
+            "is_owner": True,
+        }
+    ]
 
     data.extend(
         {
@@ -727,12 +723,10 @@ def store_users_pull(request):
             "identifier": u.identifier,
             "name": u.name,
             "warehouse_id": u.warehouse_id,
-            "access_id": u.access_id,
             "is_active": u.is_active,
             "has_password": bool(u.password),
             "password": u.password,
             "is_owner": False,
-            "update_time": u.update_time or 0,
         }
         for u in qs.select_related("warehouse").only(
             "id",
@@ -740,10 +734,8 @@ def store_users_pull(request):
             "identifier",
             "name",
             "warehouse_id",
-            "access_id",
             "is_active",
             "password",
-            "update_time",
         )
     )
 
@@ -751,7 +743,7 @@ def store_users_pull(request):
         {
             "merchant_id": merchant_id_int,
             "items": data,
-            "max_update_time": max((x["update_time"] for x in data), default=0),
+            "max_update_time": 0,
         }
     )
 
