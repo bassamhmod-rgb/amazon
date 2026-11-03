@@ -1,20 +1,26 @@
-
+﻿
 from django.urls import path
 from . import views
 from . import views_api
+from . import warehouse_transfer_views
+from .account_views import owner_account
 app_name = "dashboard"
 urlpatterns = [
+    path("<slug:store_slug>/products/transfers/", warehouse_transfer_views.transfer_list, name="warehouse_transfers"),
+    path("<slug:store_slug>/products/transfers/add/", warehouse_transfer_views.transfer_create, name="warehouse_transfer_create"),
+    path("<slug:store_slug>/products/transfers/<int:transfer_id>/", warehouse_transfer_views.transfer_detail, name="warehouse_transfer_detail"),
+    path("<slug:store_slug>/account/", owner_account, name="owner_account"),
     path("<slug:store_slug>/", views.dashboard_home, name="home"),
     path("<slug:store_slug>/orders/", views.orders_list, name="orders_list"),
 
-    # 🔹 إدارة المنتجات
+    # ًں”¹ ط¥ط¯ط§ط±ط© ط§ظ„ظ…ظ†طھط¬ط§طھ
     path("<slug:store_slug>/products/", views.products_list, name="products_list"),
     path("<slug:store_slug>/products/add/", views.product_create, name="product_create"),
     path("<slug:store_slug>/products/<int:product_id>/edit/", views.product_update, name="product_update"),
     path("<slug:store_slug>/products/<int:product_id>/delete/", views.product_delete, name="product_delete"),
     path("products/gallery/<int:image_id>/delete/", views.delete_gallery_image, name="delete_gallery_image"),
 
-    # 🏬 المستودعات
+    # ًںڈ¬ ط§ظ„ظ…ط³طھظˆط¯ط¹ط§طھ
     path("<slug:store_slug>/products/warehouses/", views.warehouses_list, name="warehouses_list"),
     path("<slug:store_slug>/products/warehouses/add/", views.warehouse_create, name="warehouse_create"),
     path(
@@ -28,7 +34,7 @@ urlpatterns = [
         name="warehouse_delete",
     ),
 
-    # 👤 المستخدمين
+    # ًں‘¤ ط§ظ„ظ…ط³طھط®ط¯ظ…ظٹظ†
     path("<slug:store_slug>/products/users/", views.store_users_list, name="store_users_list"),
     path("<slug:store_slug>/products/users/add/", views.store_user_create, name="store_user_create"),
     path(
@@ -42,15 +48,15 @@ urlpatterns = [
         name="store_user_delete",
     ),
 
-# ادارة الفئات
+# ط§ط¯ط§ط±ط© ط§ظ„ظپط¦ط§طھ
     path('<slug:store_slug>/categories/', views.categories_list, name='categories_list'),
     path('<slug:store_slug>/categories/add/', views.add_category, name='add_category'),
     path('<slug:store_slug>/categories/<int:category_id>/edit/', views.edit_category, name='edit_category'),
     path('<slug:store_slug>/categories/<int:category_id>/delete/', views.delete_category, name='delete_category'),
-#تفاصيل منتج
+#طھظپط§طµظٹظ„ ظ…ظ†طھط¬
     path("<slug:store_slug>/products/<int:product_id>/", views.product_detail, name="product_detail"),
 
-#ادارة طلبات
+#ط§ط¯ط§ط±ط© ط·ظ„ط¨ط§طھ
 path('<slug:store_slug>/orders/<int:order_id>/delete/', views.delete_order, name='delete_order'),
 path('<slug:store_slug>/orders/<int:order_id>/confirm/', views.confirm_order, name='confirm_order'),
 path("<slug:store_slug>/orders/add/", views.order_create, name="order_create"),
@@ -59,30 +65,42 @@ path("<slug:store_slug>/search-products-by-barcode/", views.search_products_by_b
 path("<slug:store_slug>/search-customers/", views.search_customers, name="search_customers"),
 path("<slug:store_slug>/orders/<int:order_id>/edit/", views.order_update, name="order_update"),
 path("<slug:store_slug>/dashboard/order/<int:order_id>/",views.order_detail_dashboard,name="order_detail_dashboard"),
-#لاظهار الكاش باك
+#ظ„ط§ط¸ظ‡ط§ط± ط§ظ„ظƒط§ط´ ط¨ط§ظƒ
 path(
     "stores/<slug:store_slug>/cashback-preview/",
     views.cashback_preview,
     name="cashback_preview"
 ),
 
-#موردين
+#ظ…ظˆط±ط¯ظٹظ†
 path("<slug:store_slug>/suppliers/", views.suppliers_list, name="suppliers_list"),
 path("<slug:store_slug>/suppliers/create/", views.supplier_create, name="supplier_create"),
 path("<slug:store_slug>/suppliers/<int:supplier_id>/edit/", views.supplier_update, name="supplier_update"),
 path("<slug:store_slug>/suppliers/<int:supplier_id>/delete/", views.delete_supplier, name="delete_supplier"),
+path("<slug:store_slug>/employees/", views.employees_list, name="employees_list"),
+path("<slug:store_slug>/employees/add/", views.employee_create, name="employee_create"),
+path("<slug:store_slug>/employees/settings/", views.employee_settings, name="employee_settings"),
+path("<slug:store_slug>/employees/<int:employee_id>/edit/", views.employee_update, name="employee_update"),
+path("<slug:store_slug>/employees/salary-vouchers/", views.salary_vouchers_list, name="salary_vouchers_list"),
+path("<slug:store_slug>/employees/salary-vouchers/add/", views.salary_voucher_create, name="salary_voucher_create"),
+path("<slug:store_slug>/employees/salary-vouchers/<int:voucher_id>/edit/", views.salary_voucher_update, name="salary_voucher_update"),
+path("<slug:store_slug>/employees/salary-payments/", views.salary_payments_list, name="salary_payments_list"),
+path("<slug:store_slug>/employees/salary-payments/add/", views.salary_payment_create, name="salary_payment_create"),
+path("<slug:store_slug>/employees/salary-payments/<int:payment_id>/edit/", views.salary_payment_update, name="salary_payment_update"),
 path("<slug:store_slug>/balances/", views.balances_report, name="balances_report"),
 path("<slug:store_slug>/profits/", views.profits_report, name="profits_report"),
+path("<slug:store_slug>/fixed-assets/", views.fixed_assets_list, name="fixed_assets_list"),
 
-# للبحث
+# ظ„ظ„ط¨ط­ط«
 path("<slug:store_slug>/search-suppliers/", views.search_suppliers),
 
 # Customers (Clients)
 path("<slug:store_slug>/customers/", views.customers_list, name="customers_list"),
 path("<slug:store_slug>/customers/add/", views.customer_create, name="customer_create"),
+path("<slug:store_slug>/customers/bulk-delete/", views.bulk_delete_customers, name="bulk_delete_customers"),
 path("<slug:store_slug>/customers/<int:customer_id>/edit/", views.customer_update, name="customer_update"),
 path("<slug:store_slug>/customers/<int:customer_id>/delete/", views.delete_customer, name="delete_customer"),
-# ادارة النقاط
+# ط§ط¯ط§ط±ط© ط§ظ„ظ†ظ‚ط§ط·
 path("<slug:store_slug>/points/", views.points_page, name="points_page"),
 path(
     "stores/<slug:store_slug>/points/delete/<int:transaction_id>/",
@@ -90,41 +108,56 @@ path(
     name="delete_points_transaction"
 ),
 
-#اعدادات
+#ط§ط¹ط¯ط§ط¯ط§طھ
 path("<slug:store_slug>/settings/", views.store_settings, name="store_settings"),
 path("<slug:store_slug>/settings/reset-data/", views.reset_store_data, name="reset_store_data"),
-#الجرد
+path(
+    "<slug:store_slug>/settings/reset-access-export-flags/",
+    views.reset_access_export_flags,
+    name="reset_access_export_flags",
+),
+path(
+    "<slug:store_slug>/settings/allow-mobile-resend/",
+    views.allow_mobile_resend,
+    name="allow_mobile_resend",
+),
+#ط§ظ„ط¬ط±ط¯
 path(
     "<slug:store_slug>/inventory/",
     views.inventory_list,
     name="inventory_list"
 ),
-#عرض اشعارات القبض و الصرف
+#ط¹ط±ط¶ ط§ط´ط¹ط§ط±ط§طھ ط§ظ„ظ‚ط¨ط¶ ظˆ ط§ظ„طµط±ظپ
 path(
     "store/<slug:store_slug>/notices/",
     views.notices_list,
     name="notices_list"
 ),
-#اضافة اشعار قبض او صرف
+#ط§ط¶ط§ظپط© ط§ط´ط¹ط§ط± ظ‚ط¨ط¶ ط§ظˆ طµط±ظپ
 path(
         "store/<slug:store_slug>/notices/create/",
         views.notice_create,
         name="notice_create"
     ),
-# للفلترة داخل الاشعارات
+# ظ„ظ„ظپظ„طھط±ط© ط¯ط§ط®ظ„ ط§ظ„ط§ط´ط¹ط§ط±ط§طھ
 path(
     "store/<slug:store_slug>/notices/filter/",
     views.notices_filter,
     name="notices_filter"
 ),
-#حذف اشعار
+#ط­ط°ظپ ط§ط´ط¹ط§ط±
+path(
+    'store/<slug:store_slug>/notices/bulk-delete/',
+    views.notice_bulk_delete,
+    name='notice_bulk_delete'
+),
 path(
     "store/<slug:store_slug>/notices/<int:notice_id>/delete/",
     views.notice_delete,
     name="notice_delete"
 ),
 
-# الصرفيات
+# ط§ظ„طµط±ظپظٹط§طھ
 path("<slug:store_slug>/expenses/", views.expenses_list, name="expenses_list"),
 path("<slug:store_slug>/expenses/<int:expense_id>/edit/", views.expense_edit, name="expense_edit"),
 path("<slug:store_slug>/expenses/<int:expense_id>/delete/", views.expense_delete, name="expense_delete"),
@@ -146,4 +179,45 @@ path(
     views_api.create_expense_from_access,
     name="create_expense_from_access"
 ),
+path(
+    "api/merchant-employees/<int:merchant_id>/",
+    views_api.merchant_employees_export_api,
+    name="merchant_employees_export_api",
+),
+path(
+    "api/merchant-employees-confirm/",
+    views_api.merchant_employees_confirm_api,
+    name="merchant_employees_confirm_api",
+),
+path(
+    "api/create-employee-department-from-access/<int:merchant_id>/",
+    views_api.create_employee_department_from_access,
+    name="create_employee_department_from_access",
+),
+path(
+    "api/create-employee-job-title-from-access/<int:merchant_id>/",
+    views_api.create_employee_job_title_from_access,
+    name="create_employee_job_title_from_access",
+),
+path(
+    "api/create-employee-pay-period-from-access/<int:merchant_id>/",
+    views_api.create_employee_pay_period_from_access,
+    name="create_employee_pay_period_from_access",
+),
+path(
+    "api/create-employee-from-access/<int:merchant_id>/",
+    views_api.create_employee_from_access,
+    name="create_employee_from_access",
+),
+path(
+    "api/create-salary-voucher-from-access/<int:merchant_id>/",
+    views_api.create_salary_voucher_from_access,
+    name="create_salary_voucher_from_access",
+),
+path(
+    "api/create-salary-payment-from-access/<int:merchant_id>/",
+    views_api.create_salary_payment_from_access,
+    name="create_salary_payment_from_access",
+),
 ]
+

@@ -136,6 +136,18 @@
 
 <form method="post">
 {% csrf_token %}
+<div class="mb-3">
+    <label class="form-label">مستودع الطلب</label>
+    {% if can_select_warehouse %}
+    <select name="warehouse_id" class="form-select" required>
+        {% for w in order_warehouses %}
+        <option value="{{ w.pk }}" {% if w.pk == selected_order_warehouse.pk %}selected{% endif %}>{{ w.name }}</option>
+        {% endfor %}
+    </select>
+    {% else %}
+    <div>{{ selected_order_warehouse.name|default:"يجب ربط المستخدم بمستودع فعال قبل إنشاء الطلب." }}</div>
+    {% endif %}
+</div>
 <input type="hidden" name="customer_id" id="customer_id">
 <input type="hidden" name="supplier_id" id="supplier_id">
 
@@ -241,6 +253,12 @@
        placeholder="محسوب تلقائياً ويمكن التعديل">
 </div>
 </div>
+    <div class="row g-3 mt-3">
+        <div class="col-12">
+            <label>&#1605;&#1604;&#1575;&#1581;&#1592;&#1577;</label>
+            <textarea name="note" class="form-control" rows="2" placeholder="&#1575;&#1603;&#1578;&#1576; &#1605;&#1604;&#1575;&#1581;&#1592;&#1577;"></textarea>
+        </div>
+    </div>
     <button class="btn btn-primary mt-4 px-4">💾 حفظ الطلب</button>
     <a href="{% url 'dashboard:orders_list' store.slug %}"
        class="btn btn-secondary mt-4 px-4">إلغاء</a>
@@ -250,6 +268,7 @@
 </div>
 
 <!-- ===== كل السكربتات بدون أي نقص ===== -->
+{% include 'dashboard/customer_note_script.html' %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     toggleTransactionFields();
@@ -430,6 +449,7 @@ document.getElementById("customerSearch").addEventListener("keydown", function (
 });
 
 function selectCustomer(item) {
+    applyInvoiceCustomerPrivateNote(item.private_note);
     document.getElementById("customer_id").value = item.id;
     document.getElementById("selectedCustomerName").innerText = item.name;
 
@@ -439,6 +459,7 @@ function selectCustomer(item) {
 }
 
 function removeCustomer() {
+    applyInvoiceCustomerPrivateNote('');
     document.getElementById("customer_id").value = "";
     document.getElementById("customerSearchContainer").style.display = "block";
     document.getElementById("selectedCustomerCard").style.display = "none";
@@ -579,5 +600,6 @@ function updateCashbackPreview() {
 }
 </script>
 
+{% include "core/message_dialog.html" %}
 </body>
 </html>

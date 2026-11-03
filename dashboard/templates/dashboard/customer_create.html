@@ -3,7 +3,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إضافة عميل – {{ store.name }}</title>
+    <title>إضافة عميل - {{ store.name }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
@@ -15,7 +15,6 @@
             overflow-x:hidden;
         }
 
-        /* ===== SIDEBAR ===== */
         .sidebar{
             width:230px;
             background:#fff;
@@ -43,19 +42,16 @@
             color:#0d6efd;
         }
 
-        /* ===== CONTENT ===== */
         .content{
             margin-right:240px;
             padding:20px;
             transition:.3s;
         }
 
-        /* ===== SIDEBAR ARROW ===== */
         #sidebarArrow{
             display:none;
         }
 
-        /* ===== MOBILE (نفس صفحة المنتجات) ===== */
         @media (max-width:768px){
             .sidebar{ right:-260px; }
             .sidebar.active{ right:0; }
@@ -99,38 +95,64 @@
 
 <body>
 
-<!-- سهم السايدبار -->
-<div id="sidebarArrow">❯</div>
+<div id="sidebarArrow">‹</div>
 
-<!-- Sidebar -->
 {% include "dashboard/sidebar.html" %}
 
-<!-- Content -->
 <div class="content">
 
     <h3 class="mb-3">إضافة عميل جديد</h3>
 
     <form method="post" class="bg-white p-4 rounded shadow-sm">
         {% csrf_token %}
+<div class="mb-3"><label class="form-label" for="private-note">&#1605;&#1604;&#1575;&#1581;&#1592;&#1577; &#1582;&#1575;&#1589;&#1577;</label>
+<textarea id="private-note" name="private_note" class="form-control" rows="3">{{ form_data.private_note|default:'' }}</textarea></div>
 
         <div class="mb-3">
             <label class="form-label">اسم العميل</label>
             <input type="text" name="name" class="form-control"
-                   placeholder="اكتب اسم العميل" required>
+                   placeholder="اكتب اسم العميل" value="{{ form_data.name }}" required>
         </div>
 
         <div class="mb-3">
             <label class="form-label">رقم الموبايل</label>
             <input type="text" name="phone" class="form-control"
-                   placeholder="مثال: 0933333333" required>
+                   placeholder="مثال: 0933333333" value="{{ form_data.phone }}">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">السعر الخاص للعميل</label>
+            <select name="preferred_price_level" class="form-select">
+                <option value="0" {% if form_data.preferred_price_level|default:'0' == '0' %}selected{% endif %}>اتباع النظام</option>
+                <option value="1" {% if form_data.preferred_price_level == '1' %}selected{% endif %}>سعر المفرق</option>
+                <option value="2" {% if form_data.preferred_price_level == '2' %}selected{% endif %}>سعر نص جملة</option>
+                <option value="3" {% if form_data.preferred_price_level == '3' %}selected{% endif %}>سعر جملة</option>
+                <option value="4" {% if form_data.preferred_price_level == '4' %}selected{% endif %}>آخر سعر بيع لهذا العميل</option>
+                <option value="5" {% if form_data.preferred_price_level == '5' %}selected{% endif %}>آخر سعر بيع للمادة عموماً</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">قيمة الاشتراك</label>
+            <input type="number" name="balance" class="form-control"
+                   min="0" step="0.01" value="{{ form_data.balance|default:'0' }}">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">الرصيد الافتتاحي</label>
+            <input type="number" name="opening_balance" class="form-control"
+                   step="0.01" value="{{ form_data.opening_balance|default:'0' }}">
+            <div class="form-text">الموجب: على العميل، السالب: له.</div>
+        </div>
+
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="is_subscription_active" id="is_subscription_active" checked>
+            <label class="form-check-label" for="is_subscription_active">الاشتراك مفعل</label>
         </div>
 
         <div class="d-flex gap-2 flex-wrap">
             <button class="btn btn-primary">حفظ</button>
-            <a href="{% url 'dashboard:customers_list' store.slug %}"
-               class="btn btn-secondary">
-                إلغاء
-            </a>
+            <a href="{% url 'dashboard:customers_list' store.slug %}" class="btn btn-secondary">إلغاء</a>
         </div>
     </form>
 
@@ -142,7 +164,7 @@
 
     arrow.onclick = () => {
         sidebar.classList.toggle("active");
-        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+        arrow.innerHTML = sidebar.classList.contains("active") ? "›" : "‹";
     };
 </script>
 

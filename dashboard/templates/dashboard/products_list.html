@@ -182,6 +182,12 @@
         </a>
     </div>
 
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} mb-3">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
     <!-- فلترة -->
     <form method="get" class="row g-2 mb-3" id="productsFilterForm">
         <div class="col-12 col-md-4">
@@ -245,7 +251,7 @@
                 </thead>
                 <tbody>
                     {% for product in products_qs %}
-                    <tr>
+                    <tr data-edit-url="{% url 'dashboard:product_update' current_store.slug product.id %}?return_query={{ product_list_query|urlencode }}" tabindex="0" role="link" aria-label="تعديل {{ product.name }}">
                         
 
                         <td>{{ product.name }}</td>
@@ -259,7 +265,7 @@
                                 🔍
                             </a>
 
-                            <a href="{% url 'dashboard:product_update' current_store.slug product.id %}"
+                            <a href="{% url 'dashboard:product_update' current_store.slug product.id %}?return_query={{ product_list_query|urlencode }}"
                                class="btn btn-warning btn-sm">
                                 ✏️
                             </a>
@@ -267,7 +273,7 @@
                             <form method="post"
                                   action="{% url 'dashboard:product_delete' current_store.slug product.id %}"
                                   style="display:inline;"
-                                  onsubmit="return confirm('هل أنت متأكد من حذف المنتج؟');">
+                                  onsubmit="return confirm('{% if is_access_linked %}انتبه: قد توجد فواتير مرتبطة بهذه المادة لم تتم مزامنتها بعد من قاعدة البيانات المركزية أو نقاط البيع. حذف المادة قبل اكتمال المزامنة قد يمنع رفع هذه الفواتير.\n\nهل تريد الحذف بالتأكيد؟{% else %}هل أنت متأكد من حذف المنتج؟{% endif %}');">
                                 {% csrf_token %}
                                 <button type="submit"
                                  class="btn btn-danger js-confirm-delete">
@@ -302,6 +308,7 @@
     };
 </script>
 <script src="{% static 'js/confirm_delete.js' %}"></script>
+<script src="{% static 'js/catalog_edit_navigation.js' %}" defer></script>
 
 <script>
 (() => {

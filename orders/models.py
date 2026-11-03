@@ -1,5 +1,6 @@
 ﻿from django.db import models
 from django.contrib.auth.models import User
+from decimal import Decimal
 
 from stores.models import Store, StorePaymentMethod, Warehouse
 from accounts.models import Customer, StoreUser
@@ -15,6 +16,8 @@ STATUS_CHOICES = [
 TRANSACTION_TYPES = [
     ("sale", "بيع"),
     ("purchase", "شراء"),
+    ("sale_return", "مرتجع بيع"),
+    ("purchase_return", "مرتجع شراء"),
 ]
 
 PAYMENT_TYPES = [
@@ -36,9 +39,64 @@ def _touch_update_time(instance, kwargs):
         update_fields = set(update_fields)
         update_fields.add("update_time")
         kwargs["update_fields"] = update_fields
+
+
+def _touch_mobile_update_time(instance, kwargs):
+    if getattr(instance, "_skip_mobile_update_time_touch", False):
+        return
+    instance.mobile_update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("mobile_update_time")
+        kwargs["update_fields"] = update_fields
+
+
 class Order(models.Model):
+    storefront_checkout_token = models.UUIDField(null=True, blank=True, unique=True, editable=False)
+    @property
+    def input_discount(self):
+        from mobile_sync.input_money import source_values
+        return source_values(self).get("discount", self.discount)
+
+    @property
+    def input_payment(self):
+        from mobile_sync.input_money import source_values
+        return source_values(self).get("payment", self.payment)
+
+    @property
+    def input_total(self):
+        from mobile_sync.input_money import source_values
+        return source_values(self).get("subtotal", self.items_total)
+
+    @property
+    def input_currency_label(self):
+        import json
+        currency = json.loads(self.input_data)['currency'] if self.input_data else (self.base_currency or self.store.pricing_currency)
+        return '$' if currency == 'USD' else 'ل.س'
+
+    @property
+    def input_net(self):
+        from mobile_sync.input_money import source_values
+        return source_values(self).get('total', self.net_total)
+
+    @property
+    def input_remaining(self):
+        return Decimal(str(self.input_net)) - Decimal(str(self.input_payment))
+
+    input_data = models.TextField(blank=True, null=True)
+    mobile_uploaded_digest = models.CharField(max_length=64, blank=True, default="")
+    base_currency = models.CharField(max_length=3, blank=True, null=True)
+    payment_currency = models.CharField(max_length=3, blank=True, null=True)
+    exchange_rate = models.FloatField(blank=True, null=True)
+    amount_payment_currency = models.FloatField(blank=True, null=True)
+    subtotal_alt = models.FloatField(blank=True, null=True)
+    discount_alt = models.FloatField(blank=True, null=True)
+    total_alt = models.FloatField(blank=True, null=True)
+
     is_seen_by_store = models.BooleanField(default=False)
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -109,27 +167,38 @@ class Order(models.Model):
     )
 
     transaction_type = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=TRANSACTION_TYPES,
         default="sale"
     )
 
     discount = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+        max_digits=28,
+        decimal_places=12,
         default=0
+    )
+    shipping_cost = models.DecimalField(
+        max_digits=28,
+        decimal_places=12,
+        default=0,
+        verbose_name="أجور الشحن للتكلفة",
     )
 
     payment = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+        max_digits=28,
+        decimal_places=12,
         default=0
     )
 
     amount = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+        max_digits=28,
+        decimal_places=12,
         default=0
+    )
+
+    note = models.TextField(
+        blank=True,
+        default=""
     )
 
     payment_method = models.ForeignKey(
@@ -203,6 +272,7 @@ class Order(models.Model):
         return f"Order #{self.id} â€“ {self.store.name}"
 
     def save(self, *args, **kwargs):
+        _touch_mobile_update_time(self, kwargs)
         if not getattr(self, "_skip_update_time_touch", False):
             should_touch = False
             # لا نعبّي وقت التعديل عند الإنشاء.
@@ -228,7 +298,8 @@ class Order(models.Model):
 
     @property
     def items_total(self):
-        return sum(item.subtotal for item in self.items.all())
+        from mobile_sync.input_money import source_base_value
+        return source_base_value(self, "subtotal", sum(item.subtotal for item in self.items.all()))
 
     @property
     def net_total(self):
@@ -239,7 +310,24 @@ class Order(models.Model):
         return self.net_total - self.payment
 
 class OrderItem(models.Model):
+    @property
+    def input_price(self):
+        from mobile_sync.input_money import source_values
+        return source_values(self).get("price", self.price)
+
+    @property
+    def input_quantity(self):
+        from mobile_sync.input_money import source_values
+        return source_values(self).get("quantity", self.quantity)
+
+    @property
+    def input_subtotal(self):
+        from mobile_sync.input_money import source_values
+        return source_values(self).get("total", self.subtotal)
+
+    input_data = models.TextField(blank=True, null=True)
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     warehouse = models.ForeignKey(
         "stores.Warehouse",
@@ -263,13 +351,20 @@ class OrderItem(models.Model):
     )
 
     quantity = models.DecimalField(
-        max_digits=10,
-        decimal_places=2
+        max_digits=28,
+        decimal_places=12
+    )
+
+    bonus_quantity = models.DecimalField(
+        max_digits=28,
+        decimal_places=12,
+        default=0,
+        help_text="كمية البونص المجانية من نفس الصنف",
     )
 
     price = models.DecimalField(
-        max_digits=10,
-        decimal_places=2
+        max_digits=28,
+        decimal_places=12
     )
 
     direction = models.IntegerField(
@@ -277,6 +372,7 @@ class OrderItem(models.Model):
         help_text="ط¨ظٹط¹ = -1 / ط´ط±ط§ط، = +1"
     )
 
+    line_note = models.TextField(blank=True, default="", verbose_name="ملاحظة البند")
     item_note = models.TextField(
         blank=True,
         null=True,
@@ -284,8 +380,8 @@ class OrderItem(models.Model):
     )
 
     buy_price = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+        max_digits=28,
+        decimal_places=12,
         null=True,
         blank=True,
         help_text="طھظƒظ„ظپط© ط§ظ„ظ‚ط·ط¹ط© ظˆظ‚طھ ط§ظ„ط¨ظٹط¹ / ط³ط¹ط± ط§ظ„ط´ط±ط§ط،"
@@ -293,14 +389,20 @@ class OrderItem(models.Model):
 
     @property
     def subtotal(self):
-        return self.price * abs(self.quantity)
+        from mobile_sync.input_money import source_base_value
+        return source_base_value(self, "total", self.price * abs(self.quantity))
+
+    @property
+    def stock_quantity(self):
+        return abs(self.quantity) + abs(self.bonus_quantity or 0)
 
     @property
     def profit(self):
         if self.direction == 1 or self.buy_price is None:
             return 0
-        return (self.price - self.buy_price) * abs(self.quantity)
+        return self.subtotal - self.buy_price * self.stock_quantity
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)

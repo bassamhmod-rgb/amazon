@@ -72,6 +72,10 @@
             color: var(--primary-color);
         }
 
+        .product-prices {
+            display: flex;
+            flex-direction: column;
+        }
         .product-price {
             font-size: 1.6rem;
             font-weight: 700;
@@ -175,17 +179,17 @@
                 <h1 class="product-title">{{ product.name }}</h1>
 
                 {% if product.show_price %}
-                {% if store.pricing_currency == "USD" %}
-                    <div class="product-price">{{ product.price|floatformat:2 }} $</div>
-                    <div class="text-muted" style="font-size:1rem;">
-                        {{ product.price_syp|floatformat:0 }} ل.س
-                    </div>
-                {% else %}
-                    <div class="product-price">{{ product.price_syp|floatformat:0 }} ل.س</div>
-                {% endif %}
-                {% endif %}
+    <div class="product-prices">
+    {% if store.display_currency == "USD" or store.display_currency == "BOTH" %}
+        {% if product.price_usd != None %}<div class="product-price">{{ product.price_usd|floatformat:2 }} $</div>{% endif %}
+    {% endif %}
+    {% if store.display_currency == "SYP" or store.display_currency == "BOTH" %}
+        {% if product.price_syp != None %}<div class="product-price">{{ product.price_syp|floatformat:0 }} ل.س</div>{% endif %}
+    {% endif %}
+    </div>
+{% endif %}
 
-                <p><strong>الكمية المتوفرة:</strong> {{ product.real_stock }}</p>
+                <p><strong>الكمية المتوفرة:</strong> {{ product.real_stock_calc }}</p>
                 <p><strong>الفئة:</strong>
                     {% if product.category %}
                         {{ product.category.name }}
@@ -225,7 +229,7 @@
                 </div>
                 {% endif %}
 
-<form method="POST" action="{% url 'cart:add_to_cart' store.slug product.id %}">                    
+<form id="local-product-form" data-product-id="{{ product.id }}">
                                  {% csrf_token %}  <div class="row g-2 mb-3"></div>
                             <div class="row g-2 mb-3">
                         <div class="col-3">
@@ -235,7 +239,7 @@
 
                         <div class="col-9">
                             <label class="form-label-sm">ملاحظة (لون، قياس..)</label>
-                            <input type="text" name="item_note" class="form-control custom-input" placeholder="اكتب تفاصيل المنتج هنا...">
+                            <input type="text" name="item_note" maxlength="2000" class="form-control custom-input" placeholder="اكتب تفاصيل المنتج هنا...">
                         </div>
                     </div>
 
@@ -259,6 +263,8 @@
     }
 </script>
 
+{% include "stores/local_cart_dialog.html" %}
+{% include "stores/storefront_return_position.html" %}
 </body>
 </html>
 

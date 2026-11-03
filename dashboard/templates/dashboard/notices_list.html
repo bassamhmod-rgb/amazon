@@ -112,6 +112,19 @@
     </div>
 <div class="card p-3 mb-3 shadow-sm border-0">
 
+    <div class="row g-2 mb-3">
+        <div class="col-12 col-md-6">
+            <label class="form-label fw-bold">رقم الإشعار بالمتجر</label>
+            <input type="number" id="filterNoticeId" class="form-control"
+                   value="{{ current_notice_id }}" placeholder="رقم الإشعار بالمتجر">
+        </div>
+        <div class="col-12 col-md-6">
+            <label class="form-label fw-bold">رقم الإشعار بالتطبيق</label>
+            <input type="number" id="filterMobileNoticeId" class="form-control"
+                   value="{{ current_mobile_notice_id }}" placeholder="رقم الإشعار بالتطبيق">
+        </div>
+    </div>
+
     <label class="form-label fw-bold">نوع الإشعار</label>
     <select id="filter_type" class="form-select mb-3" onchange="onFilterTypeChange()">
         <option value="">الكل</option>
@@ -138,21 +151,37 @@
 </div>
     <!-- ===== جدول الإشعارات ===== -->
     <div class="card p-3 shadow-sm">
-        <div class="table-responsive">
-            <table class="table table-striped align-middle mb-0">
-                <thead>
-      <tr>
-          <th>#</th>
-          <th>النوع</th>
-          <th>الطرف</th>
-          <th>مبلغ (صرف)</th>
-          <th>دفعة (قبض)</th>
-          <th>التاريخ</th>
-          {% if can_delete_notice %}
-              <th>حذف</th>
-          {% endif %}
-      </tr>
-  </thead>
+        <form method="post" action="{% url 'dashboard:notice_bulk_delete' store.slug %}" id="bulkDeleteForm">
+            {% csrf_token %}
+            {% if can_delete_notice %}
+                <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="selectAllNotices">
+                        <label class="form-check-label fw-bold" for="selectAllNotices">تحديد الكل</label>
+                    </div>
+                    <button type="submit" class="btn btn-danger" id="deleteSelectedBtn" disabled>
+                        حذف المحدد
+                    </button>
+                </div>
+            {% endif %}
+            <div class="table-responsive">
+                <table class="table table-striped align-middle mb-0">
+                    <thead>
+          <tr>
+              {% if can_delete_notice %}
+                  <th style="width:48px;">تحديد</th>
+              {% endif %}
+              <th>#</th>
+              <th>النوع</th>
+              <th>الطرف</th>
+              <th>مبلغ (صرف)</th>
+              <th>دفعة (قبض)</th>
+              <th>التاريخ</th>
+              {% if can_delete_notice %}
+                  <th>حذف</th>
+              {% endif %}
+          </tr>
+      </thead>
 
                 <tbody id="noticesTable">
 
@@ -162,8 +191,9 @@
 
                 </tbody>
 
-            </table>
-        </div>
+                </table>
+            </div>
+        </form>
     </div>
 
 </div>
@@ -193,19 +223,70 @@ function onFilterTypeChange() {
 }
 
 function applyNoticeFilter() {
-    let url = `/dashboard/store/{{ store.slug }}/notices/filter/?`;
+    const params = new URLSearchParams();
 
     const type = document.getElementById("filter_type").value;
-    if (type) url += `transaction_type=${type}&`;
-    if (filterCustomerId) url += `customer_id=${filterCustomerId}&`;
-    if (filterSupplierId) url += `supplier_id=${filterSupplierId}`;
+    const noticeId = document.getElementById("filterNoticeId").value.trim();
+    const mobileNoticeId = document.getElementById("filterMobileNoticeId").value.trim();
+    if (type) params.set("transaction_type", type);
+    if (noticeId) params.set("notice_id", noticeId);
+    if (mobileNoticeId) params.set("mobile_notice_id", mobileNoticeId);
+    if (filterCustomerId) params.set("customer_id", filterCustomerId);
+    if (filterSupplierId) params.set("supplier_id", filterSupplierId);
+
+    const url = `/dashboard/store/{{ store.slug }}/notices/filter/?${params.toString()}`;
 
     fetch(url)
         .then(r => r.text())
         .then(html => {
             document.getElementById("noticesTable").innerHTML = html;
+            refreshNoticeSelectionState();
         });
 }
+
+document.getElementById("filterNoticeId").addEventListener("input", applyNoticeFilter);
+document.getElementById("filterMobileNoticeId").addEventListener("input", applyNoticeFilter);
+
+function refreshNoticeSelectionState() {
+    const checkboxes = [...document.querySelectorAll(".notice-select")];
+    const selected = checkboxes.filter(item => item.checked);
+    const selectAll = document.getElementById("selectAllNotices");
+    const deleteBtn = document.getElementById("deleteSelectedBtn");
+
+    if (selectAll) {
+        selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+        selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+    }
+    if (deleteBtn) {
+        deleteBtn.disabled = selected.length === 0;
+    }
+}
+
+document.addEventListener("change", function (event) {
+    if (event.target && event.target.id === "selectAllNotices") {
+        document.querySelectorAll(".notice-select").forEach(item => {
+            item.checked = event.target.checked;
+        });
+        refreshNoticeSelectionState();
+    }
+
+    if (event.target && event.target.classList.contains("notice-select")) {
+        refreshNoticeSelectionState();
+    }
+});
+
+document.getElementById("bulkDeleteForm")?.addEventListener("submit", function (event) {
+    if (event.submitter && event.submitter.id !== "deleteSelectedBtn") {
+        return;
+    }
+
+    const selectedCount = document.querySelectorAll(".notice-select:checked").length;
+    if (!selectedCount || !confirm(`هل تريد حذف ${selectedCount} إشعار محدد؟`)) {
+        event.preventDefault();
+    }
+});
+
+refreshNoticeSelectionState();
 </script>
 <script>
     const sidebar = document.getElementById("sidebar");

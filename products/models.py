@@ -1,7 +1,7 @@
 from django.db import models
 import time
 from stores.models import Store
-from django.db.models import Sum, F
+from django.db.models import Sum, F, Q
 from decimal import Decimal
 from orders.models import OrderItem
 
@@ -17,11 +17,23 @@ def _touch_update_time(instance, kwargs):
         kwargs["update_fields"] = update_fields
 
 
+def _touch_mobile_update_time(instance, kwargs):
+    instance.mobile_update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("mobile_update_time")
+        kwargs["update_fields"] = update_fields
+
+
 class Category(models.Model):
+    display_order = models.PositiveIntegerField(default=0, verbose_name="ترتيب العرض")
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey("stores.Store", on_delete=models.CASCADE, related_name="categories")
     name = models.CharField(max_length=255)
+    image = models.ImageField(upload_to="categories/", blank=True, null=True)
 
     class Meta:
         constraints = [
@@ -36,13 +48,17 @@ class Category(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 
 
 
 
 class Product(models.Model):
+    input_data = models.TextField(blank=True, null=True)
+    display_order = models.PositiveIntegerField(default=0, verbose_name="ترتيب العرض")
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey(
         Store,
@@ -51,14 +67,15 @@ class Product(models.Model):
     )
 
     name = models.CharField(max_length=200)
+    product_number = models.CharField(max_length=100, blank=True, default="", verbose_name="رقم المادة")
     description = models.TextField(blank=True)
 
-    price = models.DecimalField(max_digits=8, decimal_places=2)
-    price2 = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True)
-    price3 = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True)
+    price = models.DecimalField(max_digits=28, decimal_places=12)
+    price2 = models.DecimalField(max_digits=28, decimal_places=12, default=0, blank=True)
+    price3 = models.DecimalField(max_digits=28, decimal_places=12, default=0, blank=True)
 
     unit2 = models.CharField(max_length=100, default="", blank=True)
-    unit2_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True)
+    unit2_price = models.DecimalField(max_digits=28, decimal_places=12, default=0, blank=True)
     unit2_pieces = models.DecimalField(
         max_digits=10,
         decimal_places=3,
@@ -69,13 +86,15 @@ class Product(models.Model):
     show_price = models.BooleanField(default=True)
 
     buy_price = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+        max_digits=28,
+        decimal_places=12,
         default=0,
         help_text="متوسط سعر شراء المنتج"
     )
 
-    stock = models.IntegerField(default=0)
+    stock = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    stock_alert_threshold = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    allow_negative_stock_sale = models.BooleanField(default=False)
     main_image = models.ImageField(upload_to="products/", blank=True, null=True)
 
     category = models.ForeignKey(
@@ -109,48 +128,85 @@ class Product(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 
     # ⭐⭐⭐ المخزون الحقيقي = المخزون الابتدائي + الحركات
     @property
     def real_stock(self):
         movements = self.order_items.aggregate(
-            total=Sum(F("quantity") * F("direction"))
+            total=Sum((F("quantity") + F("bonus_quantity")) * F("direction"))
         )["total"] or 0
-        return self.stock + movements
+        stock_movements = self.stock_movements.aggregate(
+            total=Sum("quantity_change")
+        )["total"] or 0
+        return self.stock + movements + stock_movements
 
     # ⭐ حساب متوسط سعر الشراء (آمن 100%)
-    def get_avg_buy_price(self):
-        total_qty = Decimal("0")
-        total_cost = Decimal("0")
+    def get_sale_item_buy_price(self, order, saved_buy_price=None):
+        if saved_buy_price is not None:
+            saved_buy_price = Decimal(saved_buy_price)
+            if saved_buy_price.is_finite() and saved_buy_price > 0:
+                return saved_buy_price
+        return self.get_avg_buy_price(before_order=order)
 
-        items = OrderItem.objects.filter(product=self).order_by("id")
+    def get_avg_buy_price(self, before_order=None):
+        total_qty = Decimal(self.stock or 0)
+        total_cost = total_qty * Decimal(self.buy_price or 0)
+        purchase_subtotals = {}
+
+        items = (
+            OrderItem.objects
+            .filter(product=self)
+            .select_related("order")
+            .order_by("order__created_at", "order_id", "id")
+        )
+        if before_order is not None:
+            items = items.exclude(order_id=before_order.pk).filter(
+                Q(order__created_at__lt=before_order.created_at)
+                | Q(order__created_at=before_order.created_at, order_id__lt=before_order.pk),
+                order__status__in=("confirmed", "completed"),
+                order__document_kind=1,
+            )
 
         for item in items:
-            qty = Decimal(item.quantity or 0)
+            qty = Decimal(item.quantity or 0) + Decimal(item.bonus_quantity or 0)
+            transaction_type = item.order.transaction_type if item.order_id else ""
+            is_inbound_cost = transaction_type in ("purchase", "sale_return")
+            is_outbound_cost = transaction_type in ("sale", "purchase_return")
 
-            # ⛑️ حماية من None بالبيانات القديمة
             if item.buy_price is not None:
                 buy_price = Decimal(item.buy_price)
-            elif item.direction == 1 and item.price is not None:
+            elif is_inbound_cost and item.price is not None:
                 buy_price = Decimal(item.price)
             else:
                 buy_price = Decimal("0")
 
-            cost = buy_price * qty
+            cost = (Decimal(item.price or 0) * Decimal(item.quantity or 0)
+                    if transaction_type in ("purchase", "purchase_return") else buy_price * qty)
+            if transaction_type == "purchase":
+                if item.order_id not in purchase_subtotals:
+                    purchase_subtotals[item.order_id] = item.order.items.aggregate(
+                        total=Sum(F("price") * F("quantity"))
+                    )["total"] or Decimal("0")
+                subtotal = purchase_subtotals[item.order_id]
+                landed_total = max(
+                    Decimal("0"),
+                    subtotal - Decimal(item.order.discount or 0)
+                    + Decimal(item.order.shipping_cost or 0),
+                )
+                cost = cost * landed_total / subtotal if subtotal > 0 else Decimal("0")
 
-            if item.direction == 1:  # شراء
+            if is_inbound_cost:
                 total_qty += qty
                 total_cost += cost
-
-            elif item.direction == -1:  # بيع
-                if item.buy_price is None:
+            elif is_outbound_cost:
+                if item.buy_price is None or (before_order is not None and item.buy_price <= 0):
                     current_avg = (total_cost / total_qty) if total_qty > 0 else Decimal("0")
                     cost = current_avg * qty
                 total_qty -= qty
                 total_cost -= cost
 
-            # إذا انتهى المخزون نعيد الحساب
             if total_qty <= 0:
                 total_qty = Decimal("0")
                 total_cost = Decimal("0")
@@ -158,7 +214,7 @@ class Product(models.Model):
         if total_qty > 0:
             return total_cost / total_qty
 
-        return Decimal("0")
+        return Decimal("0") if before_order is not None else self.buy_price or Decimal("0")
 
 class ProductDetails(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
@@ -183,6 +239,7 @@ class ProductGallery(models.Model):
 
 class ProductBarcode(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="barcodes")
     value = models.CharField(max_length=120)
@@ -200,4 +257,5 @@ class ProductBarcode(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)

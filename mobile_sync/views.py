@@ -1,11 +1,17 @@
+from .input_money import validate_input_data
+import hashlib
+import base64
 import time
 import json
 import time
+import uuid
+import math
 from urllib.parse import quote
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.contrib.auth import authenticate
 from django.contrib.auth import login as auth_login
+from django.core.files.base import ContentFile
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -16,24 +22,125 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
-from mobile_sync.models import MobileDeleteSync
-from accounts.models import Customer, normalize_phone_number, PointsTransaction
+from mobile_sync.models import MobileDeleteSync, CustomerSyncOrigin
+from accounts.models import Customer, Supplier, normalize_phone_number, PointsTransaction
 from accounts.models import StoreUser
 from products.models import Category
 from products.models import Product
 from products.models import ProductBarcode
 from orders.models import Order, OrderItem
+from dashboard.models import AppUpdate, ContactInfo, Expense, ExpenseType, ExpenseReason, FixedAsset
+from mobile_sync.update_downloads import file_metadata, installer_response
+from employees.models import (
+    Employee,
+    EmployeeDepartment,
+    EmployeeJobTitle,
+    EmployeePayPeriod,
+    SalaryPayment,
+    SalaryPaymentVoucher,
+)
 from stores.models import Store
-from stores.models import Warehouse
+from stores.models import TrialDevice
+from stores.models import (
+    InventoryAdjustment,
+    StockMovement,
+    Warehouse,
+    WarehouseTransfer,
+    WarehouseTransferItem,
+)
 from django.db import IntegrityError, transaction
+from django.db.models import Prefetch, Q
 
 
 STORE_WEB_LOGIN_SIGNER_SALT = "mobile_sync.store_web_login"
 STORE_WEB_LOGIN_MAX_AGE_SECONDS = 300
+MOBILE_PERMISSION_KEYS = [
+    "sales.view",
+    "sales.create",
+    "sales.edit",
+    "sales.delete",
+    "purchases.view",
+    "purchases.create",
+    "purchases.edit",
+    "purchases.delete",
+    "products.view",
+    "products.create",
+    "products.edit",
+    "products.delete",
+    "products.prices",
+    "products.stock",
+    "customers.view",
+    "customers.create",
+    "customers.edit",
+    "customers.delete",
+    "customers.balances",
+    "suppliers.view",
+    "suppliers.create",
+    "suppliers.edit",
+    "suppliers.delete",
+    "suppliers.balances",
+    "warehouses.view",
+    "warehouses.create",
+    "warehouses.edit",
+    "warehouses.delete",
+    "warehouses.transfer",
+    "stock.view",
+    "stock.adjust",
+    "stock.movement",
+    "expenses.view",
+    "expenses.create",
+    "expenses.edit",
+    "expenses.delete",
+    "expenses.settings",
+    "notices.receipt",
+    "notices.receipt.create",
+    "notices.receipt.edit",
+    "notices.receipt.delete",
+    "notices.disbursement",
+    "notices.disbursement.create",
+    "notices.disbursement.edit",
+    "notices.disbursement.delete",
+    "reports.profits",
+    "reports.history",
+    "sync.run",
+    "store.open",
+    "settings.open",
+]
+LEGACY_MOBILE_PERMISSION_MAP = {
+    "sales_orders": ["sales.view", "sales.create"],
+    "purchase_orders": ["purchases.view", "purchases.create"],
+    "products": ["products.view", "products.create", "products.edit"],
+    "customer_balances": ["customers.view", "customers.balances"],
+    "receipt_notices": [
+        "customers.view",
+        "customers.create",
+        "notices.receipt",
+        "notices.receipt.create",
+        "notices.receipt.edit",
+        "notices.receipt.delete",
+        "notices.disbursement",
+        "notices.disbursement.create",
+        "notices.disbursement.edit",
+        "notices.disbursement.delete",
+    ],
+}
+GENERAL_CUSTOMER_NAME = "زبون عام"
+GENERAL_CUSTOMER_PHONE = "GENERAL_CUSTOMER"
 
 
 def _now_minute():
     return int(time.time() // 60)
+
+
+def _mobile_time(obj):
+    return max(
+        getattr(obj, "mobile_update_time", None) or 0,
+        getattr(obj, "update_time", None) or 0,
+    )
+
+
+def _mobile_since_q(since_int):
+    return Q(mobile_update_time__gt=since_int) | Q(update_time__gt=since_int)
 
 
 def _to_int(value, default=None):
@@ -73,19 +180,151 @@ def _to_str(value, default=""):
     return str(value)
 
 
+def _mobile_sync_key(device_id, entity, local_id):
+    device_id = _to_str(device_id).strip()
+    entity = _to_str(entity).strip()
+    if not device_id or not entity or local_id in (None, ""):
+        return None
+    return f"{device_id}:{entity}:{local_id}"[:160]
+
+
+def _all_mobile_permissions():
+    return {key: True for key in MOBILE_PERMISSION_KEYS}
+
+
+def _normalize_mobile_permissions(permissions):
+    permissions = permissions or {}
+    normalized = {key: bool(permissions.get(key)) for key in MOBILE_PERMISSION_KEYS}
+    for legacy_key, new_keys in LEGACY_MOBILE_PERMISSION_MAP.items():
+        if permissions.get(legacy_key):
+            for key in new_keys:
+                normalized[key] = True
+    return normalized
+
+
+def _normalize_mobile(value):
+    return _to_str(value).strip().replace(" ", "")
+
+
+def _request_value(request, key):
+    if request.method == "GET":
+        return request.query_params.get(key)
+    data = request.data if isinstance(request.data, dict) else {}
+    return data.get(key)
+
+
+def _claim_store_user_device(store_user, device_id, *, allow_new=True):
+    # Lock the store as well as the user so two different accounts cannot
+    # concurrently claim the same device. Owners never change POS bindings.
+    with transaction.atomic():
+        store = Store.objects.select_for_update().get(pk=store_user.store_id)
+        user = StoreUser.objects.select_for_update().get(pk=store_user.pk)
+        if not user.is_active:
+            return None, Response(
+                {"detail": "User is inactive"}, status=status.HTTP_409_CONFLICT,
+            )
+        if user.is_owner:
+            return user, None
+        registered = _to_str(user.sync_device_id).strip()
+        if not registered and not allow_new:
+            return None, Response(
+                {"detail": "يلزم تسجيل الدخول عبر الإنترنت لربط الجهاز أولاً."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if registered and registered != device_id:
+            return None, Response(
+                {"detail": "هذا المستخدم مرتبط بجهاز آخر."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        occupied = StoreUser.objects.filter(
+            store=store, sync_device_id=device_id,
+        ).exclude(pk=user.pk).exclude(auth_user_id=store.owner_id).exists()
+        if occupied:
+            return None, Response(
+                {"detail": "هذا الجهاز مرتبط بمستخدم نقطة بيع آخر. يلزم فك الربط بواسطة المدير."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if registered != device_id:
+            StoreUser.objects.filter(pk=user.pk).update(sync_device_id=device_id)
+            user.sync_device_id = device_id
+        return user, None
+
+
+def _ensure_store_user_sync_device(request, merchant_id):
+    device_id = _to_str(_request_value(request, "device_id")).strip()
+    store_user_id = _to_int(_request_value(request, "store_user_id"))
+    store_user_identifier = _to_str(_request_value(request, "store_user_identifier")).strip()
+
+    if not device_id:
+        return None, Response({"detail": "device_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    qs = StoreUser.objects.filter(store_id=merchant_id)
+    if store_user_id is not None:
+        qs = qs.filter(id=store_user_id)
+    elif store_user_identifier:
+        qs = qs.filter(identifier__iexact=store_user_identifier)
+    else:
+        return None, Response(
+            {"detail": "store_user_id or store_user_identifier is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    store_user = qs.first()
+    if not store_user and store_user_id is not None and store_user_identifier:
+        store_user = StoreUser.objects.filter(
+            store_id=merchant_id,
+            identifier__iexact=store_user_identifier,
+        ).first()
+    if not store_user:
+        return None, Response({"detail": "Store user not found"}, status=status.HTTP_404_NOT_FOUND)
+    if not store_user.is_active:
+        return None, Response({"detail": "Store user is inactive"}, status=status.HTTP_409_CONFLICT)
+
+    return _claim_store_user_device(store_user, device_id, allow_new=False)
+
+
+def _ensure_mobile_default_records(store):
+    now_minute = _now_minute()
+    Customer.objects.get_or_create(
+        store=store,
+        name=GENERAL_CUSTOMER_NAME,
+        defaults={
+            "phone": GENERAL_CUSTOMER_PHONE,
+            "address": "",
+            "note": "",
+            "balance": Decimal("0"),
+            "opening_balance": Decimal("0"),
+            "preferred_price_level": 0,
+            "is_subscription_active": True,
+            "mobile_update_time": now_minute,
+        },
+    )
+
+
 def _serialize_category(category):
     return {
         "id": category.id,
         "name": category.name,
         "access_id": category.access_id,
-        "update_time": category.update_time or 0,
+        "update_time": _mobile_time(category),
     }
 
 
-def _serialize_product(product):
+def _product_main_image_url(request, product):
+    if not product.main_image:
+        return ""
+    name = str(product.main_image.name or "").strip()
+    if name.startswith(("http://", "https://")):
+        return name
+    return request.build_absolute_uri(product.main_image.url)
+
+
+def _serialize_product(product, request=None):
     return {
+        "input_data": getattr(product, "input_data", None),
         "id": product.id,
         "name": product.name,
+        "product_number": product.product_number,
         "price": float(product.price if isinstance(product.price, Decimal) else product.price),
         "description": product.description or "",
         "price2": float(product.price2 if isinstance(product.price2, Decimal) else product.price2),
@@ -96,11 +335,17 @@ def _serialize_product(product):
         "show_price": product.show_price,
         "buy_price": float(product.buy_price if isinstance(product.buy_price, Decimal) else product.buy_price),
         "stock": product.stock,
-        "main_image": product.main_image.name if product.main_image else "",
+        "stock_alert_threshold": product.stock_alert_threshold,
+        "allow_negative_stock_sale": product.allow_negative_stock_sale,
+        "main_image": (
+            _product_main_image_url(request, product)
+            if request is not None
+            else (product.main_image.name if product.main_image else "")
+        ),
         "category_id": product.category_id,
         "category2_id": product.category2_id,
         "active": product.active,
-        "update_time": product.update_time or 0,
+        "update_time": _mobile_time(product),
     }
 
 
@@ -110,7 +355,7 @@ def _serialize_barcode(barcode):
         "value": barcode.value,
         "product_id": barcode.product_id,
         "access_id": barcode.access_id,
-        "update_time": barcode.update_time or 0,
+        "update_time": _mobile_time(barcode),
     }
 
 
@@ -118,14 +363,338 @@ def _serialize_customer(customer):
     return {
         "id": customer.id,
         "name": customer.name,
-        "phone": customer.phone,
+        "phone": "" if customer.name == GENERAL_CUSTOMER_NAME else customer.phone,
         "address": customer.address or "",
         "note": customer.note or "",
+        "private_note": customer.private_note or "",
         "balance": float(customer.balance),
         "opening_balance": float(customer.opening_balance),
+        "preferred_price_level": getattr(customer, "preferred_price_level", 0) or 0,
+        "is_subscription_active": customer.is_subscription_active,
         "access_id": customer.access_id,
-        "update_time": customer.update_time or 0,
+        "update_time": _mobile_time(customer),
     }
+
+
+def _serialize_supplier(supplier):
+    return {
+        "id": supplier.id,
+        "name": supplier.name,
+        "phone": supplier.phone or "",
+        "address": supplier.address or "",
+        "email": supplier.email or "",
+        "balance": float(supplier.balance),
+        "opening_balance": float(supplier.opening_balance),
+        "access_id": supplier.access_id,
+        "update_time": _mobile_time(supplier),
+    }
+
+
+def _serialize_warehouse(warehouse):
+    return {
+        "id": warehouse.id,
+        "store_id": warehouse.store_id,
+        "identifier": warehouse.identifier,
+        "name": warehouse.name,
+        "address": warehouse.address or "",
+        "phone": warehouse.phone or "",
+        "percentage": float(warehouse.percentage or 0),
+        "is_representative": warehouse.is_representative,
+        "is_main": warehouse.is_main,
+        "is_active": warehouse.is_active,
+        "access_id": warehouse.access_id,
+        "update_time": _mobile_time(warehouse),
+    }
+
+
+def _serialize_warehouse_transfer(transfer):
+    return {
+        "id": transfer.id,
+        "store_id": transfer.store_id,
+        "from_warehouse_id": transfer.from_warehouse_id,
+        "to_warehouse_id": transfer.to_warehouse_id,
+        "transfer_date": transfer.transfer_date.isoformat() if transfer.transfer_date else "",
+        "notes": transfer.notes or "",
+        "access_id": transfer.access_id,
+        "update_time": _mobile_time(transfer),
+        "items": [
+            {
+                "id": item.id,
+                "product_id": item.product_id,
+                "quantity": float(item.quantity or 0),
+                "unit_name": item.unit_name or "",
+                "unit_factor": float(item.unit_factor or 1),
+                "notes": item.notes or "",
+                "access_id": item.access_id,
+                "update_time": _mobile_time(item),
+            }
+            for item in transfer.items.all()
+        ],
+    }
+
+
+def _serialize_inventory_adjustment(adjustment):
+    return {
+        "id": adjustment.id,
+        "store_id": adjustment.store_id,
+        "product_id": adjustment.product_id,
+        "warehouse_id": adjustment.warehouse_id,
+        "registered_quantity": float(adjustment.registered_quantity or 0),
+        "actual_quantity": float(adjustment.actual_quantity or 0),
+        "difference_quantity": float(adjustment.difference_quantity or 0),
+        "unit_cost": float(adjustment.unit_cost or 0),
+        "difference_value": float(adjustment.difference_value or 0),
+        "reason": adjustment.reason or "",
+        "notes": adjustment.notes or "",
+        "adjusted_at": adjustment.adjusted_at.isoformat()
+        if adjustment.adjusted_at
+        else "",
+        "created_by_store_user_id": adjustment.created_by_store_user_id,
+        "access_id": adjustment.access_id,
+        "update_time": _mobile_time(adjustment),
+    }
+
+
+def _serialize_stock_movement(movement):
+    return {
+        "id": movement.id,
+        "store_id": movement.store_id,
+        "product_id": movement.product_id,
+        "warehouse_id": movement.warehouse_id,
+        "movement_type": movement.movement_type,
+        "quantity_change": float(movement.quantity_change or 0),
+        "unit_cost": float(movement.unit_cost or 0),
+        "reference_type": movement.reference_type or "",
+        "reference_id": movement.reference_id or "",
+        "notes": movement.notes or "",
+        "occurred_at": movement.occurred_at.isoformat() if movement.occurred_at else "",
+        "created_by_store_user_id": movement.created_by_store_user_id,
+        "access_id": movement.access_id,
+        "update_time": _mobile_time(movement),
+    }
+
+
+def _serialize_expense_type(expense_type):
+    return {
+        "id": expense_type.id,
+        "name": expense_type.name,
+        "access_id": expense_type.access_id,
+        "update_time": _mobile_time(expense_type),
+    }
+
+
+def _serialize_expense_reason(expense_reason):
+    return {
+        "id": expense_reason.id,
+        "name": expense_reason.name,
+        "access_id": expense_reason.access_id,
+        "update_time": _mobile_time(expense_reason),
+    }
+
+
+def _mobile_currency_value(obj, name, fallback):
+    value = getattr(obj, name, None)
+    return fallback if value is None or value == "" else value
+
+
+def _currency_sync_fields(payload, names):
+    # Omitted fields from older clients must not erase saved currency metadata.
+    result = {}
+    for name in names:
+        value = payload.get(name)
+        if value is None or value == "":
+            continue
+        if name.endswith("currency") and name != "amount_payment_currency":
+            value = str(value).strip().upper()
+            if value not in ("SYP", "USD"):
+                raise ValueError("Unsupported currency: " + value)
+        else:
+            value = float(value)
+            if not math.isfinite(value) or (name == "exchange_rate" and value <= 0):
+                raise ValueError("Invalid currency value: " + name)
+        result[name] = value
+    return result
+
+
+def _serialize_expense(expense):
+    store = expense.store
+    payment_currency = _mobile_currency_value(expense, "payment_currency", getattr(store, "pricing_currency", "SYP") or "SYP")
+    return {
+        "input_data": getattr(expense, "input_data", None),
+        "id": expense.id,
+        "amount": float(expense.amount or 0),
+        "payment_currency": payment_currency,
+        "exchange_rate": float(_mobile_currency_value(expense, "exchange_rate", getattr(store, "exchange_rate", 1) or 1)),
+        "amount_payment_currency": float(_mobile_currency_value(expense, "amount_payment_currency", expense.amount or 0)),
+        "date": expense.date.strftime("%Y-%m-%d"),
+        "expense_type_server_id": expense.expense_type_id,
+        "expense_type": expense.expense_type.name if expense.expense_type else "",
+        "expense_reason_server_id": expense.expense_reason_id,
+        "expense_reason": expense.expense_reason.name if expense.expense_reason else "",
+        "notes": expense.notes or "",
+        "access_id": expense.access_id,
+        "update_time": _mobile_time(expense),
+    }
+
+
+def _serialize_fixed_asset(asset):
+    return {
+        "id": asset.id,
+        "name": asset.name,
+        "value": float(asset.value or 0),
+        "existed_before_program": asset.existed_before_program,
+        "access_id": asset.access_id,
+        "update_time": _mobile_time(asset),
+    }
+
+
+def _serialize_contact_info(info):
+    return {
+        "id": info.id,
+        "label": info.label,
+        "statement": info.statement or "",
+        "update_time": _mobile_time(info),
+    }
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def activate_permanent_license(request):
+    mobile = _normalize_mobile(request.data.get("mobile"))
+    activation_code = _to_str(request.data.get("activation_code")).strip()
+    device_id = _to_str(request.data.get("device_id")).strip()
+
+    if not mobile or not activation_code or not device_id:
+        return Response(
+            {"detail": "رقم الموبايل ورمز التفعيل ورقم الجهاز مطلوبة."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    store = Store.objects.filter(
+        mobile=mobile,
+        activation_code=activation_code,
+    ).first()
+    if not store:
+        return Response(
+            {
+                "detail": "رمز التفعيل غير صحيح. تواصل مع المسؤول للحصول على رمز تفعيل.",
+                "contact_numbers": ["+963000000000"],
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    registered_device_id = _to_str(store.licensed_device_id).strip()
+    if registered_device_id and registered_device_id != device_id:
+        return Response(
+            {
+                "detail": "يوجد بالفعل نسخة مسجلة من قبل بهذه البيانات يرجى التواصل مع المسؤول",
+                "contact_numbers": ["+963000000000"],
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    if registered_device_id != device_id:
+        store.licensed_device_id = device_id
+        store.save(update_fields=["licensed_device_id"])
+
+    owner_profile = _ensure_owner_store_user(store)
+    if owner_profile and _to_str(owner_profile.sync_device_id).strip() != device_id:
+        StoreUser.objects.filter(pk=owner_profile.pk).update(sync_device_id=device_id)
+
+    return Response(
+        {
+            "license_type": 1,
+            "activation_code": activation_code,
+            "store": {
+                "id": store.id,
+                "name": store.name,
+                "slug": store.slug,
+                "logo": request.build_absolute_uri(store.logo.url) if store.logo else "",
+                "mobile": store.mobile,
+            },
+            "periodic_check_enabled": True,
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def register_trial_license(request):
+    device_id = _to_str(request.data.get("device_id")).strip()
+    owner_name = _to_str(request.data.get("owner_name")).strip()
+    if not device_id:
+        return Response(
+            {"detail": "رقم الجهاز مطلوب."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not owner_name:
+        return Response(
+            {"detail": "اسم صاحب النسخة مطلوب."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    existing = TrialDevice.objects.filter(device_id=device_id).first()
+    if existing:
+        if existing.owner_name != owner_name:
+            existing.owner_name = owner_name
+            existing.save(update_fields=["owner_name"])
+        return Response(
+            {
+                "detail": "انتهت الفترة التجريبية لهذا الجهاز. تواصل مع المسؤول للحصول على نسخة دائمة.",
+                "contact_numbers": ["+963000000000"],
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    TrialDevice.objects.create(device_id=device_id, owner_name=owner_name)
+    return Response({"license_type": 2})
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def check_permanent_license(request):
+    activation_code = _to_str(request.data.get("activation_code")).strip()
+    device_id = _to_str(request.data.get("device_id")).strip()
+
+    if not activation_code or not device_id:
+        return Response(
+            {"detail": "رمز التفعيل ورقم الجهاز مطلوبان."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    store = Store.objects.filter(activation_code=activation_code).first()
+    if not store:
+        return Response(
+            {
+                "valid": False,
+                "detail": "رقم الجهاز غير مطابق للنسخة الدائمة.",
+                "contact_numbers": ["+963000000000"],
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    registered_device_id = _to_str(store.licensed_device_id).strip()
+    if not registered_device_id:
+        return Response(
+            {
+                "valid": False,
+                "needs_activation": True,
+                "detail": "Permanent license needs activation.",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    if registered_device_id != device_id:
+        return Response(
+            {
+                "valid": False,
+                "detail": "رقم الجهاز غير مطابق للنسخة الدائمة.",
+                "contact_numbers": ["+963000000000"],
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    return Response({"valid": True, "store_id": store.id})
 
 
 def _resolve_mobile_warehouse(store, warehouse_server_id):
@@ -145,42 +714,9 @@ def _resolve_mobile_warehouse(store, warehouse_server_id):
 
 
 def _ensure_owner_store_user(store, owner_name=None):
-    owner = getattr(store, "owner", None)
-    if owner is None:
-        return None
+    from accounts.models import ensure_owner_store_user
 
-    owner_profile = getattr(owner, "store_user_profile", None)
-    if owner_profile and owner_profile.store_id == store.id:
-        return owner_profile
-
-    existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
-    if existing:
-        return existing
-
-    display_name = _to_str(owner_name).strip() or (owner.get_full_name() or owner.username or store.name).strip()
-    identifier = _to_str(owner.username).strip() or f"owner_{store.id}"
-
-    try:
-        with transaction.atomic():
-            return StoreUser.objects.create(
-                store=store,
-                auth_user=owner,
-                identifier=identifier,
-                name=display_name,
-                is_active=owner.is_active and store.is_active,
-            )
-    except IntegrityError:
-        with transaction.atomic():
-            existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
-            if existing:
-                return existing
-            return StoreUser.objects.create(
-                store=store,
-                auth_user=owner,
-                identifier=f"{identifier}_{store.id}",
-                name=f"{display_name} ({store.id})",
-                is_active=owner.is_active and store.is_active,
-            )
+    return ensure_owner_store_user(store, owner_name=owner_name)
 
 
 def _sync_mobile_invoice_cashback(store, order, customer):
@@ -263,6 +799,9 @@ def _sync_mobile_invoice_cashback(store, order, customer):
 
 def _apply_category_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
+    image_text = _to_str(payload.get("image")).strip()
+    image_file = _content_file_from_data_url(image_text, "category")
+    image_value = "" if image_text.startswith("data:image/") else image_text
     access_id = _to_int(payload.get("access_id"))
     if not name:
         raise ValueError("Category name is required")
@@ -275,20 +814,87 @@ def _apply_category_change(store, payload, server_id=None):
         obj = Category.objects.filter(store=store, name=name).first()
 
     if obj:
-        update_fields = {"name": name, "update_time": now_minute}
+        update_fields = {"name": name, "mobile_update_time": now_minute}
+        if image_file is None and (image_value or "image" in payload):
+            update_fields["image"] = image_value or None
         if access_id is not None and obj.access_id in (None, 0, ""):
             update_fields["access_id"] = access_id
         Category.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
+        if image_file is not None:
+            obj.image.save(image_file.name, image_file, save=True)
+            obj.mobile_update_time = now_minute
+            obj.save(update_fields=["image", "mobile_update_time"])
         return obj, "updated"
 
     obj = Category.objects.create(
         store=store,
         access_id=access_id,
         name=name,
-        update_time=now_minute,
+        image=image_value or None,
+        mobile_update_time=now_minute,
     )
+    if image_file is not None:
+        obj.image.save(image_file.name, image_file, save=True)
+        obj.mobile_update_time = now_minute
+        obj.save(update_fields=["image", "mobile_update_time"])
     return obj, "created"
+
+
+def _category_image_url(request, category):
+    if not category.image:
+        return ""
+    name = str(category.image.name or "").strip()
+    if name.startswith(("http://", "https://")):
+        return name
+    return request.build_absolute_uri(category.image.url)
+
+
+def _content_file_from_data_url(value, default_prefix="image"):
+    text = _to_str(value).strip()
+    if not text.startswith("data:image/") or "," not in text:
+        return None
+
+    header, encoded = text.split(",", 1)
+    image_type = header.split(";", 1)[0].split("/", 1)[1].lower()
+    extension = {
+        "jpeg": "jpg",
+        "jpg": "jpg",
+        "png": "png",
+        "webp": "webp",
+        "gif": "gif",
+    }.get(image_type)
+    if not extension:
+        return None
+
+    try:
+        raw = base64.b64decode(encoded)
+    except (TypeError, ValueError):
+        return None
+
+    return ContentFile(raw, name=f"{default_prefix}_{uuid.uuid4().hex}.{extension}")
+
+
+def _can_product_enrichment(actor, permission):
+    return bool(actor and (actor.is_owner or _normalize_mobile_permissions(actor.permissions).get(permission)))
+
+
+def _apply_product_image_change(store, payload, server_id):
+    if set(payload) != {"main_image"}:
+        raise ValueError("تعديل صورة المادة يقبل الصورة فقط دون بقية بيانات المادة.")
+    obj = Product.objects.filter(pk=server_id, store=store).first()
+    if not obj:
+        raise ValueError("المادة غير موجودة. زامن المواد أولاً.")
+    raw = payload["main_image"]
+    if raw == "":
+        obj.main_image = None
+    else:
+        image = _content_file_from_data_url(raw, "product")
+        if image is None:
+            raise ValueError("بيانات صورة المادة غير صالحة.")
+        obj.main_image = image
+    obj.save(update_fields=["main_image"])
+    return obj
 
 
 def _apply_product_change(store, payload, server_id=None, category_resolver=None):
@@ -302,6 +908,8 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
     if category_resolver:
         category = category_resolver(payload.get("category_server_id"), payload.get("category_local_id"))
         category2 = category_resolver(payload.get("category2_server_id"), payload.get("category2_local_id"))
+    main_image_file = _content_file_from_data_url(payload.get("main_image"), "product")
+    clear_main_image = "main_image" in payload and _to_str(payload.get("main_image")).strip() == ""
 
     obj = None
     if server_id:
@@ -321,9 +929,18 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         "show_price": _to_bool(payload.get("show_price"), True),
         "buy_price": _to_float(payload.get("buy_price")),
         "stock": int(_to_float(payload.get("stock"))),
+        "stock_alert_threshold": _to_float(payload.get("stock_alert_threshold")),
+        "allow_negative_stock_sale": _to_bool(payload.get("allow_negative_stock_sale"), False),
         "active": _to_bool(payload.get("active"), True),
-        "update_time": now_minute,
+        "mobile_update_time": now_minute,
     }
+    if "input_data" in payload:
+        update_fields["input_data"] = validate_input_data(payload["input_data"], obj.input_data if obj else None)
+    if "product_number" in payload:
+        product_number = _to_str(payload.get("product_number")).strip()
+        if len(product_number) > 100:
+            raise ValueError("رقم المادة يجب ألا يتجاوز 100 حرف")
+        update_fields["product_number"] = product_number
     if category is not None:
         update_fields["category"] = category
     if category2 is not None:
@@ -335,13 +952,24 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
                 update_fields["access_id"] = access_id
         Product.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
+        if main_image_file is not None:
+            obj.main_image.save(main_image_file.name, main_image_file, save=True)
+            obj.mobile_update_time = now_minute
+            obj.save(update_fields=["main_image", "mobile_update_time"])
+        elif clear_main_image and obj.main_image:
+            obj.main_image.delete(save=False)
+            obj.main_image = None
+            obj.mobile_update_time = now_minute
+            obj.save(update_fields=["main_image", "mobile_update_time"])
         return obj, "updated"
 
     obj = Product.objects.create(
         store=store,
         access_id=_to_int(payload.get("access_id")),
         name=name,
+        input_data=update_fields.get("input_data"),
         price=update_fields["price"],
+        product_number=update_fields.get("product_number", ""),
         description=update_fields["description"],
         price2=update_fields["price2"],
         price3=update_fields["price3"],
@@ -351,11 +979,17 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         show_price=update_fields["show_price"],
         buy_price=update_fields["buy_price"],
         stock=update_fields["stock"],
+        stock_alert_threshold=update_fields["stock_alert_threshold"],
+        allow_negative_stock_sale=update_fields["allow_negative_stock_sale"],
         category=category,
         category2=category2,
         active=update_fields["active"],
-        update_time=now_minute,
+        mobile_update_time=now_minute,
     )
+    if main_image_file is not None:
+        obj.main_image.save(main_image_file.name, main_image_file, save=True)
+        obj.mobile_update_time = now_minute
+        obj.save(update_fields=["main_image", "mobile_update_time"])
     return obj, "created"
 
 
@@ -381,7 +1015,7 @@ def _apply_barcode_change(store, payload, server_id=None, product_resolver=None)
         ProductBarcode.objects.filter(id=obj.id).update(
             product=product,
             value=value,
-            update_time=now_minute,
+            mobile_update_time=now_minute,
         )
         obj.refresh_from_db()
         return obj, "updated"
@@ -389,33 +1023,81 @@ def _apply_barcode_change(store, payload, server_id=None, product_resolver=None)
     obj = ProductBarcode.objects.create(
         product=product,
         value=value,
-        update_time=now_minute,
+        mobile_update_time=now_minute,
     )
     return obj, "created"
 
 
+def _unique_customer_sync_name(store, name, phone, identifier, exclude_id=None):
+    def occupied(value):
+        return Customer.objects.filter(store=store, name=value).exclude(pk=exclude_id).exists()
+    if not occupied(name):
+        return name
+    suffix = phone or str(identifier)
+    def candidate(tail):
+        return name[:max(0, 150 - len(tail) - 3)] + " \u2014 " + tail
+    value = candidate(suffix)
+    if not occupied(value):
+        return value
+    suffix = f"{suffix}-{identifier}"
+    value = candidate(suffix)
+    attempt = 2
+    while occupied(value):
+        value = candidate(f"{suffix}-{attempt}")
+        attempt += 1
+    return value
+
+
+@transaction.atomic
 def _apply_customer_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
     phone = normalize_phone_number(_to_str(payload.get("phone")).strip())
     address = _to_str(payload.get("address")).strip()
     note = _to_str(payload.get("note")).strip()
     access_id = _to_int(payload.get("access_id"))
-    if not name and not phone:
-        raise ValueError("Customer name or phone is required")
-
+    preferred_price_level = _to_int(payload.get("preferred_price_level"), 0)
+    if preferred_price_level not in (0, 1, 2, 3, 4, 5):
+        preferred_price_level = 0
     if not name:
-        name = phone
+        raise ValueError("اسم العميل مطلوب للمزامنة.")
 
     now_minute = _now_minute()
-    obj = None
-    if server_id:
+    # Serialize name allocation and origin registration for this store.
+    Store.objects.select_for_update().get(pk=store.pk)
+    origin = _to_str(payload.get("sync_origin")).strip()
+    independent = _to_bool(payload.get("independent_customer"))
+    resolve_name = _to_bool(payload.get("resolve_name_conflict"))
+    if independent and not origin:
+        raise ValueError("A stable sync_origin is required for a new customer")
+    if len(origin) > 100:
+        raise ValueError("Invalid customer sync_origin")
+    origin_link = CustomerSyncOrigin.objects.filter(merchant_id=store.pk, origin_key=origin).first() if origin else None
+    obj = origin_link.customer if origin_link else None
+    if obj and independent and not server_id:
+        # A retried creation must keep the already allocated name.
+        name = obj.name
+    if obj and server_id and obj.pk != server_id:
+        raise ValueError("Customer sync origin and server identifier disagree")
+    if access_id not in (None, 0) and Customer.objects.filter(store=store, access_id=access_id).count() > 1:
+        raise ValueError(f"تعارض معرّف العملاء {access_id}: مرتبط بأكثر من سجل. يجب تصحيحه قبل المزامنة.")
+    if server_id and not obj:
         obj = Customer.objects.filter(id=server_id, store=store).first()
+        if not obj and resolve_name:
+            raise ValueError("The linked customer no longer exists; pull deletions before retrying")
     if not obj and access_id not in (None, 0, ""):
         obj = Customer.objects.filter(store=store, access_id=access_id).first()
-    if not obj and phone:
-        obj = Customer.objects.filter(store=store, phone=phone).first()
-    if not obj:
+    if not obj and not independent:
         obj = Customer.objects.filter(store=store, name=name).first()
+    if obj and access_id not in (None, 0) and Customer.objects.filter(
+            store=store, access_id=access_id).exclude(pk=obj.pk).exists():
+        raise ValueError(f"تعارض معرّف العملاء {access_id}: مرتبط بعميل آخر. يجب تصحيح المعرّف قبل المزامنة.")
+    if resolve_name:
+        identifier = obj.pk if obj else f"app-{origin[:12]}-{payload.get('source_local_id', '')}"
+        name = _unique_customer_sync_name(store, name, phone, identifier, obj.pk if obj else None)
+    if Customer.objects.filter(store=store, name=name).exclude(pk=obj.pk if obj else None).exists():
+        raise ValueError("اسم العميل مرتبط بمعرف آخر. يرجى تصحيح التعارض قبل المزامنة.")
+    if phone and Customer.objects.filter(store=store, phone=phone).exclude(pk=obj.pk if obj else None).exists():
+        raise ValueError("رقم الموبايل مسجل لعميل آخر. يرجى تصحيح الرقم قبل المزامنة.")
 
     update_fields = {
         "name": name,
@@ -424,14 +1106,20 @@ def _apply_customer_change(store, payload, server_id=None):
         "note": note,
         "balance": Decimal(str(_to_float(payload.get("balance"), 0.0))),
         "opening_balance": Decimal(str(_to_float(payload.get("opening_balance"), 0.0))),
-        "update_time": now_minute,
+        "preferred_price_level": preferred_price_level,
+        "is_subscription_active": _to_bool(payload.get("is_subscription_active")),
+        "mobile_update_time": now_minute,
     }
+    if "private_note" in payload:
+        update_fields["private_note"] = _to_str(payload.get("private_note")).strip()
     if access_id is not None:
         update_fields["access_id"] = access_id
 
     if obj:
         Customer.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
+        if origin and not origin_link:
+            CustomerSyncOrigin.objects.create(merchant_id=store.pk, origin_key=origin, customer=obj)
         return obj, "updated"
 
     obj = Customer.objects.create(
@@ -441,10 +1129,677 @@ def _apply_customer_change(store, payload, server_id=None):
         phone=phone,
         address=address,
         note=note,
+        private_note=update_fields.get("private_note", ""),
         balance=update_fields["balance"],
         opening_balance=update_fields["opening_balance"],
-        update_time=now_minute,
+        preferred_price_level=preferred_price_level,
+        is_subscription_active=update_fields["is_subscription_active"],
+        mobile_update_time=now_minute,
     )
+    if origin:
+        CustomerSyncOrigin.objects.create(merchant_id=store.pk, origin_key=origin, customer=obj)
+    return obj, "created"
+
+
+def _customer_identity_conflicts(store, changes):
+    """Reject every member of an ambiguous batch before applying any member."""
+    groups = {}
+    for item in changes:
+        if str(item.get("entity", "")).lower() != "customer":
+            continue
+        payload = item.get("payload") or {}
+        server_id = _to_int(item.get("server_id"))
+        access_id = _to_int(payload.get("access_id"))
+        name = _to_str(payload.get("name")).strip()
+        keys = []
+        local_id = _to_int(item.get("local_id"))
+        origin = _to_str(payload.get("sync_origin")).strip()
+        if origin:
+            keys.append(("origin", origin))
+            keys.extend(("server", pk) for pk in CustomerSyncOrigin.objects.filter(
+                merchant_id=store.pk, origin_key=origin).values_list("customer_id", flat=True))
+        if local_id is not None:
+            keys.append(("local", local_id))
+        if server_id:
+            keys.append(("server", server_id))
+        if access_id:
+            keys.append(("access", access_id))
+            keys.extend(("server", pk) for pk in Customer.objects.filter(
+                store=store, access_id=access_id).values_list("pk", flat=True))
+        if name and not _to_bool(payload.get("resolve_name_conflict")):
+            keys.append(("name", name))
+            target = Customer.objects.filter(store=store, name=name).first()
+            if target:
+                keys.append(("server", target.pk))
+        for key in set(keys):
+            groups.setdefault(key, []).append(item)
+    conflicts = {}
+    for (_, identity), items in groups.items():
+        if len(items) < 2:
+            continue
+        names = "، ".join(f"{(item.get('payload') or {}).get('name', '')} (محلي {item.get('local_id')})" for item in items)
+        detail = f"تعارض هوية العملاء {identity}: {names}. لم تتم مزامنة هذه السجلات؛ يجب تصحيح المعرّفات أولاً."
+        for item in items:
+            conflicts[id(item)] = detail
+    return conflicts
+
+
+def _supplier_identity_conflicts(store, changes):
+    """Reject every member of an ambiguous batch before applying any member."""
+    groups = {}
+    for item in changes:
+        if str(item.get("entity", "")).lower() != "supplier":
+            continue
+        payload = item.get("payload") or {}
+        server_id = _to_int(item.get("server_id"))
+        access_id = _to_int(payload.get("access_id"))
+        name = _to_str(payload.get("name")).strip()
+        keys = []
+        local_id = _to_int(item.get("local_id"))
+        if local_id is not None:
+            keys.append(("local", local_id))
+        if server_id:
+            keys.append(("server", server_id))
+        if access_id:
+            keys.append(("access", access_id))
+            keys.extend(("server", pk) for pk in Supplier.objects.filter(
+                store=store, access_id=access_id).values_list("pk", flat=True))
+        if name:
+            keys.append(("name", name))
+            target = Supplier.objects.filter(store=store, name=name).first()
+            if target:
+                keys.append(("server", target.pk))
+        for key in set(keys):
+            groups.setdefault(key, []).append(item)
+    conflicts = {}
+    for (_, identity), items in groups.items():
+        if len(items) < 2:
+            continue
+        names = "، ".join(f"{(item.get('payload') or {}).get('name', '')} (محلي {item.get('local_id')})" for item in items)
+        detail = f"تعارض هوية الموردين {identity}: {names}. لم تتم مزامنة هذه السجلات؛ يجب تصحيح المعرّفات أولاً."
+        for item in items:
+            conflicts[id(item)] = detail
+    return conflicts
+
+
+def _apply_supplier_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    phone = _to_str(payload.get("phone")).strip()
+    address = _to_str(payload.get("address")).strip()
+    email = _to_str(payload.get("email")).strip()
+    access_id = _to_int(payload.get("access_id"))
+    if not name:
+        raise ValueError("اسم المورد مطلوب للمزامنة.")
+
+    now_minute = _now_minute()
+    obj = None
+    if access_id not in (None, 0) and Supplier.objects.filter(store=store, access_id=access_id).count() > 1:
+        raise ValueError(f"تعارض معرّف الموردين {access_id}: مرتبط بأكثر من سجل. يجب تصحيحه قبل المزامنة.")
+    if server_id:
+        obj = Supplier.objects.filter(id=server_id, store=store).first()
+    if not obj and access_id not in (None, 0, ""):
+        obj = Supplier.objects.filter(store=store, access_id=access_id).first()
+    if not obj:
+        obj = Supplier.objects.filter(store=store, name=name).first()
+
+    if obj and access_id not in (None, 0) and Supplier.objects.filter(store=store, access_id=access_id).exclude(pk=obj.pk).exists():
+        raise ValueError(f"تعارض معرّف الموردين {access_id}: مرتبط بمورد آخر. يجب تصحيح المعرّف قبل المزامنة.")
+    if Supplier.objects.filter(store=store, name=name).exclude(pk=obj.pk if obj else None).exists():
+        raise ValueError("اسم المورد مرتبط بمعرف آخر. يرجى تصحيح التعارض قبل المزامنة.")
+    if phone and Supplier.objects.filter(store=store, phone=phone).exclude(pk=obj.pk if obj else None).exists():
+        raise ValueError("رقم الموبايل مسجل لمورد آخر. يرجى تصحيح الرقم قبل المزامنة.")
+
+    update_fields = {
+        "name": name,
+        "phone": phone,
+        "address": address,
+        "email": email,
+        "balance": Decimal(str(_to_float(payload.get("balance"), 0.0))),
+        "opening_balance": Decimal(str(_to_float(payload.get("opening_balance"), 0.0))),
+        "mobile_update_time": now_minute,
+    }
+    if access_id is not None:
+        update_fields["access_id"] = access_id
+
+    if obj:
+        Supplier.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+
+    obj = Supplier.objects.create(
+        store=store,
+        access_id=access_id,
+        name=name,
+        phone=update_fields["phone"],
+        address=address,
+        email=email,
+        balance=update_fields["balance"],
+        opening_balance=update_fields["opening_balance"],
+        mobile_update_time=now_minute,
+    )
+    return obj, "created"
+
+
+def _apply_employee_lookup_change(store, payload, model, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    if not name:
+        raise ValueError("Name is required")
+    now_minute = _now_minute()
+    obj = model.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj:
+        obj = model.objects.filter(store=store, name=name).first()
+    fields = {
+        "name": name,
+        "notes": _to_str(payload.get("notes")).strip(),
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        model.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return model.objects.create(store=store, **fields), "created"
+
+
+def _apply_employee_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    if not name:
+        raise ValueError("Employee name is required")
+    now_minute = _now_minute()
+    obj = Employee.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj:
+        national_id = _to_str(payload.get("national_id")).strip()
+        if national_id:
+            obj = Employee.objects.filter(store=store, national_id=national_id).first()
+    department = None
+    department_id = _to_int(payload.get("department_id"))
+    if department_id:
+        department = EmployeeDepartment.objects.filter(id=department_id, store=store).first()
+    job_title = None
+    job_title_id = _to_int(payload.get("job_title_id"))
+    if job_title_id:
+        job_title = EmployeeJobTitle.objects.filter(id=job_title_id, store=store).first()
+    pay_period = None
+    pay_period_id = _to_int(payload.get("pay_period_id"))
+    if pay_period_id:
+        pay_period = EmployeePayPeriod.objects.filter(id=pay_period_id, store=store).first()
+    fields = {
+        "name": name,
+        "national_id": _to_str(payload.get("national_id")).strip(),
+        "mobile": _to_str(payload.get("mobile")).strip(),
+        "address": _to_str(payload.get("address")).strip(),
+        "department": department,
+        "job_title": job_title,
+        "pay_period": pay_period,
+        "salary": Decimal(str(_to_float(payload.get("salary"), 0.0))),
+        "work_hours": _to_str(payload.get("work_hours")).strip(),
+        "notes": _to_str(payload.get("notes")).strip(),
+        "is_active": _to_bool(payload.get("is_active"), True),
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        Employee.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return Employee.objects.create(store=store, **fields), "created"
+
+
+def _apply_salary_voucher_change(store, payload, server_id=None):
+    description = _to_str(payload.get("description")).strip()
+    if not description:
+        raise ValueError("Salary voucher description is required")
+    date_value = parse_datetime(str(payload.get("date") or ""))
+    if date_value is None:
+        from django.utils.dateparse import parse_date
+        date_value = parse_date(str(payload.get("date") or "")) or timezone.localdate()
+    else:
+        date_value = date_value.date()
+    now_minute = _now_minute()
+    obj = SalaryPaymentVoucher.objects.filter(id=server_id, store=store).first() if server_id else None
+    fields = {
+        "description": description,
+        "date": date_value,
+        "decision_number": _to_str(payload.get("decision_number")).strip(),
+        "notes": _to_str(payload.get("notes")).strip(),
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        SalaryPaymentVoucher.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return SalaryPaymentVoucher.objects.create(store=store, **fields), "created"
+
+
+def _apply_salary_payment_change(store, payload, server_id=None):
+    voucher_id = _to_int(payload.get("voucher_id"))
+    employee_id = _to_int(payload.get("employee_id"))
+    voucher = SalaryPaymentVoucher.objects.filter(id=voucher_id, store=store).first() if voucher_id else None
+    employee = Employee.objects.filter(id=employee_id, store=store).first() if employee_id else None
+    if not voucher or not employee:
+        raise ValueError("Salary payment voucher and employee are required")
+    date_value = parse_datetime(str(payload.get("date") or ""))
+    if date_value is None:
+        from django.utils.dateparse import parse_date
+        date_value = parse_date(str(payload.get("date") or "")) or timezone.localdate()
+    else:
+        date_value = date_value.date()
+    now_minute = _now_minute()
+    obj = SalaryPayment.objects.filter(id=server_id, store=store).first() if server_id else None
+    fields = {
+        "voucher": voucher,
+        "employee": employee,
+        "salary": Decimal(str(_to_float(payload.get("salary"), 0.0))),
+        "extra_amount": Decimal(str(_to_float(payload.get("extra_amount"), 0.0))),
+        "discount_amount": Decimal(str(_to_float(payload.get("discount_amount"), 0.0))),
+        "advance_amount": Decimal(str(_to_float(payload.get("advance_amount"), 0.0))),
+        "advance_installment_deduction": Decimal(str(_to_float(payload.get("advance_installment_deduction"), 0.0))),
+        "notes": _to_str(payload.get("notes")).strip(),
+        "date": date_value,
+        "is_received": _to_bool(payload.get("is_received"), False),
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        SalaryPayment.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return SalaryPayment.objects.create(store=store, **fields), "created"
+
+
+def _apply_warehouse_change(store, payload, server_id=None):
+    identifier = _to_str(payload.get("identifier")).strip()
+    name = _to_str(payload.get("name")).strip()
+    if not identifier:
+        identifier = name
+    if not identifier or not name:
+        raise ValueError("Warehouse identifier and name are required")
+
+    now_minute = _now_minute()
+    obj = Warehouse.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj:
+        obj = Warehouse.objects.filter(store=store, identifier=identifier).first()
+    if not obj:
+        obj = Warehouse.objects.filter(store=store, name=name).first()
+
+    is_main = bool(obj.is_main) if obj else _to_bool(payload.get("is_main"), False)
+    if is_main:
+        name = Warehouse.MAIN_WAREHOUSE_NAME
+
+    update_fields = {
+        "identifier": identifier,
+        "name": name,
+        "address": _to_str(payload.get("address")).strip(),
+        "phone": _to_str(payload.get("phone")).strip(),
+        "percentage": Decimal(str(_to_float(payload.get("percentage"), 0.0))),
+        "is_representative": _to_bool(payload.get("is_representative"), False),
+        "is_main": is_main,
+        "is_active": _to_bool(payload.get("is_active"), True),
+        "mobile_update_time": now_minute,
+    }
+
+    if obj:
+        Warehouse.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+
+    obj = Warehouse.objects.create(store=store, **update_fields)
+    return obj, "created"
+
+
+def _apply_warehouse_transfer_change(store, payload, server_id=None, product_resolver=None):
+    from_warehouse_id = _to_int(payload.get("from_warehouse_id"))
+    to_warehouse_id = _to_int(payload.get("to_warehouse_id"))
+    from_warehouse = Warehouse.objects.filter(id=from_warehouse_id, store=store).first()
+    to_warehouse = Warehouse.objects.filter(id=to_warehouse_id, store=store).first()
+    if not from_warehouse:
+        from_identifier = _to_str(payload.get("from_warehouse_identifier")).strip()
+        if from_identifier:
+            from_warehouse = Warehouse.objects.filter(store=store, identifier=from_identifier).first()
+    if not to_warehouse:
+        to_identifier = _to_str(payload.get("to_warehouse_identifier")).strip()
+        if to_identifier:
+            to_warehouse = Warehouse.objects.filter(store=store, identifier=to_identifier).first()
+    if not from_warehouse or not to_warehouse:
+        raise ValueError("Transfer warehouses are required")
+    if from_warehouse.id == to_warehouse.id:
+        raise ValueError("Transfer source and target must be different")
+
+    transfer_date_raw = _to_str(payload.get("transfer_date")).strip()
+    transfer_date = parse_datetime(transfer_date_raw) if transfer_date_raw else None
+    if transfer_date is None:
+        transfer_date = timezone.now()
+    if timezone.is_naive(transfer_date):
+        transfer_date = timezone.make_aware(transfer_date)
+
+    now_minute = _now_minute()
+    obj = WarehouseTransfer.objects.filter(id=server_id, store=store).first() if server_id else None
+    fields = {
+        "from_warehouse": from_warehouse,
+        "to_warehouse": to_warehouse,
+        "transfer_date": transfer_date,
+        "notes": _to_str(payload.get("notes")).strip(),
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        WarehouseTransfer.objects.filter(id=obj.id, store=store).update(**fields)
+        action = "updated"
+        obj.refresh_from_db()
+    else:
+        obj = WarehouseTransfer.objects.create(store=store, **fields)
+        action = "created"
+
+    items = payload.get("items", [])
+    if not isinstance(items, list):
+        items = []
+    obj.items.all().delete()
+    for item_payload in items:
+        if not isinstance(item_payload, dict):
+            continue
+        product = None
+        if product_resolver:
+            product = product_resolver(
+                product_server_id=_to_int(item_payload.get("product_id")),
+                product_local_id=_to_int(item_payload.get("product_local_id")),
+                product_access_id=_to_int(item_payload.get("product_access_id")),
+            )
+        if not product:
+            raise ValueError("Transfer item product is required")
+        WarehouseTransferItem.objects.create(
+            transfer=obj,
+            store=store,
+            product=product,
+            quantity=Decimal(str(_to_float(item_payload.get("quantity"), 0.0))),
+            unit_name=_to_str(item_payload.get("unit_name")).strip(),
+            unit_factor=Decimal(str(_to_float(item_payload.get("unit_factor"), 1.0) or 1.0)),
+            notes=_to_str(item_payload.get("notes")).strip(),
+            mobile_update_time=now_minute,
+        )
+    return obj, action
+
+
+def _apply_inventory_adjustment_change(
+    store,
+    payload,
+    server_id=None,
+    product_resolver=None,
+):
+    money_quant = Decimal("0.01")
+    qty_quant = Decimal("0.001")
+
+    product = None
+    if product_resolver:
+        product = product_resolver(
+            product_server_id=_to_int(payload.get("product_id")),
+            product_local_id=_to_int(payload.get("product_local_id")),
+            product_access_id=_to_int(payload.get("product_access_id")),
+        )
+    if not product:
+        raise ValueError("Adjustment product is required")
+
+    warehouse = None
+    warehouse_id = _to_int(payload.get("warehouse_id"))
+    if warehouse_id:
+        warehouse = Warehouse.objects.filter(id=warehouse_id, store=store).first()
+
+    registered_quantity = Decimal(str(_to_float(payload.get("registered_quantity"), 0.0))).quantize(
+        qty_quant, rounding=ROUND_HALF_UP
+    )
+    actual_quantity = Decimal(str(_to_float(payload.get("actual_quantity"), 0.0))).quantize(
+        qty_quant, rounding=ROUND_HALF_UP
+    )
+    unit_cost = Decimal(str(_to_float(payload.get("unit_cost"), 0.0))).quantize(
+        money_quant, rounding=ROUND_HALF_UP
+    )
+    difference_quantity = (actual_quantity - registered_quantity).quantize(
+        qty_quant, rounding=ROUND_HALF_UP
+    )
+    difference_value = (difference_quantity * unit_cost).quantize(
+        money_quant, rounding=ROUND_HALF_UP
+    )
+    adjusted_at = parse_datetime(str(payload.get("adjusted_at") or ""))
+    if adjusted_at is None:
+        adjusted_at = timezone.now()
+
+    created_by_store_user = None
+    created_by_store_user_id = _to_int(payload.get("created_by_store_user_id"))
+    if created_by_store_user_id:
+        created_by_store_user = StoreUser.objects.filter(
+            id=created_by_store_user_id,
+            store=store,
+        ).first()
+
+    now_minute = _now_minute()
+    obj = InventoryAdjustment.objects.filter(id=server_id, store=store).first() if server_id else None
+    fields = {
+        "product": product,
+        "warehouse": warehouse,
+          "registered_quantity": registered_quantity,
+          "actual_quantity": actual_quantity,
+          "difference_quantity": difference_quantity,
+          "unit_cost": unit_cost,
+          "difference_value": difference_value,
+        "reason": _to_str(payload.get("reason")).strip(),
+        "notes": _to_str(payload.get("notes")).strip(),
+        "adjusted_at": adjusted_at,
+        "created_by_store_user": created_by_store_user,
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        InventoryAdjustment.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    obj = InventoryAdjustment.objects.create(store=store, **fields)
+    return obj, "created"
+
+
+def _apply_stock_movement_change(store, payload, server_id=None, product_resolver=None):
+    qty_quant = Decimal("0.001")
+    money_quant = Decimal("0.01")
+    product = None
+    if product_resolver:
+        product = product_resolver(
+            product_id=payload.get("product_id"),
+            product_server_id=payload.get("product_server_id"),
+            product_local_id=payload.get("product_local_id"),
+            product_access_id=payload.get("product_access_id"),
+        )
+    if not product:
+        product_id = _to_int(payload.get("product_id"))
+        product = Product.objects.filter(id=product_id, store=store).first() if product_id else None
+    if not product:
+        raise ValueError("Stock movement product is required")
+
+    warehouse = None
+    warehouse_id = _to_int(payload.get("warehouse_id"))
+    if warehouse_id:
+        warehouse = Warehouse.objects.filter(id=warehouse_id, store=store).first()
+
+    movement_type = _to_str(payload.get("movement_type")).strip() or "manual"
+    valid_types = {choice[0] for choice in StockMovement.MOVEMENT_TYPES}
+    if movement_type not in valid_types:
+        movement_type = "manual"
+
+    quantity_change = Decimal(str(_to_float(payload.get("quantity_change"), 0.0))).quantize(
+        qty_quant, rounding=ROUND_HALF_UP
+    )
+    if quantity_change == 0:
+        raise ValueError("Stock movement quantity_change must not be zero")
+
+    unit_cost = Decimal(str(_to_float(payload.get("unit_cost"), 0.0))).quantize(
+        money_quant, rounding=ROUND_HALF_UP
+    )
+    occurred_at = parse_datetime(str(payload.get("occurred_at") or ""))
+    if occurred_at is None:
+        occurred_at = timezone.now()
+
+    created_by_store_user = None
+    created_by_store_user_id = _to_int(payload.get("created_by_store_user_id"))
+    if created_by_store_user_id:
+        created_by_store_user = StoreUser.objects.filter(
+            id=created_by_store_user_id,
+            store=store,
+        ).first()
+
+    now_minute = _now_minute()
+    obj = StockMovement.objects.filter(id=server_id, store=store).first() if server_id else None
+    reference_type = _to_str(payload.get("reference_type")).strip()
+    reference_id = _to_str(payload.get("reference_id")).strip()
+    if reference_type == "stock_disposal":
+        if movement_type != "disposal" or quantity_change >= 0 or unit_cost < 0:
+            raise ValueError("Invalid stock disposal quantity or cost")
+        if not warehouse or not reference_id:
+            raise ValueError("Stock disposal requires a warehouse and stable reference")
+    if not obj and reference_type and reference_id:
+        obj = StockMovement.objects.filter(
+            store=store,
+            reference_type=reference_type,
+            reference_id=reference_id,
+            product=product,
+            movement_type=movement_type,
+        ).first()
+
+    fields = {
+        "product": product,
+        "warehouse": warehouse,
+        "movement_type": movement_type,
+        "quantity_change": quantity_change,
+        "unit_cost": unit_cost,
+        "reference_type": reference_type,
+        "reference_id": reference_id,
+        "notes": _to_str(payload.get("notes")).strip(),
+        "occurred_at": occurred_at,
+        "created_by_store_user": created_by_store_user,
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        if obj.reference_type == "stock_disposal":
+            # Retries may acknowledge the same immutable line; never change it.
+            for key in ("product", "warehouse", "movement_type", "quantity_change",
+                        "unit_cost", "reference_type", "reference_id", "notes"):
+                if getattr(obj, key) != fields[key]:
+                    raise ValueError("Saved stock disposal cannot be edited")
+            return obj, "updated"
+        StockMovement.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    obj = StockMovement.objects.create(store=store, **fields)
+    return obj, "created"
+
+
+def _apply_expense_type_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    if not name:
+        raise ValueError("Expense type name is required")
+    now_minute = _now_minute()
+    obj = ExpenseType.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj:
+        obj = ExpenseType.objects.filter(store=store, name=name).first()
+    if obj:
+        ExpenseType.objects.filter(id=obj.id, store=store).update(name=name, mobile_update_time=now_minute)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return ExpenseType.objects.create(store=store, name=name, mobile_update_time=now_minute), "created"
+
+
+def _apply_expense_reason_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    if not name:
+        raise ValueError("Expense reason name is required")
+    now_minute = _now_minute()
+    obj = ExpenseReason.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj:
+        obj = ExpenseReason.objects.filter(store=store, name=name).first()
+    if obj:
+        ExpenseReason.objects.filter(id=obj.id, store=store).update(name=name, mobile_update_time=now_minute)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return ExpenseReason.objects.create(store=store, name=name, mobile_update_time=now_minute), "created"
+
+
+def _apply_expense_change(store, payload, server_id=None, mobile_sync_key=None):
+    expense_type = None
+    expense_reason = None
+    type_id = _to_int(payload.get("expense_type_server_id"))
+    reason_id = _to_int(payload.get("expense_reason_server_id"))
+    type_name = _to_str(payload.get("expense_type")).strip()
+    reason_name = _to_str(payload.get("expense_reason")).strip()
+    if type_id:
+        expense_type = ExpenseType.objects.filter(id=type_id, store=store).first()
+    if not expense_type and type_name:
+        expense_type, _ = ExpenseType.objects.get_or_create(store=store, name=type_name)
+    if reason_id:
+        expense_reason = ExpenseReason.objects.filter(id=reason_id, store=store).first()
+    if not expense_reason and reason_name:
+        expense_reason, _ = ExpenseReason.objects.get_or_create(store=store, name=reason_name)
+
+    date_value = parse_datetime(str(payload.get("date") or ""))
+    if date_value is None:
+        from django.utils.dateparse import parse_date
+        date_value = parse_date(str(payload.get("date") or "")) or timezone.localdate()
+    else:
+        date_value = date_value.date()
+
+    now_minute = _now_minute()
+    update_fields = {
+        "amount": Decimal(str(_to_float(payload.get("amount"), 0.0))),
+        "date": date_value,
+        "expense_type": expense_type,
+        "expense_reason": expense_reason,
+        "notes": _to_str(payload.get("notes")),
+        "mobile_update_time": now_minute,
+    }
+    update_fields.update(_currency_sync_fields(payload, ("payment_currency", "exchange_rate", "amount_payment_currency")))
+    obj = Expense.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj and mobile_sync_key:
+        obj = Expense.objects.filter(store=store, mobile_sync_key=mobile_sync_key).first()
+    if "input_data" in payload:
+        update_fields["input_data"] = validate_input_data(payload["input_data"], obj.input_data if obj else None)
+    if mobile_sync_key:
+        update_fields["mobile_sync_key"] = mobile_sync_key
+    if obj:
+        Expense.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    try:
+        obj = Expense.objects.create(store=store, **update_fields)
+    except IntegrityError:
+        if not mobile_sync_key:
+            raise
+        obj = Expense.objects.filter(store=store, mobile_sync_key=mobile_sync_key).first()
+        if obj is None:
+            raise
+        Expense.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return obj, "created"
+
+
+def _apply_fixed_asset_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    if not name:
+        raise ValueError("Fixed asset name is required")
+
+    now_minute = _now_minute()
+    access_id = _to_int(payload.get("access_id"))
+    obj = FixedAsset.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj and access_id not in (None, 0, ""):
+        obj = FixedAsset.objects.filter(store=store, access_id=access_id).first()
+    if not obj:
+        obj = FixedAsset.objects.filter(store=store, name=name).first()
+
+    update_fields = {
+        "name": name,
+        "value": Decimal(str(_to_float(payload.get("value"), 0.0))),
+        "existed_before_program": _to_bool(payload.get("existed_before_program"), True),
+        "mobile_update_time": now_minute,
+    }
+    if access_id is not None:
+        update_fields["access_id"] = access_id
+
+    if obj:
+        FixedAsset.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+
+    obj = FixedAsset.objects.create(store=store, **update_fields)
     return obj, "created"
 
 
@@ -468,6 +1823,10 @@ def categories_pull(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
     qs = Category.objects.filter(store_id=merchant_id_int).order_by("id")
 
     if since not in (None, "", "0"):
@@ -478,16 +1837,17 @@ def categories_pull(request):
                 {"detail": "since must be an integer (minutes)"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         {
             "id": c.id,
             "name": c.name,
+            "image": _category_image_url(request, c),
             "access_id": c.access_id,
-            "update_time": c.update_time or 0,
+            "update_time": _mobile_time(c),
         }
-        for c in qs.only("id", "name", "access_id", "update_time")
+        for c in qs.only("id", "name", "image", "access_id", "update_time", "mobile_update_time")
     ]
 
     return Response(
@@ -516,6 +1876,10 @@ def customers_pull(request):
     store = Store.objects.filter(id=merchant_id_int).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+    _ensure_mobile_default_records(store)
 
     qs = Customer.objects.filter(store_id=merchant_id_int).order_by("id")
     if since not in (None, "", "0"):
@@ -523,7 +1887,7 @@ def customers_pull(request):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         _serialize_customer(customer)
@@ -533,10 +1897,14 @@ def customers_pull(request):
             "phone",
             "address",
             "note",
+            "private_note",
             "balance",
             "opening_balance",
+            "preferred_price_level",
+            "is_subscription_active",
             "access_id",
             "update_time",
+            "mobile_update_time",
         )
     ]
 
@@ -551,8 +1919,448 @@ def customers_pull(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def suppliers_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+    _ensure_mobile_default_records(store)
+
+    qs = Supplier.objects.filter(store_id=merchant_id_int).order_by("id")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(_mobile_since_q(since_int))
+
+    data = [
+        _serialize_supplier(supplier)
+        for supplier in qs.only(
+            "id",
+            "name",
+            "phone",
+            "address",
+            "email",
+            "balance",
+            "opening_balance",
+            "access_id",
+            "update_time",
+            "mobile_update_time",
+        )
+    ]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
+def _pull_store_rows(request, model, serializer, only_fields):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
+    qs = model.objects.filter(store_id=merchant_id_int).order_by("id")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(_mobile_since_q(since_int))
+
+    data = [serializer(row) for row in qs.only(*only_fields)]
+    return Response({
+        "merchant_id": merchant_id_int,
+        "items": data,
+        "max_update_time": max((x["update_time"] for x in data), default=0),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def expense_types_pull(request):
+    return _pull_store_rows(
+        request,
+        ExpenseType,
+        _serialize_expense_type,
+        ["id", "name", "access_id", "update_time", "mobile_update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def expense_reasons_pull(request):
+    return _pull_store_rows(
+        request,
+        ExpenseReason,
+        _serialize_expense_reason,
+        ["id", "name", "access_id", "update_time", "mobile_update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def expenses_pull(request):
+    return _pull_store_rows(
+        request,
+        Expense,
+        _serialize_expense,
+        [
+            "id",
+            "amount",
+            "date",
+            "expense_type_id",
+            "expense_reason_id",
+            "notes",
+            "access_id",
+            "update_time",
+            "mobile_update_time",
+        ],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def fixed_assets_pull(request):
+    return _pull_store_rows(
+        request,
+        FixedAsset,
+        _serialize_fixed_asset,
+        [
+            "id",
+            "name",
+            "value",
+            "existed_before_program",
+            "access_id",
+            "update_time",
+            "mobile_update_time",
+        ],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def contact_infos_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
+    qs = ContactInfo.objects.all().order_by("id")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(_mobile_since_q(since_int))
+
+    data = [
+        _serialize_contact_info(row)
+        for row in qs.only("id", "label", "statement", "update_time", "mobile_update_time")
+    ]
+    return Response({
+        "merchant_id": merchant_id_int,
+        "items": data,
+        "max_update_time": max((x["update_time"] for x in data), default=0),
+    })
+
+
+def _serialize_employee_lookup(row):
+    return {
+        "id": row.id,
+        "name": row.name,
+        "notes": row.notes or "",
+        "access_id": row.access_id,
+        "update_time": _mobile_time(row),
+    }
+
+
+def _serialize_employee(row):
+    return {
+        "id": row.id,
+        "name": row.name,
+        "national_id": row.national_id or "",
+        "mobile": row.mobile or "",
+        "address": row.address or "",
+        "department_id": row.department_id,
+        "job_title_id": row.job_title_id,
+        "pay_period_id": row.pay_period_id,
+        "salary": _to_float(row.salary),
+        "work_hours": row.work_hours or "",
+        "notes": row.notes or "",
+        "is_active": row.is_active,
+        "access_id": row.access_id,
+        "update_time": _mobile_time(row),
+    }
+
+
+def _serialize_salary_voucher(row):
+    return {
+        "id": row.id,
+        "description": row.description,
+        "date": row.date.isoformat() if row.date else "",
+        "decision_number": row.decision_number or "",
+        "notes": row.notes or "",
+        "access_id": row.access_id,
+        "update_time": _mobile_time(row),
+    }
+
+
+def _serialize_salary_payment(row):
+    return {
+        "id": row.id,
+        "voucher_id": row.voucher_id,
+        "employee_id": row.employee_id,
+        "salary": _to_float(row.salary),
+        "extra_amount": _to_float(row.extra_amount),
+        "discount_amount": _to_float(row.discount_amount),
+        "advance_amount": _to_float(row.advance_amount),
+        "advance_installment_deduction": _to_float(row.advance_installment_deduction),
+        "notes": row.notes or "",
+        "date": row.date.isoformat() if row.date else "",
+        "is_received": row.is_received,
+        "access_id": row.access_id,
+        "update_time": _mobile_time(row),
+    }
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def employee_departments_pull(request):
+    return _pull_store_rows(
+        request,
+        EmployeeDepartment,
+        _serialize_employee_lookup,
+        ["id", "name", "notes", "access_id", "update_time", "mobile_update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def employee_job_titles_pull(request):
+    return _pull_store_rows(
+        request,
+        EmployeeJobTitle,
+        _serialize_employee_lookup,
+        ["id", "name", "notes", "access_id", "update_time", "mobile_update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def employee_pay_periods_pull(request):
+    return _pull_store_rows(
+        request,
+        EmployeePayPeriod,
+        _serialize_employee_lookup,
+        ["id", "name", "notes", "access_id", "update_time", "mobile_update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def employees_pull(request):
+    return _pull_store_rows(
+        request,
+        Employee,
+        _serialize_employee,
+        [
+            "id",
+            "name",
+            "national_id",
+            "mobile",
+            "address",
+            "department_id",
+            "job_title_id",
+            "pay_period_id",
+            "salary",
+            "work_hours",
+            "notes",
+            "is_active",
+            "access_id",
+            "update_time",
+            "mobile_update_time",
+        ],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def salary_vouchers_pull(request):
+    return _pull_store_rows(
+        request,
+        SalaryPaymentVoucher,
+        _serialize_salary_voucher,
+        ["id", "description", "date", "decision_number", "notes", "access_id", "update_time", "mobile_update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def salary_payments_pull(request):
+    return _pull_store_rows(
+        request,
+        SalaryPayment,
+        _serialize_salary_payment,
+        [
+            "id",
+            "voucher_id",
+            "employee_id",
+            "salary",
+            "extra_amount",
+            "discount_amount",
+            "advance_amount",
+            "advance_installment_deduction",
+            "notes",
+            "date",
+            "is_received",
+            "access_id",
+            "update_time",
+            "mobile_update_time",
+        ],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def ping(request):
     return Response({"ok": True})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def app_update_check(request):
+    platform = _to_str(request.query_params.get("platform")).strip().lower()
+    current_build = _to_int(request.query_params.get("build")) or 0
+    if platform not in ("android", "windows"):
+        return Response(
+            {"detail": "platform must be android or windows"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    update = (
+        AppUpdate.objects
+        .filter(platform=platform, is_active=True, build__gt=current_build)
+        .order_by("-build", "-id")
+        .first()
+    )
+    if not update:
+        return Response({"update_available": False})
+
+    file_url = request.build_absolute_uri(
+        f"/api/mobile/v1/app-update/{update.id}/download/"
+    ) if update.file else ""
+    return Response({
+        "update_available": True,
+        "platform": update.platform,
+        "version": update.version,
+        "build": update.build,
+        "required": update.required,
+        "notes": update.notes or "",
+        "url": file_url,
+        **file_metadata(update.file, update.updated_at),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def merchant_update_check(request):
+    merchant_id = _to_int(request.query_params.get("merchant_id"))
+    platform = _to_str(request.query_params.get("platform")).strip().lower()
+    if merchant_id is None:
+        return Response(
+            {"detail": "merchant_id is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if platform not in ("android", "windows"):
+        return Response(
+            {"detail": "platform must be android or windows"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    store = Store.objects.filter(id=merchant_id).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if (
+        not store.update_file_active
+        or not store.update_file
+        or store.update_file_platform != platform
+    ):
+        return Response({"update_available": False})
+
+    return Response({
+        "update_available": True,
+        "platform": store.update_file_platform,
+        "version": "",
+        "build": None,
+        "required": False,
+        "notes": "تحديث خاص لهذا التاجر.",
+        "url": request.build_absolute_uri(f"/api/mobile/v1/merchant-update/{store.id}/download/"),
+        **file_metadata(store.update_file),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def app_update_download(request, update_id):
+    update = AppUpdate.objects.filter(id=update_id, is_active=True).first()
+    if not update or not update.file:
+        return Response({"detail": "Update not found"}, status=404)
+    return installer_response(update.file, update.platform, update.build)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def merchant_update_download(request, merchant_id):
+    store = Store.objects.filter(id=merchant_id, update_file_active=True).first()
+    if not store or not store.update_file:
+        return Response({"detail": "Update not found"}, status=404)
+    return installer_response(store.update_file, store.update_file_platform, f"merchant_{store.id}")
 
 
 @api_view(["GET"])
@@ -566,19 +2374,20 @@ def stores_pull(request):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         {
             "id": s.id,
             "name": s.name,
             "slug": s.slug,
+            "logo": request.build_absolute_uri(s.logo.url) if s.logo else "",
             "mobile": s.mobile or "",
             "access_id": s.access_id,
             "is_active": s.is_active,
-            "update_time": s.update_time or 0,
+            "update_time": _mobile_time(s),
         }
-        for s in qs.only("id", "name", "slug", "mobile", "access_id", "is_active", "update_time")
+        for s in qs.only("id", "name", "slug", "logo", "mobile", "access_id", "is_active", "update_time", "mobile_update_time")
     ]
 
     return Response(
@@ -587,6 +2396,61 @@ def stores_pull(request):
             "max_update_time": max((x["update_time"] for x in data), default=0),
         }
     )
+
+
+@api_view(["GET", "POST"])
+@permission_classes([AllowAny])
+def store_currency_settings(request):
+    merchant_id = _request_value(request, "merchant_id")
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response(
+            {"detail": "merchant_id is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if request.method == "POST":
+        _, error = _ensure_store_user_sync_device(request, merchant_id_int)
+        if error is not None:
+            return error
+
+    with transaction.atomic():
+        stores = Store.objects.filter(pk=merchant_id_int, is_active=True)
+        if request.method == "POST":
+            stores = stores.select_for_update()
+        store = stores.first()
+        if store is None:
+            return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+        if request.method == "POST":
+            # Use the same user/device validation as the other sync endpoints.
+            # The app sends rate updates only from permanent copies.
+            if _request_value(request, "base_currency") != store.pricing_currency:
+                return Response({"detail": "وحّد العملة الرئيسية أولاً."},
+                                status=status.HTTP_409_CONFLICT)
+            try:
+                rate = Decimal(str(_request_value(request, "exchange_rate")))
+                updated_at = int(_request_value(request, "exchange_rate_updated_at"))
+                if not rate.is_finite() or rate <= 0 or rate > Decimal("9999999999.99") or not 0 <= updated_at <= 9223372036854775807:
+                    raise ValueError()
+                rate = rate.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                if rate <= 0:
+                    raise ValueError()
+            except (ValueError, TypeError, ArithmeticError):
+                return Response({"detail": "سعر الصرف أو وقت تعديله غير صالح."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            # Equal/unknown timestamps use the store value, making retries stable.
+            if updated_at > store.exchange_rate_updated_at:
+                Store.objects.filter(pk=store.pk).update(
+                    exchange_rate=rate, exchange_rate_updated_at=updated_at,
+                    update_time=_now_minute(), mobile_update_time=_now_minute())
+                store.exchange_rate = rate
+                store.exchange_rate_updated_at = updated_at
+        return Response({
+            "base_currency": store.pricing_currency,
+            "exchange_rate": float(store.exchange_rate or 0),
+            "exchange_rate_updated_at": store.exchange_rate_updated_at,
+        })
 
 
 @api_view(["GET"])
@@ -609,6 +2473,10 @@ def products_pull(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
     qs = Product.objects.filter(store_id=merchant_id_int).order_by("id")
 
     if since not in (None, "", "0"):
@@ -619,12 +2487,13 @@ def products_pull(request):
                 {"detail": "since must be an integer (minutes)"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         {
             "id": p.id,
             "name": p.name,
+            "product_number": p.product_number,
             "price": float(p.price if isinstance(p.price, Decimal) else p.price),
             "description": p.description or "",
             "price2": float(p.price2 if isinstance(p.price2, Decimal) else p.price2),
@@ -635,17 +2504,21 @@ def products_pull(request):
                 p.unit2_pieces if isinstance(p.unit2_pieces, Decimal) else p.unit2_pieces
             ),
             "show_price": p.show_price,
+            "input_data": p.input_data,
             "buy_price": float(p.buy_price if isinstance(p.buy_price, Decimal) else p.buy_price),
             "stock": p.stock,
-            "main_image": p.main_image.name if p.main_image else "",
+            "stock_alert_threshold": p.stock_alert_threshold,
+            "allow_negative_stock_sale": p.allow_negative_stock_sale,
+            "main_image": _product_main_image_url(request, p),
             "category_id": p.category_id,
             "category2_id": p.category2_id,
             "active": p.active,
-            "update_time": p.update_time or 0,
+            "update_time": _mobile_time(p),
         }
         for p in qs.only(
             "id",
             "name",
+            "product_number",
             "price",
             "description",
             "price2",
@@ -656,11 +2529,14 @@ def products_pull(request):
             "show_price",
             "buy_price",
             "stock",
+            "stock_alert_threshold",
+            "allow_negative_stock_sale",
             "main_image",
             "category_id",
             "category2_id",
             "active",
             "update_time",
+            "mobile_update_time",
         )
     ]
 
@@ -701,6 +2577,9 @@ def store_users_pull(request):
     owner_name = (
         owner_profile.name if owner_profile else owner.get_full_name() or owner.username or store.name
     ).strip()
+    owner_warehouse_id = owner_profile.warehouse_id if owner_profile else (
+        Warehouse.objects.filter(store=store, is_main=True).values_list("id", flat=True).first()
+    )
 
     data = [
         {
@@ -708,11 +2587,12 @@ def store_users_pull(request):
             "store_id": store.id,
             "identifier": owner_profile.identifier if owner_profile else owner.username,
             "name": owner_name,
-            "warehouse_id": None,
-            "is_active": owner.is_active and store.is_active,
+            "warehouse_id": owner_warehouse_id,
+            "is_active": owner.is_active,
             "has_password": owner.has_usable_password(),
             "password": owner.password,
             "is_owner": True,
+            "permissions": _all_mobile_permissions(),
         }
     ]
 
@@ -727,6 +2607,8 @@ def store_users_pull(request):
             "has_password": bool(u.password),
             "password": u.password,
             "is_owner": False,
+            "sync_device_id": u.sync_device_id or "",
+            "permissions": _normalize_mobile_permissions(u.permissions),
         }
         for u in qs.select_related("warehouse").only(
             "id",
@@ -736,6 +2618,8 @@ def store_users_pull(request):
             "warehouse_id",
             "is_active",
             "password",
+            "permissions",
+            "sync_device_id",
         )
     )
 
@@ -744,6 +2628,195 @@ def store_users_pull(request):
             "merchant_id": merchant_id_int,
             "items": data,
             "max_update_time": 0,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def warehouses_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
+    qs = Warehouse.objects.filter(store_id=merchant_id_int).order_by("-is_main", "name")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(_mobile_since_q(since_int))
+
+    data = [
+        _serialize_warehouse(warehouse)
+        for warehouse in qs.only(
+            "id",
+            "store_id",
+            "identifier",
+            "name",
+            "address",
+            "phone",
+            "percentage",
+            "is_representative",
+            "is_main",
+            "is_active",
+            "access_id",
+            "update_time",
+            "mobile_update_time",
+        )
+    ]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def warehouse_transfers_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
+    qs = (
+        WarehouseTransfer.objects.filter(store_id=merchant_id_int)
+        .prefetch_related("items")
+        .order_by("-transfer_date", "-id")
+    )
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(_mobile_since_q(since_int))
+
+    data = [_serialize_warehouse_transfer(transfer) for transfer in qs]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def inventory_adjustments_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
+    qs = (
+        InventoryAdjustment.objects.filter(store_id=merchant_id_int)
+        .select_related("product", "warehouse", "created_by_store_user")
+        .order_by("-adjusted_at", "-id")
+    )
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(_mobile_since_q(since_int))
+
+    data = [_serialize_inventory_adjustment(adjustment) for adjustment in qs]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def stock_movements_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
+    qs = (
+        StockMovement.objects.filter(store_id=merchant_id_int)
+        .select_related("product", "warehouse", "created_by_store_user")
+        .order_by("-occurred_at", "-id")
+    )
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(_mobile_since_q(since_int))
+
+    data = [_serialize_stock_movement(movement) for movement in qs]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
         }
     )
 
@@ -769,13 +2842,13 @@ def store_user_login(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
-    if not store.is_active:
-        return Response({"detail": "Store is inactive"}, status=status.HTTP_409_CONFLICT)
-
     owner_candidate = authenticate(username=identifier, password=password)
     if owner_candidate is not None and owner_candidate == store.owner:
         owner_profile = _ensure_owner_store_user(store, owner_candidate.get_full_name() or owner_candidate.username or store.name)
         owner_name = (owner_profile.name if owner_profile else owner_candidate.get_full_name() or owner_candidate.username or store.name).strip()
+        owner_warehouse_id = owner_profile.warehouse_id if owner_profile else (
+            Warehouse.objects.filter(store=store, is_main=True).values_list("id", flat=True).first()
+        )
         return Response(
             {
                 "status": "ok",
@@ -789,8 +2862,10 @@ def store_user_login(request):
                     "id": owner_profile.id if owner_profile else owner_candidate.id,
                     "identifier": owner_profile.identifier if owner_profile else owner_candidate.username,
                     "name": owner_name,
+                    "warehouse_id": owner_warehouse_id,
                     "is_active": owner_candidate.is_active,
                     "is_owner": True,
+                    "permissions": _all_mobile_permissions(),
                 },
             }
         )
@@ -802,6 +2877,16 @@ def store_user_login(request):
         return Response({"detail": "User is inactive"}, status=status.HTTP_409_CONFLICT)
     if not user.check_password(password):
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    device_id = _to_str(payload.get("device_id")).strip()
+    if device_id:
+        if not store.is_active:
+            return Response({"detail": "Store is inactive"}, status=status.HTTP_403_FORBIDDEN)
+        if len(device_id) > 128:
+            return Response({"detail": "Invalid device ID"}, status=status.HTTP_400_BAD_REQUEST)
+        user, error = _claim_store_user_device(user, device_id)
+        if error is not None:
+            return error
 
     return Response(
         {
@@ -818,9 +2903,31 @@ def store_user_login(request):
                 "name": user.name,
                 "is_active": user.is_active,
                 "is_owner": False,
+                "sync_device_id": user.sync_device_id or "",
+                "permissions": _normalize_mobile_permissions(user.permissions),
             },
         }
     )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def check_pos_device(request):
+    payload = request.data if isinstance(request.data, dict) else {}
+    merchant_id = _to_int(payload.get("merchant_id"))
+    user_id = _to_int(payload.get("store_user_id"))
+    device_id = _to_str(payload.get("device_id")).strip()
+    if not merchant_id or not user_id or not device_id:
+        return Response({"detail": "Store, user and device are required"},
+                        status=status.HTTP_400_BAD_REQUEST)
+    user = StoreUser.objects.select_related("store").filter(
+        pk=user_id, store_id=merchant_id).first()
+    # Verification never registers a new device or changes an existing binding.
+    valid = bool(user and user.is_active and user.store.is_active and
+                 not user.is_owner and
+                 _to_str(user.sync_device_id).strip() == device_id)
+    return Response({"valid": valid, "store_id": merchant_id, "user_id": user_id,
+                     "detail": "" if valid else "حساب نقطة البيع معطّل أو لم يعد مرتبطاً بهذا الجهاز."})
 
 
 @api_view(["POST"])
@@ -844,8 +2951,6 @@ def store_web_login(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
-    if not store.is_active:
-        return Response({"detail": "Store is inactive"}, status=status.HTTP_409_CONFLICT)
 
     owner_candidate = authenticate(username=identifier, password=password)
     ticket_payload = None
@@ -864,11 +2969,14 @@ def store_web_login(request):
             return Response({"detail": "User is inactive"}, status=status.HTTP_409_CONFLICT)
         if not user.check_password(password):
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-        ticket_payload = {
-            "kind": "store_user",
-            "store_id": store.id,
-            "store_user_id": user.id,
-        }
+        return Response(
+            {"detail": "فتح المتجر متاح للمدير فقط."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    # Only known destinations are signed; never accept arbitrary redirect URLs.
+    if payload.get("destination") == "users":
+        ticket_payload["destination"] = "users"
 
     signer = TimestampSigner(salt=STORE_WEB_LOGIN_SIGNER_SALT)
     ticket = signer.sign(json.dumps(ticket_payload, separators=(",", ":")))
@@ -905,10 +3013,12 @@ def store_web_login_open(request):
         return Response({"detail": "invalid ticket payload"}, status=status.HTTP_400_BAD_REQUEST)
 
     store = Store.objects.filter(id=store_id).first()
-    if not store or not store.is_active:
+    if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
 
     next_url = reverse("stores:store_front", kwargs={"slug": store.slug})
+    if not store.is_active or payload.get("destination") == "users":
+        next_url = reverse("dashboard:store_users_list", kwargs={"store_slug": store.slug})
 
     if kind == "owner":
         user_id = _to_int(payload.get("user_id"))
@@ -949,6 +3059,7 @@ def sync_push(request):
         return Response({"detail": "Invalid JSON payload"}, status=status.HTTP_400_BAD_REQUEST)
 
     merchant_id = _to_int(payload.get("merchant_id"))
+    device_id = _to_str(payload.get("device_id")).strip()
     changes = payload.get("changes", [])
     if merchant_id is None:
         return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -958,12 +3069,18 @@ def sync_push(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Merchant not found"}, status=status.HTTP_404_NOT_FOUND)
+    sync_actor, device_error = _ensure_store_user_sync_device(request, merchant_id)
+    if device_error:
+        return device_error
+    _ensure_mobile_default_records(store)
 
     applied = []
     errors = []
     category_local_to_server = {}
     product_local_to_server = {}
     customer_local_to_server = {}
+    supplier_local_to_server = {}
+    warehouse_transfer_local_to_server = {}
 
     def resolve_category(server_id, local_id):
         if server_id not in (None, ""):
@@ -993,22 +3110,56 @@ def sync_push(request):
             return Product.objects.filter(store_id=merchant_id, access_id=int(product_access_id)).first()
         return None
 
-    def resolve_barcode_product(payload_item):
+    def resolve_barcode_product(
+        product_id=None,
+        product_access_id=None,
+        product_server_id=None,
+        product_local_id=None,
+    ):
         return resolve_product(
-            payload_item.get("product_id"),
-            payload_item.get("product_access_id"),
-            payload_item.get("product_server_id"),
-            payload_item.get("product_local_id"),
+            product_id,
+            product_access_id,
+            product_server_id,
+            product_local_id,
         )
+
+    def resolve_warehouse(server_id=None, local_id=None):
+        if server_id not in (None, ""):
+            obj = Warehouse.objects.filter(id=int(server_id), store_id=merchant_id).first()
+            if obj:
+                return obj
+        return None
 
     upserts = [item for item in changes if str(item.get("action", "upsert")).lower() != "delete"]
     deletes = [item for item in changes if str(item.get("action", "upsert")).lower() == "delete"]
 
     def entity_priority(item):
-        return {"category": 0, "product": 1, "barcode": 2}.get(str(item.get("entity")), 99)
+        return {
+            "category": 0,
+            "customer": 0,
+            "supplier": 0,
+            "warehouse": 0,
+            "expense_type": 0,
+            "expense_reason": 0,
+            "employee_department": 0,
+            "employee_job_title": 0,
+            "employee_pay_period": 0,
+            "product": 1,
+            "employee": 1,
+            "salary_voucher": 2,
+            "salary_payment": 3,
+            "barcode": 2,
+            "expense": 2,
+            "fixed_asset": 2,
+            "warehouse_transfer": 3,
+            "inventory_adjustment": 4,
+            "stock_movement": 4,
+        }.get(str(item.get("entity")), 99)
 
     upserts.sort(key=entity_priority)
     deletes.sort(key=entity_priority, reverse=True)
+    party_conflicts = _customer_identity_conflicts(store, changes)
+    party_conflicts.update(_supplier_identity_conflicts(store, changes))
 
     try:
         with transaction.atomic():
@@ -1017,6 +3168,11 @@ def sync_push(request):
                 local_id = item.get("local_id")
                 server_id = item.get("server_id")
                 payload_item = item.get("payload") or {}
+
+                if id(item) in party_conflicts:
+                    errors.append({"entity": entity, "local_id": local_id,
+                                   "detail": party_conflicts[id(item)]})
+                    continue
 
                 if entity == "category":
                     obj, action = _apply_category_change(
@@ -1033,6 +3189,15 @@ def sync_push(request):
                         "server_id": obj.id,
                         "update_time": obj.update_time or 0,
                     })
+                elif entity == "product_image":
+                    if not _can_product_enrichment(sync_actor, "products.edit"):
+                        errors.append({"entity": entity, "local_id": local_id, "detail": "Product image permission required"})
+                        continue
+                    product = product_local_to_server.get(_to_int(local_id))
+                    obj = _apply_product_image_change(store, payload_item,
+                        _to_int(server_id) or (product.pk if product else None))
+                    applied.append({"entity": "product_image", "action": "updated",
+                        "local_id": local_id, "server_id": obj.pk, "update_time": _mobile_time(obj)})
                 elif entity == "product":
                     obj, action = _apply_product_change(
                         store,
@@ -1050,16 +3215,27 @@ def sync_push(request):
                         "update_time": obj.update_time or 0,
                     })
                 elif entity == "barcode":
+                    if not _can_product_enrichment(sync_actor, "products.edit"):
+                        errors.append({"entity": entity, "local_id": local_id, "detail": "Product barcode permission required"})
+                        continue
                     payload_item = dict(payload_item)
                     if "product_id" not in payload_item and "product_server_id" not in payload_item and "product_local_id" not in payload_item:
                         payload_item["product_server_id"] = item.get("product_server_id")
                         payload_item["product_local_id"] = item.get("product_local_id")
-                    obj, action = _apply_barcode_change(
-                        store,
-                        payload_item,
-                        server_id=_to_int(server_id),
-                        product_resolver=resolve_barcode_product,
-                    )
+                    try:
+                        obj, action = _apply_barcode_change(
+                            store,
+                            payload_item,
+                            server_id=_to_int(server_id),
+                            product_resolver=resolve_barcode_product,
+                        )
+                    except ValueError as exc:
+                        errors.append({
+                            "entity": "barcode",
+                            "local_id": local_id,
+                            "detail": str(exc),
+                        })
+                        continue
                     applied.append({
                         "entity": "barcode",
                         "action": action,
@@ -1068,15 +3244,226 @@ def sync_push(request):
                         "update_time": obj.update_time or 0,
                     })
                 elif entity == "customer":
-                    obj, action = _apply_customer_change(
-                        store,
-                        payload_item,
-                        server_id=_to_int(server_id),
-                    )
+                    try:
+                        with transaction.atomic():
+                            obj, action = _apply_customer_change(
+                                store, payload_item, server_id=_to_int(server_id))
+                    except (ValueError, IntegrityError) as exc:
+                        errors.append({"entity": "customer", "local_id": local_id, "detail": str(exc)})
+                        continue
                     if local_id not in (None, ""):
                         customer_local_to_server[int(local_id)] = obj
                     applied.append({
                         "entity": "customer",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "name": obj.name,
+                        "update_time": obj.update_time or 0,
+                    })
+                elif entity == "supplier":
+                    try:
+                        with transaction.atomic():
+                            obj, action = _apply_supplier_change(
+                                store, payload_item, server_id=_to_int(server_id))
+                    except (ValueError, IntegrityError) as exc:
+                        errors.append({"entity": "supplier", "local_id": local_id, "detail": str(exc)})
+                        continue
+                    if local_id not in (None, ""):
+                        supplier_local_to_server[int(local_id)] = obj
+                    applied.append({
+                        "entity": "supplier",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "warehouse":
+                    obj, action = _apply_warehouse_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "warehouse",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
+                elif entity == "expense_type":
+                    obj, action = _apply_expense_type_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "expense_type",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
+                elif entity == "expense_reason":
+                    obj, action = _apply_expense_reason_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "expense_reason",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
+                elif entity == "employee_department":
+                    obj, action = _apply_employee_lookup_change(
+                        store,
+                        payload_item,
+                        EmployeeDepartment,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "employee_department",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "employee_job_title":
+                    obj, action = _apply_employee_lookup_change(
+                        store,
+                        payload_item,
+                        EmployeeJobTitle,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "employee_job_title",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "employee_pay_period":
+                    obj, action = _apply_employee_lookup_change(
+                        store,
+                        payload_item,
+                        EmployeePayPeriod,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "employee_pay_period",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "employee":
+                    obj, action = _apply_employee_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "employee",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "salary_voucher":
+                    obj, action = _apply_salary_voucher_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "salary_voucher",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "salary_payment":
+                    obj, action = _apply_salary_payment_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "salary_payment",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "warehouse_transfer":
+                    obj, action = _apply_warehouse_transfer_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                        product_resolver=resolve_product,
+                    )
+                    if local_id not in (None, ""):
+                        warehouse_transfer_local_to_server[int(local_id)] = obj
+                    applied.append({
+                        "entity": "warehouse_transfer",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
+                elif entity == "inventory_adjustment":
+                    obj, action = _apply_inventory_adjustment_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                        product_resolver=resolve_product,
+                    )
+                    applied.append({
+                        "entity": "inventory_adjustment",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
+                elif entity == "stock_movement":
+                    obj, action = _apply_stock_movement_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                        product_resolver=resolve_product,
+                    )
+                    applied.append({
+                        "entity": "stock_movement",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "expense":
+                    obj, action = _apply_expense_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                        mobile_sync_key=_mobile_sync_key(device_id, "expense", local_id),
+                    )
+                    applied.append({
+                        "entity": "expense",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "fixed_asset":
+                    obj, action = _apply_fixed_asset_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "fixed_asset",
                         "action": action,
                         "local_id": local_id,
                         "server_id": obj.id,
@@ -1087,6 +3474,39 @@ def sync_push(request):
                 entity = str(item.get("entity", "")).lower()
                 server_id = _to_int(item.get("server_id"))
                 local_id = item.get("local_id")
+                payload_item = item.get("payload") or {}
+                if id(item) in party_conflicts:
+                    errors.append({"entity": entity, "local_id": local_id,
+                                   "detail": party_conflicts[id(item)]})
+                    continue
+                if entity == "production_stock_movement_delete":
+                    reference_type = _to_str(payload_item.get("reference_type")).strip()
+                    reference_id = _to_str(payload_item.get("reference_id")).strip()
+                    if reference_type and reference_id:
+                        qs = StockMovement.objects.filter(
+                            store_id=merchant_id,
+                            reference_type=reference_type,
+                            reference_id=reference_id,
+                        )
+                        deleted_count = qs.count()
+                        for obj in qs:
+                            obj._skip_mobile_delete_sync = True
+                            obj.delete()
+                        applied.append({
+                            "entity": "production_stock_movement_delete",
+                            "action": "deleted_reference",
+                            "local_id": local_id,
+                            "server_id": None,
+                            "deleted_count": deleted_count,
+                        })
+                    elif local_id not in (None, ""):
+                        applied.append({
+                            "entity": "production_stock_movement_delete",
+                            "action": "skipped",
+                            "local_id": local_id,
+                            "server_id": None,
+                        })
+                    continue
                 if server_id is None:
                     if local_id not in (None, ""):
                         applied.append({
@@ -1098,6 +3518,9 @@ def sync_push(request):
                     continue
 
                 if entity == "barcode":
+                    if not _can_product_enrichment(sync_actor, "products.edit"):
+                        errors.append({"entity": entity, "local_id": local_id, "detail": "Product barcode permission required"})
+                        continue
                     obj = ProductBarcode.objects.filter(id=server_id, product__store_id=merchant_id).first()
                     if obj:
                         obj._skip_mobile_delete_sync = True
@@ -1136,6 +3559,14 @@ def sync_push(request):
                 elif entity == "customer":
                     obj = Customer.objects.filter(id=server_id, store_id=merchant_id).first()
                     if obj:
+                        if obj.name == GENERAL_CUSTOMER_NAME:
+                            applied.append({
+                                "entity": "customer",
+                                "action": "protected",
+                                "local_id": local_id,
+                                "server_id": server_id,
+                            })
+                            continue
                         obj._skip_mobile_delete_sync = True
                         obj.delete()
                         applied.append({
@@ -1144,10 +3575,223 @@ def sync_push(request):
                             "local_id": local_id,
                             "server_id": server_id,
                         })
+                elif entity == "supplier":
+                    obj = Supplier.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "supplier",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "warehouse":
+                    obj = Warehouse.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        if obj.is_main:
+                            applied.append({
+                                "entity": "warehouse",
+                                "action": "protected",
+                                "local_id": local_id,
+                                "server_id": server_id,
+                            })
+                            continue
+                        obj._skip_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "warehouse",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "warehouse_transfer":
+                    obj = WarehouseTransfer.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj.delete()
+                        applied.append({
+                            "entity": "warehouse_transfer",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "inventory_adjustment":
+                    obj = InventoryAdjustment.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "inventory_adjustment",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "stock_movement":
+                    obj = StockMovement.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        # Disposal deletions must also reach other devices so
+                        # their local expiry allocations are restored.
+                        obj._skip_mobile_delete_sync = obj.reference_type != "stock_disposal"
+                        obj.delete()
+                    applied.append({
+                        "entity": "stock_movement",
+                        "action": "deleted",
+                        "local_id": local_id,
+                        "server_id": server_id,
+                    })
+                elif entity == "expense":
+                    obj = Expense.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "expense",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "fixed_asset":
+                    obj = FixedAsset.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "fixed_asset",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "expense_type":
+                    obj = ExpenseType.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "expense_type",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "expense_reason":
+                    obj = ExpenseReason.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "expense_reason",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "employee_department":
+                    obj = EmployeeDepartment.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "employee_department",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "employee_job_title":
+                    obj = EmployeeJobTitle.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "employee_job_title",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "employee_pay_period":
+                    obj = EmployeePayPeriod.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "employee_pay_period",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "employee":
+                    obj = Employee.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "employee",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "salary_voucher":
+                    obj = SalaryPaymentVoucher.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "salary_voucher",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "salary_payment":
+                    obj = SalaryPayment.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "salary_payment",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
 
         return Response({"status": "ok", "applied": applied, "errors": errors})
+    except ValueError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def orders_received(request):
+    payload = request.data if isinstance(request.data, dict) else {}
+    merchant_id = _to_int(payload.get("merchant_id"))
+    client_id = _to_str(payload.get("sync_client_id")).strip()
+    receipts = payload.get("orders", [])
+    if merchant_id is None or not client_id or not isinstance(receipts, list):
+        return Response({"detail": "Invalid receipt payload"}, status=400)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id)
+    if device_error:
+        return device_error
+    received = []
+    mobile_order_ids = {}
+    with transaction.atomic():
+        for receipt in receipts:
+            if not isinstance(receipt, dict):
+                continue
+            local_id = _to_int(receipt.get("local_order_id"))
+            server_id = _to_int(receipt.get("server_order_id"))
+            if not local_id or local_id < 1 or not server_id:
+                continue
+            order = Order.objects.select_for_update().filter(
+                store_id=merchant_id, pk=server_id, status__in=["confirmed", "completed"], document_kind=1,
+            ).first()
+            if order is None:
+                continue
+            if not order.mobile_local_order_id and order.mobile_sync_client_id in (None, "", client_id):
+                order.mobile_local_order_id = local_id
+                order.mobile_sync_client_id = client_id
+                order.save(update_fields=["mobile_local_order_id", "mobile_sync_client_id"])
+            if order.mobile_local_order_id:
+                received.append(server_id)
+                mobile_order_ids[str(server_id)] = order.mobile_local_order_id
+    return Response({"received": received, "mobile_order_ids": mobile_order_ids})
 
 
 @api_view(["POST"])
@@ -1167,6 +3811,10 @@ def orders_push(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Merchant not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id)
+    if device_error:
+        return device_error
+    _ensure_mobile_default_records(store)
 
     applied = []
     errors = []
@@ -1193,27 +3841,51 @@ def orders_push(request):
 
         return None
 
+    def resolve_supplier(order_payload):
+        server_id = _to_int(order_payload.get("supplier_server_id"))
+        supplier_phone = _to_str(order_payload.get("supplier_phone")).strip()
+        supplier_name = _to_str(order_payload.get("supplier_name")).strip()
+
+        if server_id is not None:
+            supplier = Supplier.objects.filter(id=server_id, store=store).first()
+            if supplier:
+                return supplier
+
+        if supplier_phone:
+            supplier = Supplier.objects.filter(store=store, phone=supplier_phone).first()
+            if supplier:
+                return supplier
+
+        if supplier_name:
+            supplier = Supplier.objects.filter(store=store, name=supplier_name).first()
+            if supplier:
+                return supplier
+            return Supplier.objects.create(
+                store=store,
+                name=supplier_name,
+                phone=supplier_phone,
+                update_time=_now_minute(),
+            )
+
+        return None
+
     def resolve_store_user(order_payload):
         server_id = _to_int(order_payload.get("created_by_store_user_id"))
         if server_id is not None:
             user = StoreUser.objects.filter(id=server_id, store=store).first()
             if user:
-                if user.auth_user_id and user.auth_user_id == getattr(store, "owner_id", None):
-                    return None
                 return user
 
             if server_id < 0:
-                return None
+                return _ensure_owner_store_user(store)
 
         created_by_name = _to_str(order_payload.get("created_by_store_user_name")).strip()
         if created_by_name:
             user = StoreUser.objects.filter(store=store, name__iexact=created_by_name).first()
             if user:
-                if user.auth_user_id and user.auth_user_id == getattr(store, "owner_id", None):
-                    return None
                 return user
             if created_by_name.lower() in {"المدير", "المدير العام", "admin"}:
-                return None
+                return _ensure_owner_store_user(store, created_by_name)
 
         return None
 
@@ -1258,15 +3930,21 @@ def orders_push(request):
                     continue
 
                 local_order_id = _to_int(order_payload.get("local_order_id"))
+                server_order_id = _to_int(order_payload.get("server_order_id"))
+                action = _to_str(order_payload.get("action"), "upsert").lower()
                 sync_client_id = _to_str(order_payload.get("sync_client_id")).strip() or None
                 accounting_invoice_number = _to_int(order_payload.get("accounting_invoice_number"))
+                document_kind = _to_int(order_payload.get("document_kind"), 1)
 
+                transaction_type = _to_str(order_payload.get("transaction_type"), "sale") or "sale"
+                uses_customer = transaction_type in ("sale", "sale_return")
+                uses_supplier = transaction_type in ("purchase", "purchase_return")
                 customer = resolve_customer(order_payload)
+                supplier = resolve_supplier(order_payload) if uses_supplier else None
                 store_user = resolve_store_user(order_payload)
                 created_by_user = resolve_created_by_user(order_payload, store_user)
                 warehouse = _resolve_mobile_warehouse(store, order_payload.get("warehouse_server_id"))
 
-                transaction_type = _to_str(order_payload.get("transaction_type"), "sale") or "sale"
                 status_value = _to_str(order_payload.get("status"), "confirmed") or "confirmed"
                 if status_value == "completed":
                     status_value = "confirmed"
@@ -1279,8 +3957,13 @@ def orders_push(request):
                     created_at = timezone.now()
 
                 discount = _to_float(order_payload.get("discount"), 0.0)
+                shipping_cost = _to_float(order_payload.get("shipping_cost"), 0.0)
+                if not math.isfinite(shipping_cost) or shipping_cost < 0:
+                    errors.append({"detail": "Invalid shipping cost", "local_order_id": local_order_id})
+                    continue
                 payment = _to_float(order_payload.get("payment"), 0.0)
                 amount = _to_float(order_payload.get("amount"), 0.0)
+                note = _to_str(order_payload.get("note"), "").strip()
                 is_seen_by_store = _to_bool(order_payload.get("is_seen_by_store"), True)
                 items_payload = order_payload.get("items", [])
                 if not isinstance(items_payload, list):
@@ -1307,7 +3990,12 @@ def orders_push(request):
                 if prepared_items is None:
                     continue
 
-                if sync_client_id and local_order_id is not None:
+                if server_order_id is not None:
+                    order_qs = Order.objects.filter(
+                        store=store,
+                        id=server_order_id,
+                    ).select_related("customer", "supplier", "warehouse", "created_by_store_user")
+                elif sync_client_id and local_order_id is not None:
                     order_qs = Order.objects.filter(
                         store=store,
                         mobile_sync_client_id=sync_client_id,
@@ -1317,22 +4005,39 @@ def orders_push(request):
                     order_qs = Order.objects.filter(
                         store=store,
                         accounting_invoice_number=accounting_invoice_number,
+                        document_kind=document_kind,
                     ).select_related("customer", "supplier", "warehouse", "created_by_store_user")
                     if store_user is None:
                         order_qs = order_qs.filter(created_by_store_user__isnull=True)
                     else:
                         order_qs = order_qs.filter(created_by_store_user=store_user)
                 order = order_qs.first()
+
+                if action == "delete":
+                    if order is not None:
+                        deleted_order_id = order.id
+                        order.items.all().delete()
+                        order.delete()
+                    else:
+                        deleted_order_id = None
+                    applied.append({
+                        "local_order_id": local_order_id,
+                        "server_order_id": deleted_order_id,
+                        "action": "deleted",
+                    })
+                    continue
+
                 if order is None:
                     order = Order(
                         store=store,
                         accounting_invoice_number=accounting_invoice_number if not sync_client_id else None,
+                        document_kind=document_kind,
                         mobile_sync_client_id=sync_client_id,
                         mobile_local_order_id=local_order_id,
                     )
 
-                order.customer = customer if transaction_type == "sale" else None
-                order.supplier = None
+                order.customer = customer if uses_customer else None
+                order.supplier = supplier if uses_supplier else None
                 order.created_by = created_by_user
                 order.created_by_store_user = store_user
                 if sync_client_id:
@@ -1340,10 +4045,19 @@ def orders_push(request):
                     order.mobile_local_order_id = local_order_id
                 order.warehouse = warehouse
                 order.transaction_type = transaction_type
+                order.document_kind = document_kind
                 order.status = status_value
                 order.discount = Decimal(str(discount))
+                if transaction_type == "purchase" and document_kind == 1:
+                    if "shipping_cost" in order_payload:
+                        order.shipping_cost = Decimal(str(shipping_cost))
+                else:
+                    order.shipping_cost = Decimal("0")
+                for field, value in _currency_sync_fields(order_payload, ('base_currency', 'payment_currency', 'exchange_rate', 'amount_payment_currency', 'subtotal_alt', 'discount_alt', 'total_alt')).items():
+                    setattr(order, field, value)
                 order.payment = Decimal(str(payment))
                 order.amount = Decimal(str(amount))
+                order.note = note
                 order.payment_type = _to_str(order_payload.get("payment_type"), "") or None
                 order.payment_method_name = _to_str(order_payload.get("payment_method_name"), "") or None
                 order.payment_recipient_name = _to_str(order_payload.get("payment_recipient_name"), "") or None
@@ -1352,54 +4066,276 @@ def orders_push(request):
                 order.shipping_address = _to_str(order_payload.get("shipping_address"), "") or None
                 order.is_seen_by_store = is_seen_by_store
                 order.created_at = created_at
+                order.mobile_update_time = _now_minute()
+                if order.input_data and not order_payload.get("input_data"):
+                    raise ValueError("يجب إرسال أرقام عملة الإدخال الأصلية لهذه الفاتورة.")
+                if "input_data" in order_payload:
+                    order.input_data = validate_input_data(order_payload["input_data"], order.input_data)
+                if order.input_data:
+                    from .input_money import source_base_value
+                    original_values = json.loads(order.input_data)["values"]
+                    for field, key in (("amount", "subtotal"), ("discount", "discount"),
+                                       ("payment", "payment"), ("shipping_cost", "shipping")):
+                        if key in original_values:
+                            setattr(order, field, source_base_value(order, key, getattr(order, field)))
                 order._skip_update_time_touch = True
                 order.save()
 
+                previous_line_notes = dict(order.items.values_list("id", "line_note"))
                 order.items.all().delete()
                 created_items = []
+                purchase_subtotal = sum(
+                    Decimal(str(_to_float(payload.get("price"), 0.0)))
+                    * Decimal(str(_to_float(payload.get("quantity"), 1.0)))
+                    for payload, _ in prepared_items
+                )
                 for item_payload, product in prepared_items:
                     quantity = _to_float(item_payload.get("quantity"), 1.0)
                     price = _to_float(item_payload.get("price"), 0.0)
                     direction = _to_int(item_payload.get("direction"), -1)
                     buy_price = item_payload.get("buy_price")
-                    if transaction_type == "sale" and buy_price in (None, "", 0, "0", "0.0"):
+                    if transaction_type in ("sale", "sale_return") and buy_price in (None, "", 0, "0", "0.0"):
                         buy_price = product.get_avg_buy_price()
-                    elif transaction_type == "purchase" and buy_price in (None, "", 0, "0", "0.0"):
-                        buy_price = price
+                    elif transaction_type == "purchase":
+                        received = Decimal(str(quantity)) + Decimal(str(max(0, _to_float(item_payload.get("bonus_quantity"), 0))))
+                        landed_total = max(Decimal("0"), purchase_subtotal - order.discount + order.shipping_cost)
+                        buy_price = (
+                            Decimal(str(price)) * Decimal(str(quantity))
+                            * landed_total / purchase_subtotal / received
+                            if purchase_subtotal > 0 and received > 0 else Decimal("0")
+                        )
                     item_note = _to_str(item_payload.get("item_note"), "") or None
 
                     order_item = OrderItem(
                         order=order,
+                        item_note=item_note,
+                        line_note=(
+                            _to_str(item_payload.get("line_note"), "")
+                            if "line_note" in item_payload
+                            else previous_line_notes.get(_to_int(item_payload.get("server_item_id")), "")
+                        ),
                         product=product,
                         quantity=Decimal(str(quantity)),
+                        bonus_quantity=Decimal(str(max(0, _to_float(item_payload.get("bonus_quantity"), 0)))),
                         price=Decimal(str(price)),
+                        input_data=validate_input_data(item_payload.get("input_data")),
                         direction=direction if direction is not None else -1,
                         buy_price=None if buy_price in (None, "") else Decimal(str(_to_float(buy_price))),
                         warehouse=warehouse,
                         access_id=None,
                     )
+                    order_item.mobile_update_time = order.mobile_update_time
                     order_item._skip_update_time_touch = True
                     order_item.save()
 
                     created_items.append({
                         "local_item_id": _to_int(item_payload.get("local_item_id")),
                         "server_item_id": order_item.id,
-                        "server_update_time": order_item.update_time or 0,
+                        "server_update_time": _mobile_time(order_item),
                     })
 
                 cashback_entry = _sync_mobile_invoice_cashback(store, order, customer)
+                # Snapshot the accepted version so its source need not download it again.
+                order.refresh_from_db()
+                Order.objects.filter(pk=order.pk).update(
+                    mobile_uploaded_digest=_order_mobile_digest(_serialize_order_for_mobile(order))
+                )
 
                 applied.append({
                     "local_order_id": local_order_id,
                     "server_order_id": order.id,
-                    "server_update_time": order.update_time or 0,
+                    "server_update_time": _mobile_time(order),
+                    "created_by_store_user_id": order.created_by_store_user_id,
                     "accounting_invoice_number": order.accounting_invoice_number,
+                    "document_kind": order.document_kind,
+                    "customer_server_id": order.customer_id,
+                    "supplier_server_id": order.supplier_id,
                     "cashback_status": cashback_entry["status"],
                     "cashback_amount": float(cashback_entry["cashback_amount"] or 0),
                     "items": created_items,
                 })
 
         return Response({"status": "ok", "applied": applied, "errors": errors})
+    except Exception as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _serialize_order_item_for_mobile(item):
+    buy_price = getattr(item, "buy_price", None)
+    price_alt = total_alt = 0
+    if getattr(item, "input_data", None):
+        source = json.loads(item.input_data)
+        values = source["values"]
+        base_currency = item.order.base_currency or item.order.store.pricing_currency
+        rate = Decimal(str(item.order.exchange_rate or 1))
+        if source["currency"] != base_currency:
+            price_alt = Decimal(values["price"]) / Decimal(values.get("factor", "1"))
+            total_alt = Decimal(values["total"])
+        else:
+            price_alt = item.price * rate if base_currency == "USD" else item.price / rate
+            total_alt = item.subtotal * rate if base_currency == "USD" else item.subtotal / rate
+    return {
+        "input_data": getattr(item, "input_data", None),
+        "id": item.id,
+        "product_id": getattr(item, "product_id", None),
+        "warehouse_id": getattr(item, "warehouse_id", None),
+        "quantity": _to_float(getattr(item, "quantity", 0)),
+        "bonus_quantity": _to_float(getattr(item, "bonus_quantity", 0)),
+        "price": _to_float(getattr(item, "price", 0)),
+        "price_alt": float(price_alt),
+        "total_alt": float(total_alt),
+        "direction": getattr(item, "direction", -1),
+        "buy_price": None if buy_price is None else _to_float(buy_price),
+        "item_note": getattr(item, "item_note", "") or "",
+        "line_note": getattr(item, "line_note", "") or "",
+        "update_time": _mobile_time(item),
+    }
+
+
+def _order_mobile_digest(payload):
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+
+def _is_unchanged_upload(order, payload, sync_client_id):
+    return bool(
+        sync_client_id
+        and order.mobile_sync_client_id == sync_client_id
+        and order.mobile_uploaded_digest
+        and order.mobile_uploaded_digest == _order_mobile_digest(payload)
+    )
+
+
+def _serialize_order_for_mobile(order):
+    created_by_store_user = getattr(order, "created_by_store_user", None)
+    prefetched_items = getattr(order, "prefetched_mobile_items", None)
+    if prefetched_items is None:
+        prefetched_items = order.items.select_related("product", "warehouse").order_by("id")
+    items = [_serialize_order_item_for_mobile(item) for item in prefetched_items]
+    if getattr(order, "document_kind", 1) == 1:
+        items_total = sum(Decimal(str(item.get("price", 0))) * Decimal(str(abs(item.get("quantity", 0)))) for item in items)
+        # Mobile stores the subtotal and subtracts the separate discount once.
+        # Freight affects purchase cost, not the supplier invoice subtotal.
+        from .input_money import source_base_value
+        sync_amount = source_base_value(order, "subtotal", items_total)
+    else:
+        sync_amount = getattr(order, "amount", 0)
+    return {
+        "input_data": getattr(order, "input_data", None),
+        "id": order.id,
+        "update_time": _mobile_time(order),
+        "customer_id": order.customer_id,
+        "supplier_id": order.supplier_id,
+        "warehouse_id": order.warehouse_id,
+        "created_by_store_user_id": order.created_by_store_user_id,
+        "created_by_store_user_name": (
+            getattr(created_by_store_user, "name", "") if created_by_store_user else ""
+        ),
+        "transaction_type": getattr(order, "transaction_type", ""),
+        "status": "completed" if getattr(order, "status", "") == "confirmed" else getattr(order, "status", ""),
+        "discount": _to_float(getattr(order, "discount", 0)),
+        "shipping_cost": _to_float(getattr(order, "shipping_cost", 0)),
+        "payment": _to_float(getattr(order, "payment", 0)),
+        "amount": _to_float(sync_amount),
+        "base_currency": _mobile_currency_value(order, "base_currency", getattr(order.store, "pricing_currency", "SYP") or "SYP"),
+        "payment_currency": _mobile_currency_value(order, "payment_currency", getattr(order.store, "pricing_currency", "SYP") or "SYP"),
+        "exchange_rate": _mobile_currency_value(order, "exchange_rate", _to_float(getattr(order.store, "exchange_rate", 1))),
+        "amount_payment_currency": _mobile_currency_value(order, "amount_payment_currency", _to_float(getattr(order, "payment", 0))),
+        "subtotal_alt": _mobile_currency_value(order, "subtotal_alt", 0),
+        "discount_alt": _mobile_currency_value(order, "discount_alt", 0),
+        "total_alt": _mobile_currency_value(order, "total_alt", 0),
+        "note": getattr(order, "note", "") or "",
+        "mobile_order_id": getattr(order, "mobile_local_order_id", None),
+        "accounting_invoice_number": getattr(order, "accounting_invoice_number", None),
+        "document_kind": getattr(order, "document_kind", 1),
+        "payment_type": getattr(order, "payment_type", "") or "",
+        "payment_method_name": getattr(order, "payment_method_name", "") or "",
+        "payment_recipient_name": getattr(order, "payment_recipient_name", "") or "",
+        "payment_account_info": getattr(order, "payment_account_info", "") or "",
+        "payment_additional_info": getattr(order, "payment_additional_info", "") or "",
+        "shipping_address": getattr(order, "shipping_address", "") or "",
+        "is_seen_by_store": getattr(order, "is_seen_by_store", False),
+        "created_at": order.created_at.isoformat() if getattr(order, "created_at", None) else "",
+        "items": items,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def orders_pull(request):
+    try:
+        merchant_id = request.query_params.get("merchant_id")
+        since = request.query_params.get("since")
+        limit = _to_int(request.query_params.get("limit")) or 250
+        offset = _to_int(request.query_params.get("offset")) or 0
+        limit = max(1, min(limit, 500))
+        offset = max(0, offset)
+
+        if not merchant_id:
+            return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            merchant_id_int = int(merchant_id)
+        except (TypeError, ValueError):
+            return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+        store = Store.objects.filter(id=merchant_id_int).first()
+        if not store:
+            return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+        _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+        if device_error:
+            return device_error
+
+        qs = (
+            Order.objects.filter(store_id=merchant_id_int)
+            .filter(
+                ~Q(transaction_type="sale")
+                | ~Q(document_kind=1)
+                | Q(status="confirmed")
+            )
+            .select_related(
+                "store", "customer", "supplier", "warehouse", "created_by_store_user"
+            )
+            .order_by("id")
+        )
+        if since not in (None, "", "0"):
+            try:
+                since_int = int(since)
+            except (TypeError, ValueError):
+                return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+            qs = qs.filter(Q(mobile_update_time__gte=since_int) | Q(update_time__gte=since_int) | Q(mobile_update_time__isnull=True, update_time__isnull=True))
+
+        # Include the boundary minute so edits within the same minute remain visible.
+        sync_client_id = request.query_params.get("sync_client_id") if since not in (None, "", "0") else None
+        page_rows = list(qs.prefetch_related(
+            Prefetch(
+                "items",
+                queryset=OrderItem.objects.select_related("product", "warehouse").order_by("id"),
+                to_attr="prefetched_mobile_items",
+            )
+        )[offset:offset + limit + 1])
+        has_more = len(page_rows) > limit
+        data = []
+        errors = []
+        for order in page_rows[:limit]:
+            try:
+                payload = _serialize_order_for_mobile(order)
+                if not _is_unchanged_upload(order, payload, sync_client_id):
+                    data.append(payload)
+            except Exception as exc:
+                errors.append({
+                    "order_id": getattr(order, "id", None),
+                    "mobile_order_id": getattr(order, "mobile_local_order_id", None),
+                    "accounting_invoice_number": getattr(order, "accounting_invoice_number", None),
+                    "error": str(exc),
+                })
+        return Response({
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((_mobile_time(order) for order in page_rows[:limit]), default=0),
+            "has_more": has_more,
+            "next_offset": offset + min(len(page_rows), limit),
+            "errors": errors,
+        })
     except Exception as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -1417,6 +4353,10 @@ def deletes_pull(request):
         merchant_id_int = int(merchant_id)
     except (TypeError, ValueError):
         return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
 
     qs = MobileDeleteSync.objects.filter(merchant_id=merchant_id_int).order_by("id")
     if since not in (None, "", "0"):
@@ -1466,6 +4406,10 @@ def barcodes_pull(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
     qs = ProductBarcode.objects.filter(product__store_id=merchant_id_int).order_by("id")
 
     if since not in (None, "", "0"):
@@ -1476,7 +4420,7 @@ def barcodes_pull(request):
                 {"detail": "since must be an integer (minutes)"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         {
@@ -1484,9 +4428,9 @@ def barcodes_pull(request):
             "value": b.value,
             "product_id": b.product_id,
             "access_id": b.access_id,
-            "update_time": b.update_time or 0,
+            "update_time": _mobile_time(b),
         }
-        for b in qs.only("id", "value", "product_id", "access_id", "update_time")
+        for b in qs.only("id", "value", "product_id", "access_id", "update_time", "mobile_update_time")
     ]
 
     return Response(

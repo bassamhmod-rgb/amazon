@@ -157,17 +157,17 @@
         <div class="row g-3">
 
             <div class="col-md-6">
-                {% if order.transaction_type == "sale" %}
+                {% if order.transaction_type == "sale" or order.transaction_type == "sale_return" %}
                     <p class="fs-5"><strong>👤 الزبون:</strong>
-                        <span class="text-primary">{{ order.customer.name }}</span>
+                        <span class="text-primary">{% if order.customer %}{{ order.customer.name }}{% else %}-{% endif %}</span>
                     </p>
                 {% else %}
                     <p class="fs-5"><strong>🏭 المورد:</strong>
-                        <span class="text-primary">{{ order.supplier.name }}</span>
+                        <span class="text-primary">{% if order.supplier %}{{ order.supplier.name }}{% else %}-{% endif %}</span>
                     </p>
                 {% endif %}
 
-                <p><strong>📅 التاريخ:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</p>
+                <p><strong>📅 التاريخ:</strong> {{ order.created_at|date:"Y-m-d h:i" }} {% if order.created_at|date:"A" == "AM" %}ص{% else %}م{% endif %}</p>
 
                 <p>
                     <strong>الحالة:</strong>
@@ -180,23 +180,23 @@
             </div>
 
             <div class="col-md-6 bg-light p-3 rounded">
-                <p><strong>مجموع العناصر:</strong> {{ order.items_total|floatformat:2 }} $</p>
+                <p><strong>مجموع العناصر:</strong> {{ order.input_total }} {{ order.input_currency_label }}</p>
                 <p><strong>الحسم:</strong>
-                    <span class="text-danger">{{ order.discount|floatformat:2 }} $</span>
+                    <span class="text-danger">{{ order.input_discount }} {{ order.input_currency_label }}</span>
                 </p>
 
                 <p class="fs-5 fw-bold">
-                    <strong>الصافي للدفع:</strong> {{ order.net_total|floatformat:2 }} $
+                    <strong>الصافي للدفع:</strong> {{ order.input_net }} {{ order.input_currency_label }}
                 </p>
 
                 <hr>
 
-                <p><strong>المدفوع:</strong> {{ order.payment|floatformat:2 }} $</p>
+                <p><strong>المدفوع:</strong> {{ order.input_payment }} {{ order.input_currency_label }}</p>
 
                 <p>
                     <strong>المتبقي:</strong>
                     <span class="{% if order.remaining > 0 %}text-danger{% else %}text-success{% endif %}">
-                        {{ order.remaining|floatformat:2 }} $
+                        {{ order.input_remaining }} {{ order.input_currency_label }}
                     </span>
                 </p>
             </div>
@@ -217,12 +217,20 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% if order.note %}
+                    <tr>
+                        <td colspan="4">
+                            <strong>&#1605;&#1604;&#1575;&#1581;&#1592;&#1577;:</strong>
+                            <div class="note-box mt-2">{{ order.note|linebreaksbr }}</div>
+                        </td>
+                    </tr>
+                    {% endif %}
                     {% for item in order.items.all %}
                     <tr>
                         <td>{{ item.product.name }}</td>
-                        <td>{{ item.quantity }}</td>
-                        <td>{{ item.price|floatformat:2 }} $</td>
-                        <td class="fw-bold">{{ item.subtotal|floatformat:2 }} $</td>
+                        <td>{{ item.input_quantity }}</td>
+                        <td>{{ item.input_price }} {{ order.input_currency_label }}</td>
+                        <td class="fw-bold">{{ item.input_subtotal }} {{ order.input_currency_label }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

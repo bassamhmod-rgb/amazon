@@ -29,6 +29,12 @@ def current_store(request):
         elif store.owner_id == request.user.id:
             display_warehouse = Warehouse.objects.filter(store=store).order_by("-is_main", "id").first()
 
+        if store_user:
+            permissions = dict(store_user.permissions or {})
+            permissions["stock_view"] = bool(permissions.get("stock.view"))
+            permissions["warehouse_transfer"] = bool(permissions.get("warehouses.transfer"))
+            store_user.permissions = permissions
+
     return {
         "current_store": store,
         "current_store_user": store_user,

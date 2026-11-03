@@ -1,18 +1,78 @@
 from django.contrib import admin
-from .models import Store, Warehouse
+from .models import Store, TrialDevice, Warehouse, WarehouseTransfer, WarehouseTransferItem, StockMovement
 
 @admin.register(Store)
 class StoreAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "mobile", "rkmdb", "rkmtb", "theme", "is_active")
-    search_fields = ("name", "owner__username")
-    list_filter = ("theme", "is_active")
+    list_display = (
+        "name",
+        "owner",
+        "mobile",
+        "activation_code",
+        "licensed_device_id",
+        "update_file_platform",
+        "update_file_active",
+        "max_store_users",
+        "rkmdb",
+        "rkmtb",
+        "theme",
+        "is_active",
+    )
+    search_fields = ("name", "owner__username", "mobile", "activation_code", "licensed_device_id")
+    list_filter = ("theme", "is_active", "update_file_active", "update_file_platform")
+    fields = (
+        "owner",
+        "name",
+        "slug",
+        "mobile",
+        "max_store_users",
+        "activation_code",
+        "licensed_device_id",
+        "update_file",
+        "update_file_platform",
+        "update_file_active",
+        "rkmdb",
+        "rkmtb",
+        "logo",
+        "facebook_url",
+        "instagram_url",
+        "telegram_url",
+        "whatsapp_url",
+        "sales_paused",
+        "sales_pause_message",
+        "theme",
+        "description",
+        "description2",
+        "description3",
+        "description4",
+        "description5",
+        "is_active",
+        "allow_full_payment",
+        "allow_partial_payment",
+        "allow_cash_on_delivery",
+        "payment_required_percentage",
+        "hero_height",
+        "hero_fit",
+        "cashback_percentage",
+        "pricing_currency",
+        "exchange_rate",
+        "update_time",
+        "access_id",
+    )
 
 
 @admin.register(Warehouse)
 class WarehouseAdmin(admin.ModelAdmin):
-    list_display = ("name", "store", "identifier", "phone", "percentage", "is_active")
+    list_display = (
+        "name",
+        "store",
+        "identifier",
+        "phone",
+        "percentage",
+        "is_representative",
+        "is_active",
+    )
     search_fields = ("name", "identifier", "store__name")
-    list_filter = ("store", "is_active")
+    list_filter = ("store", "is_representative", "is_active")
 
     def get_readonly_fields(self, request, obj=None):
         readonly = list(super().get_readonly_fields(request, obj))
@@ -22,6 +82,40 @@ class WarehouseAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         if obj and obj.is_main:
+            if request.user.is_superuser or request.user.has_perm("stores.delete_store"):
+                return True
             return False
         return super().has_delete_permission(request, obj=obj)
+
+
+class WarehouseTransferItemInline(admin.TabularInline):
+    model = WarehouseTransferItem
+    extra = 0
+
+
+@admin.register(WarehouseTransfer)
+class WarehouseTransferAdmin(admin.ModelAdmin):
+    list_display = ("store", "from_warehouse", "to_warehouse", "transfer_date", "update_time")
+    search_fields = ("notes", "from_warehouse__name", "to_warehouse__name", "items__product__name")
+    list_filter = ("store", "from_warehouse", "to_warehouse")
+    inlines = [WarehouseTransferItemInline]
+
+
+@admin.register(TrialDevice)
+class TrialDeviceAdmin(admin.ModelAdmin):
+    list_display = ("owner_name", "device_id", "created_at")
+    search_fields = ("owner_name", "device_id")
+
+
+@admin.register(StockMovement)
+class StockMovementAdmin(admin.ModelAdmin):
+    list_display = ("id", "store", "product", "warehouse", "movement_type", "quantity_change", "occurred_at")
+    list_filter = ("store", "movement_type", "warehouse")
+    search_fields = ("product__name", "reference_type", "reference_id", "notes")
+
+    def has_change_permission(self, request, obj=None):
+        if obj and obj.reference_type == "stock_disposal":
+            return False
+        return super().has_change_permission(request, obj)
+
 

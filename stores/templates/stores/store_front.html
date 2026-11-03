@@ -3,7 +3,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8" />
-    <title>{{ store.slug }} | أمازون سوريا</title>
+    <title>{{ store.slug }} | متاجر سوريا</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="apple-mobile-web-app-title" content="{{ store.slug }}">
     <link rel="manifest" href="{% url 'stores:store_manifest' store.slug %}">
@@ -226,6 +226,85 @@ button.btn-primary {
     display:block;
 }
 
+.products-grid { --product-image-size: 200px; }
+.products-grid.image-medium { --product-image-size: 120px; }
+.products-grid.image-small { --product-image-size: 72px; }
+.products-grid .product-image-square {
+    width: min(var(--product-image-size), 100%);
+}
+.products-grid .product-info { min-width: 0; }
+.products-grid.image-small .store-card { padding: .6rem .4rem; }
+.products-grid.image-medium .store-card { padding: .8rem .6rem; }
+.products-grid.image-small .product-name,
+.products-grid.image-small .product-price { font-size: .85rem; }
+.products-grid .qty-control { flex-wrap: wrap; }
+.products-grid.layout-horizontal .product-column { width: 100%; }
+.products-grid.layout-horizontal .store-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    text-align: start;
+}
+.products-grid.layout-horizontal .product-image-link {
+    flex: 0 0 min(var(--product-image-size), 38%);
+    min-width: 0;
+}
+.products-grid.layout-horizontal .product-image-square { margin-bottom: 0; }
+.products-grid.layout-horizontal .product-info { flex: 1; }
+.products-grid .product-add-btn {
+    width: auto;
+    padding: .25rem .65rem;
+    font-size: .8rem;
+    margin-top: .4rem;
+    white-space: nowrap;
+}
+.products-grid.layout-horizontal .product-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .5rem;
+}
+.products-grid.layout-horizontal .product-heading .product-name { flex: 1; min-width: 0; }
+.product-prices {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+.products-grid.layout-horizontal .product-prices {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-wrap: nowrap;
+    gap: .15rem;
+    max-width: 60%;
+}
+.products-grid.layout-horizontal .product-price { margin-bottom: .3rem; }
+.products-grid.layout-horizontal .add-to-cart-form {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    margin-top: .4rem;
+}
+.products-grid.layout-horizontal .product-add-btn { margin-top: 0; flex-shrink: 0; }
+.products-grid.layout-horizontal .qty-control { justify-content: flex-start; flex-wrap: nowrap; gap: .2rem; }
+.products-grid.layout-horizontal .qty-btn { width: 28px; height: 30px; }
+.products-grid.layout-horizontal .qty-input { width: 38px; padding: .2rem 0; }
+@media (min-width: 768px) {
+    .products-grid.layout-horizontal .product-column { width: 50%; }
+}
+@media (max-width: 767.98px) {
+    .products-grid.layout-vertical.image-small .product-column { width: 33.333333%; }
+    .products-grid.layout-vertical.image-small { --bs-gutter-x: .5rem; --bs-gutter-y: .5rem; }
+    .products-grid.layout-vertical.image-small .qty-control { gap: .15rem; }
+    .products-grid.layout-vertical.image-small .qty-btn { width: 24px; height: 30px; }
+    .products-grid.layout-vertical.image-small .qty-input { width: 32px; padding: .2rem 0; }
+    .products-grid.layout-vertical.image-small .add-to-cart-form > button {
+        padding: .25rem .5rem;
+        font-size: .75rem;
+        white-space: normal;
+    }
+}
+
 .main-header {
     z-index: 2000;
 }
@@ -265,9 +344,9 @@ button.btn-primary {
     <div class="container py-2 d-flex justify-content-between align-items-center">
         <div>
             <a href="{% url 'core:index' %}" class="brand-title-en" style="text-decoration:none;">
-                Amazon Syria
+                Syria Stores
             </a><br>
-            <span class="brand-title-ar">أمازون سوريا</span><br>
+            <span class="brand-title-ar">متاجر سوريا</span><br>
             <span class="brand-subtitle">منصة التجارة الإلكترونية</span>
         </div>
 
@@ -276,7 +355,7 @@ button.btn-primary {
             <a href="{% url 'stores:store_contact_links' store.slug %}" class="btn btn-outline-primary d-none d-md-inline">&#1578;&#1608;&#1575;&#1589;&#1604; &#1605;&#1593;&#1606;&#1575;
             </a>
 
-            <a href="{% url 'cart:cart_detail' store.slug %}" class="btn btn-outline-primary cart-btn">
+            <a href="{% url 'cart:cart_detail' store.slug %}" class="btn btn-outline-primary cart-btn" data-open-local-cart aria-haspopup="dialog">
                 &#128722;
                 <span id="cart-count" class="cart-badge{% if not cart_count %} is-hidden{% endif %}">
                     {{ cart_count|default:0 }}
@@ -353,14 +432,11 @@ button.btn-primary {
                     &#9881; لوحة التحكم
                 </a>
                 
-                {% if unexported_orders_count > 0 %}
-                    <span class="badge bg-danger fs-6 d-none d-md-inline">
-                        &#128666; طلبات للترحيل ({{ unexported_orders_count }})
-                    </span>
-                {% else %}
-                    <span class="badge bg-secondary fs-6 d-none d-md-inline">
-                        &#128666; طلبات للترحيل (0)
-                    </span>
+                {% if pending_confirmation_orders_count > 0 %}
+                    <span class="badge bg-danger fs-6 d-none d-md-inline">بانتظار التأكيد ({{ pending_confirmation_orders_count }})</span>
+                {% endif %}
+                {% if awaiting_export_orders_count > 0 %}
+                    <span class="badge bg-warning text-dark fs-6 d-none d-md-inline">بانتظار الترحيل ({{ awaiting_export_orders_count }})</span>
                 {% endif %}
             {% endif %}
         </div>
@@ -412,7 +488,7 @@ button.btn-primary {
                     <div id="install-help" class="install-help text-light mt-2 d-none"></div>
                 </div>
 
-                <form method="get" class="mt-3">
+                <form method="get" class="mt-3" id="local-catalog-search">
                     <input type="text" name="q" value="{{ q }}" class="form-control mb-2"
                            placeholder="ابحث عن منتج...">
 
@@ -467,9 +543,10 @@ button.btn-primary {
         <h2 class="section-title">{{ store.description3 }}</h2>
         <p class="section-subtitle">{{ store.description4 }}</p>
 
-        <div class="row g-3 mt-3">
+        <div class="row g-3 mt-3 products-grid layout-{{ store.product_layout }} image-{{ store.product_image_size }}">
             {% for p in products %}
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md-3 product-column" data-product-id="{{ p.id }}">
+                {% include "stores/local_product_template.html" with product=p %}
                 <div class="store-card">
                     <a href="{% url 'stores:product_public' store.slug p.id %}" class="product-image-link" aria-label="{{ p.name }}">
                         {% if p.main_image %}
@@ -483,27 +560,29 @@ button.btn-primary {
                         {% endif %}
                     </a>
 
+                    <div class="product-info">
+                    <div class="product-heading">
                     <div class="product-name">{{ p.name }}</div>
+{% if p.show_price %}
+    <div class="product-prices">
+    {% if store.display_currency == "USD" or store.display_currency == "BOTH" %}
+        {% if p.price_usd != None %}<div class="product-price">{{ p.price_usd|floatformat:2 }} $</div>{% endif %}
+    {% endif %}
+    {% if store.display_currency == "SYP" or store.display_currency == "BOTH" %}
+        {% if p.price_syp != None %}<div class="product-price">{{ p.price_syp|floatformat:0 }} ل.س</div>{% endif %}
+    {% endif %}
+    </div>
+{% endif %}
+                    </div>
                     {% if p.show_price %}
-                      {% if store.pricing_currency == "USD" %}
-                          <div class="product-price">{{ p.price|floatformat:2 }} $</div>
-                          <div class="product-price text-muted" style="font-size:0.85rem;">
-                              {{ p.price_syp|floatformat:0 }} ل.س
-                          </div>
-                      {% else %}
-                          <div class="product-price">{{ p.price_syp|floatformat:0 }} ل.س</div>
-                      {% endif %}
-                    {% endif %}
-
-                    <form method="POST" action="{% url 'cart:add_to_cart' store.slug p.id %}" class="add-to-cart-form">
-                        {% csrf_token %}
-                        <div class="qty-control" data-qty>
-                            <button type="button" class="qty-btn" data-qty-dec aria-label="نقص الكمية">-</button>
-                            <input type="number" name="quantity" value="1" min="1" class="qty-input" inputmode="numeric">
-                            <button type="button" class="qty-btn" data-qty-inc aria-label="زيادة الكمية">+</button>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100 mt-2">أضف إلى السلة</button>
+                    <form class="add-to-cart-form">
+                        <div class="local-product-quantity"></div>
+                        <button type="submit" class="btn btn-primary product-add-btn">إضافة</button>
                     </form>
+                    {% else %}
+                    <p class="text-muted">الشراء من المركز مباشرة</p>
+                    {% endif %}
+                    </div>
                 </div>
             </div>
             {% empty %}
@@ -511,6 +590,7 @@ button.btn-primary {
             {% endfor %}
         </div>
 
+        <p id="local-catalog-empty" class="text-muted mt-3" hidden>لا توجد منتجات مطابقة.</p>
         <div class="notice-box mt-4">
             {{ store.description5 }}
         </div>
@@ -519,7 +599,7 @@ button.btn-primary {
 
 <footer class="main-footer">
     <div class="container text-center">
-        © <span id="year"></span> Amazon Syria - جميع الحقوق محفوظة.
+        © <span id="year"></span> Syria Stores - جميع الحقوق محفوظة.
     </div>
 </footer>
 
@@ -615,83 +695,10 @@ button.btn-primary {
         showInstallHelp("تم تثبيت المتجر على الشاشة الرئيسية.");
     });
 
-    document.querySelectorAll("[data-qty]").forEach(function (wrapper) {
-        var input = wrapper.querySelector("input[type='number']");
-        var dec = wrapper.querySelector("[data-qty-dec]");
-        var inc = wrapper.querySelector("[data-qty-inc]");
-        var min = parseInt(input.min || "1", 10);
-
-        dec.addEventListener("click", function () {
-            var value = parseInt(input.value, 10);
-            if (isNaN(value)) value = min;
-            input.value = Math.max(min, value - 1);
-        });
-
-        inc.addEventListener("click", function () {
-            var value = parseInt(input.value, 10);
-            if (isNaN(value)) value = min;
-            input.value = value + 1;
-        });
-    });
-
-    function updateCartBadge(count) {
-        var badge = document.getElementById("cart-count");
-        if (!badge) return;
-        var value = parseInt(count, 10) || 0;
-        badge.textContent = value;
-        if (value > 0) {
-            badge.classList.remove("is-hidden");
-        } else {
-            badge.classList.add("is-hidden");
-        }
-    }
-
-    document.querySelectorAll(".add-to-cart-form").forEach(function (form) {
-        form.addEventListener("submit", function (e) {
-            e.preventDefault();
-
-            var submitBtn = form.querySelector("button[type='submit']");
-            if (submitBtn) submitBtn.disabled = true;
-
-            var csrfInput = form.querySelector("input[name='csrfmiddlewaretoken']");
-            var headers = { "X-Requested-With": "XMLHttpRequest" };
-            if (csrfInput) headers["X-CSRFToken"] = csrfInput.value;
-
-            fetch(form.action, {
-                method: "POST",
-                headers: headers,
-                credentials: "same-origin",
-                body: new FormData(form)
-            })
-            .then(function (res) {
-                return res.json()
-                    .catch(function () { return {}; })
-                    .then(function (data) {
-                        if (!res.ok) {
-                            var err = new Error(data.error || "");
-                            err.hasMessage = !!data.error;
-                            throw err;
-                        }
-                        return data;
-                    });
-            })
-            .then(function (data) {
-                updateCartBadge(data.cart_count);
-            })
-            .catch(function (err) {
-                if (err && err.hasMessage) {
-                    alert(err.message);
-                    return;
-                }
-                form.submit();
-            })
-            .finally(function () {
-                if (submitBtn) submitBtn.disabled = false;
-            });
-        });
-    });
 </script>
 
+{% include "stores/local_cart_dialog.html" %}
+{% include "stores/storefront_return_position.html" %}
 </body>
 </html>
 

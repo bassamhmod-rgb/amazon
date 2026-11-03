@@ -1,3 +1,6 @@
+from products.ordering import display_order, product_display_order
+from .storefront_stock import with_storefront_stock, available_quantity
+from .pricing import set_display_prices
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Store
 from products.models import Product
@@ -6,17 +9,18 @@ from django.db.models import Sum, F, Value, DecimalField, ExpressionWrapper, Cas
 from django.db.models.functions import Coalesce, Cast
 from accounts.models import PointsTransaction
 from products.models import Category
-from django.db.models import Q, Exists, OuterRef
+from django.db.models import Q, Exists, OuterRef, Subquery
 from django.contrib.auth.decorators import login_required
-from stores.models import Store, StorePaymentMethod
+from stores.models import Store, StorePaymentMethod, StockMovement
 from cart.models import Cart
 from django.http import JsonResponse
 from django.http import HttpResponse
 from django.urls import reverse
 from django.templatetags.static import static
 from io import BytesIO
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, UnidentifiedImageError
 from accounts.models import StoreUser
+from cart.local import local_checkout_config
 
 def store_list(request):
     stores = Store.objects.filter(is_active=True)
@@ -71,22 +75,9 @@ def store_front(request, slug):
         cart_count = cart.items.count()
 
     # ============ 🔥 المنتجات ============
-    movement_expr = ExpressionWrapper(
-        F("order_items__quantity") * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
-        output_field=DecimalField(max_digits=12, decimal_places=2)
-    )
-    movements = Coalesce(
-        Sum(movement_expr),
-        Value(0),
-        output_field=DecimalField(max_digits=12, decimal_places=2)
-    )
-    real_stock_calc = ExpressionWrapper(
-        Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2)) + movements,
-        output_field=DecimalField(max_digits=12, decimal_places=2)
-    )
     sold_qty = Coalesce(
         Sum(Case(
-            When(order_items__direction=-1, then=F("order_items__quantity")),
+            When(order_items__direction=-1, then=F("order_items__quantity") + F("order_items__bonus_quantity")),
             default=Value(0),
             output_field=DecimalField(max_digits=12, decimal_places=2)
         )),
@@ -94,43 +85,47 @@ def store_front(request, slug):
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     products = (
-        Product.objects
-        .filter(store=store, active=True)
-        .annotate(real_stock_calc=real_stock_calc, sold_qty=sold_qty)
-        .filter(real_stock_calc__gt=0)
-        .order_by("-sold_qty", "-id")
+        with_storefront_stock(Product.objects.filter(store=store, active=True), store)
+        .annotate(sold_qty=sold_qty)
+        .filter(Q(real_stock_calc__gt=0) | Q(allow_negative_stock_sale=True))
+        .order_by(*product_display_order())
     )
 
+    # Load the catalogue once; search/category navigation runs in the browser.
     # ============ 🔎 البحث ============
     q = request.GET.get("q")
-    if q:
-        products = products.filter(name__icontains=q)
 
     # ============ 🟦 جلب الفئات ============
-    categories = Category.objects.filter(store=store)
+    categories = Category.objects.filter(store=store).order_by(display_order(), "id")
 
     # ============ 🟨 التصفية بالحقل category ============
     category_id = request.GET.get("category")
-    if category_id and category_id.isdigit():
-        products = products.filter(category_id=category_id)
-    else:
+    if not category_id or not category_id.isdigit():
         category_id = ""
 
     # ============ 🟧 التصفية بالحقل category2 ============
     category2_id = request.GET.get("category2")
-    if category2_id and category2_id.isdigit():
-        products = products.filter(category2_id=category2_id)
-    else:
+    if not category2_id or not category2_id.isdigit():
         category2_id = ""
 
-    products = list(products)
-    exchange_rate = store.exchange_rate or 0
-    if store.pricing_currency == "USD" and exchange_rate > 0:
-        for p in products:
-            p.price_syp = p.price * exchange_rate
-    else:
-        for p in products:
-            p.price_syp = p.price
+    products = list(products.select_related("category", "category2").prefetch_related("gallery", "details"))
+    for p in products:
+        set_display_prices(p, store)
+
+    storefront_data = {
+        **local_checkout_config(request, store),
+        "paused": store.sales_paused,
+        "pauseMessage": store.sales_pause_message or "الطلبات متوقفة مؤقتاً.",
+        "products": [{
+            "id": str(p.pk), "name": p.name, "price": str(p.price) if p.show_price else None,
+            "category": str(p.category_id or ""), "category2": str(p.category2_id or ""),
+            "available": max(0, int(p.real_stock_calc)),
+            "unlimited": p.allow_negative_stock_sale, "sellable": p.show_price,
+        } for p in products],
+        "initialItems": [{"id": str(item.product_id), "quantity": item.quantity,
+                          "note": item.item_note or ""}
+                         for item in cart.items.all()] if cart else [],
+    }
 
     return render(request, "stores/store_front.html", {
         "store": store,
@@ -140,6 +135,7 @@ def store_front(request, slug):
         "customer": customer,
         "balance": balance,
         "cart_count": cart_count,
+        "storefront_data": storefront_data,
 
         # مهم جداً للواجهة
         "categories": categories,
@@ -198,21 +194,26 @@ def store_app_icon(request, slug, size):
         fallback_url = static("pwa/icon-512.png" if size == 512 else "pwa/icon-192.png")
         return redirect(fallback_url)
 
-    with Image.open(store.logo.path).convert("RGBA") as img:
-        # Center-crop to square, then mask to a circle to match storefront logo style.
-        side = min(img.width, img.height)
-        left = (img.width - side) // 2
-        top = (img.height - side) // 2
-        square = img.crop((left, top, left + side, top + side)).resize((size, size), Image.LANCZOS)
+    try:
+        with store.logo.open("rb") as logo_file:
+            with Image.open(logo_file).convert("RGBA") as img:
+                # Center-crop to square, then mask to a circle to match storefront logo style.
+                side = min(img.width, img.height)
+                left = (img.width - side) // 2
+                top = (img.height - side) // 2
+                square = img.crop((left, top, left + side, top + side)).resize((size, size), Image.LANCZOS)
 
-        mask = Image.new("L", (size, size), 0)
-        ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+                mask = Image.new("L", (size, size), 0)
+                ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
 
-        canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        canvas.paste(square, (0, 0), mask)
+                canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+                canvas.paste(square, (0, 0), mask)
 
-        output = BytesIO()
-        canvas.save(output, format="PNG", optimize=True)
+                output = BytesIO()
+                canvas.save(output, format="PNG", optimize=True)
+    except (OSError, ValueError, UnidentifiedImageError):
+        fallback_url = static("pwa/icon-512.png" if size == 512 else "pwa/icon-192.png")
+        return redirect(fallback_url)
 
     response = HttpResponse(output.getvalue(), content_type="image/png")
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -220,16 +221,22 @@ def store_app_icon(request, slug, size):
 
 # تفاصيل المنتج للزبون
 def product_public(request, store_slug, product_id):
-    store = get_object_or_404(Store, slug=store_slug)
-    product = get_object_or_404(Product, id=product_id, store=store)
-    exchange_rate = store.exchange_rate or 0
-    if store.pricing_currency == "USD" and exchange_rate > 0:
-        product.price_syp = product.price * exchange_rate
-    else:
-        product.price_syp = product.price
+    store = get_object_or_404(Store, slug=store_slug, is_active=True)
+    product = get_object_or_404(with_storefront_stock(Product.objects.filter(active=True), store), id=product_id, store=store)
+    set_display_prices(product, store)
+    config = local_checkout_config(request, store)
+    config.update({
+        "paused": store.sales_paused,
+        "pauseMessage": store.sales_pause_message or "الطلبات متوقفة مؤقتاً.",
+        "products": [{"id": str(product.pk), "name": product.name,
+                      "price": str(product.price) if product.show_price else None,
+                      "available": max(0, int(product.real_stock_calc)),
+                      "unlimited": product.allow_negative_stock_sale, "sellable": product.show_price}],
+    })
     return render(request, "stores/product_public.html", {
     "store": store,
     "product": product,
+    "storefront_data": config,
 })
 
 

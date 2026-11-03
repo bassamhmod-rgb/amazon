@@ -1,6 +1,10 @@
-﻿# -*- coding: utf-8 -*-
+from .input_money import prepare_order_input
+from accounts.customer_notes import apply_customer_private_note
+from accounts.models import normalize_phone_number
+# -*- coding: utf-8 -*-
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import update_session_auth_hash
 from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponse
 from django.http import Http404
@@ -8,41 +12,147 @@ import csv
 import codecs
 import io
 import html
+import logging
 import zipfile
 import time
 from io import BytesIO
+from contextlib import contextmanager
 from django.contrib.auth.models import User
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models import Sum
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from orders.alerts import has_linked_app, order_alert_state
 from products.models import ProductDetails ,Product, ProductGallery, ProductBarcode
 from products.utils import fix_missing_buy_price_for_product, apply_purchase_price_to_empty_sales
 # --- استيراد المودلز من التطبيقات المختلفة ---
 from products.models import Category, Product
 from products.forms import CategoryForm, ProductForm
-from stores.models import Store, StorePaymentMethod, Warehouse
+from stores.models import Store, StorePaymentMethod, Warehouse, WarehouseTransfer, WarehouseTransferItem, InventoryAdjustment, StockMovement
 from stores.forms import WarehouseForm
 from orders.models import Order, OrderItem
 from accounts.models import PointsTransaction, AccountingClient, SystemNotification, DeleteSync, StoreUser
 from accounts.store_user_forms import StoreUserForm
-from cart.models import Cart
+from .user_sync_notice import notify_user_sync_required
+from .account_views import OwnerAccountForm, save_owner_account
+from django.contrib.auth import update_session_auth_hash
+from django.views.decorators.debug import sensitive_post_parameters
+from cart.models import Cart, CartItem
 from loyalty.models import LoyaltyPoints
+from mobile_sync.models import MobileDeleteSync
+from employees.forms import EmployeeForm, SalaryPaymentForm, SalaryPaymentVoucherForm
+from employees.models import (
+    Employee,
+    EmployeeDepartment,
+    EmployeeJobTitle,
+    EmployeePayPeriod,
+    SalaryPayment,
+    SalaryPaymentVoucher,
+)
 
 # 1. الزبون موجود بـ accounts (حسب كلامك)
 from accounts.models import Customer
 from django.contrib import messages
 ###
-from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth.hashers import check_password
 from django.db.models import Q
 from accounts.models import Supplier
 from django.http import JsonResponse
 # Expenses
-from .models import Expense, ExpenseType, ExpenseReason
+from .models import Expense, ExpenseType, ExpenseReason, FixedAsset, ContactInfo
 
 FIXED_EXPENSE_TYPES = ["صرفيات عمل", "صرفيات عامة"]
 # أما إذا كنت ناقله كمان لـ accounts، الغي السطر اللي فوق واستخدم هاد:
 from decimal import Decimal, InvalidOperation
+
+
+@contextmanager
+def _store_reset_delete_logging_disabled():
+    from django.db.models.signals import pre_delete
+    from accounts import signals as account_signals
+    from mobile_sync import signals as mobile_signals
+
+    receivers = [
+        (account_signals.log_supplier_delete, Supplier),
+        (account_signals.log_customer_delete, Customer),
+        (account_signals.log_category_delete, Category),
+        (account_signals.log_product_delete, Product),
+        (account_signals.log_product_barcode_delete, ProductBarcode),
+        (account_signals.log_order_delete, Order),
+        (account_signals.log_order_item_delete, OrderItem),
+        (account_signals.log_points_delete, PointsTransaction),
+        (account_signals.log_expense_delete, Expense),
+        (account_signals.log_warehouse_delete, Warehouse),
+        (account_signals.log_store_user_delete, StoreUser),
+        (mobile_signals.log_category_delete, Category),
+        (mobile_signals.log_product_delete, Product),
+        (mobile_signals.log_store_user_delete, StoreUser),
+        (mobile_signals.log_customer_delete, Customer),
+        (mobile_signals.log_order_delete, Order),
+        (mobile_signals.log_product_barcode_delete, ProductBarcode),
+        (mobile_signals.log_inventory_adjustment_delete, InventoryAdjustment),
+        (mobile_signals.log_stock_movement_delete, StockMovement),
+        (mobile_signals.log_expense_delete, Expense),
+        (mobile_signals.log_expense_type_delete, ExpenseType),
+        (mobile_signals.log_expense_reason_delete, ExpenseReason),
+    ]
+
+    for receiver, sender in receivers:
+        pre_delete.disconnect(receiver=receiver, sender=sender)
+    try:
+        yield
+    finally:
+        for receiver, sender in receivers:
+            pre_delete.connect(receiver, sender=sender)
+
+
+def _delete_reset_sync_rows(store, main_warehouse_id):
+    delete_sync_targets = {
+        "accounts.Supplier": Supplier.objects.filter(store=store).values("id"),
+        "accounts.Customer": Customer.objects.filter(store=store).values("id"),
+        "products.Category": Category.objects.filter(store=store).values("id"),
+        "products.Product": Product.objects.filter(store=store).values("id"),
+        "products.ProductBarcode": ProductBarcode.objects.filter(product__store=store).values("id"),
+        "orders.Order": Order.objects.filter(store=store).values("id"),
+        "orders.OrderItem": OrderItem.objects.filter(order__store=store).values("id"),
+        "accounts.PointsTransaction": PointsTransaction.objects.filter(customer__store=store).values("id"),
+        "dashboard.Expense": Expense.objects.filter(store=store).values("id"),
+        "stores.Warehouse": Warehouse.objects.filter(store=store)
+        .exclude(id=main_warehouse_id)
+        .values("id"),
+        "stores.WarehouseTransfer": WarehouseTransfer.objects.filter(store=store).values("id"),
+        "stores.WarehouseTransferItem": WarehouseTransferItem.objects.filter(store=store).values("id"),
+        "stores.InventoryAdjustment": InventoryAdjustment.objects.filter(store=store).values("id"),
+        "stores.StockMovement": StockMovement.objects.filter(store=store).values("id"),
+        "accounts.StoreUser": StoreUser.objects.filter(store=store).values("id"),
+    }
+
+    for model_name, ids in delete_sync_targets.items():
+        DeleteSync.objects.filter(
+            store_model_name=model_name,
+            store_record_id__in=ids,
+        ).delete()
+
+    MobileDeleteSync.objects.filter(merchant_id=store.id).delete()
+
+
+def _order_balance_delta(order):
+    amount = order.net_total if order.document_kind == 1 else (order.amount or Decimal("0"))
+    payment = order.payment or Decimal("0")
+    delta = amount - payment
+    if order.transaction_type in ("sale_return", "purchase_return"):
+        return -delta
+    return delta
+
+
+def _preferred_price_level_from_request(value):
+    try:
+        level = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return level if level in (0, 1, 2, 3, 4, 5) else 0
 from datetime import date as dt_date
 from django.db.models import Sum
 ###
@@ -51,24 +161,77 @@ from django.db.models import (
     Sum, F, DecimalField, ExpressionWrapper,
     OuterRef, Subquery, Value, Case, When
 )
-from django.db.models.functions import Coalesce, Cast
+from django.db.models.functions import Abs, Coalesce, Cast
 
 from stores.models import Store
 from products.models import Product, Category
 from orders.models import OrderItem
 
+from django.urls import reverse
+from products.ordering import display_order, product_display_order
+from stores.storefront_stock import with_storefront_stock, selected_warehouse_ids
+
+logger = logging.getLogger(__name__)
+
+INACTIVE_STORE_ALLOWED_DASHBOARD_VIEWS = {
+    "store_users_list",
+    "store_user_create",
+    "store_user_update",
+    "store_user_delete",
+}
+
 
 def _current_warehouse_for_request(request, store):
-    store_user_id = request.session.get("store_user_id")
-    if store_user_id:
-        su = (
-            StoreUser.objects.filter(pk=store_user_id, store=store, is_active=True)
-            .select_related("warehouse")
-            .first()
-        )
-        if su and su.warehouse_id:
-            return su.warehouse
-    return Warehouse.objects.filter(store=store, is_main=True).first()
+    if request.user.id == store.owner_id:
+        return store.warehouses.filter(is_main=True, is_active=True).first()
+    user = _current_store_user_for_request(request, store)
+    if user and user.warehouse_id and user.warehouse.is_active:
+        return user.warehouse
+    return None
+
+
+def _order_warehouse(request, store):
+    if request.user.id == store.owner_id and request.POST.get("warehouse_id"):
+        if not request.POST["warehouse_id"].isdigit():
+            raise Http404
+        return get_object_or_404(Warehouse, pk=request.POST["warehouse_id"], store=store, is_active=True)
+    return _current_warehouse_for_request(request, store)
+
+
+def _validate_order_stock(request, store, warehouse, order=None):
+    if warehouse is None:
+        return "يجب ربط المستخدم بمستودع فعال قبل إنشاء الطلب."
+    if request.POST.get("transaction_type", "sale") not in ("sale", "purchase", "sale_return", "purchase_return"):
+        return "نوع العملية غير صحيح."
+    products = request.POST.getlist("product_id[]")
+    quantities = request.POST.getlist("quantity[]")
+    prices = request.POST.getlist("price[]")
+    if not products or len(products) != len(quantities) or len(products) != len(prices):
+        return "بيانات مواد الطلب غير مكتملة."
+    totals = {}
+    item_ids = request.POST.getlist("item_id[]")
+    existing_items = {str(item.pk): item for item in order.items.all()} if order else {}
+    for index, (product_id, raw_quantity, raw_price) in enumerate(zip(products, quantities, prices)):
+        qty = _to_decimal(raw_quantity)
+        price = _to_decimal(raw_price, default="NaN")
+        if not qty.is_finite() or qty <= 0 or not price.is_finite() or price < 0:
+            return "يجب أن تكون الكمية موجبة والسعر رقماً غير سالب."
+        if not product_id.isdigit():
+            return "المادة المحددة غير صحيحة."
+        if index < len(item_ids) and item_ids[index] in existing_items:
+            qty += existing_items[item_ids[index]].bonus_quantity
+        totals[int(product_id)] = totals.get(int(product_id), Decimal("0")) + qty
+    locked = list(Product.objects.select_for_update().filter(store=store, pk__in=totals).order_by("pk"))
+    if len(locked) != len(totals):
+        return "المادة المحددة غير موجودة في المتجر."
+    if store.allow_negative_warehouse_sale or request.POST.get("transaction_type", "sale") not in ("sale", "purchase_return"):
+        return None
+    stock = with_storefront_stock(Product.objects.filter(pk__in=totals, store=store), store,
+                                  [warehouse.pk], exclude_order=order)
+    for product in stock:
+        if product.real_stock_calc < totals[product.pk]:
+            return f"الكمية غير كافية في المستودع {warehouse.name} للمادة {product.name}. البيع السالب غير مسموح."
+    return None
 
 
 def _current_store_user_for_request(request, store):
@@ -87,6 +250,12 @@ def _current_store_user_for_request(request, store):
     )
 
 
+def _ensure_owner_store_user_for_dashboard(store):
+    from accounts.models import ensure_owner_store_user
+
+    return ensure_owner_store_user(store)
+
+
 def _can_access_store_permission(request, store, permission_key):
     if store.owner_id == request.user.id:
         return True
@@ -101,7 +270,14 @@ def _get_store_for_dashboard(request, store_slug):
     if not store:
         raise Http404
 
-    if store.owner_id == request.user.id:
+    is_owner = store.owner_id == request.user.id
+
+    if not store.is_active:
+        url_name = getattr(getattr(request, "resolver_match", None), "url_name", "")
+        if not is_owner or url_name not in INACTIVE_STORE_ALLOWED_DASHBOARD_VIEWS:
+            raise Http404
+
+    if is_owner:
         return store
 
     store_user_id = request.session.get("store_user_id")
@@ -158,7 +334,7 @@ def _rebuild_missing_cashback(store):
             buy_price = item.buy_price
             if buy_price in (None, ""):
                 buy_price = item.product.get_avg_buy_price() if item.product_id else Decimal("0")
-            total_profit += (Decimal(item.price or 0) - Decimal(buy_price or 0)) * Decimal(abs(item.quantity or 0))
+            total_profit += Decimal(item.price or 0) * abs(Decimal(item.quantity or 0)) - Decimal(buy_price or 0) * item.stock_quantity
 
         if not has_items:
             skipped_empty += 1
@@ -271,11 +447,23 @@ def warehouse_delete(request, store_slug, warehouse_id):
 @login_required
 def store_users_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
-    users = StoreUser.objects.filter(store=store).order_by("name", "id")
+    users = StoreUser.objects.filter(store=store).select_related("store").order_by("name", "id")
+    for user in users:
+        permissions = user.permissions or {}
+        if permissions.get("stock.movement"):
+            permissions["stock_movement"] = True
+        user.permissions = permissions
+    users_count = users.count()
+    can_add_store_user = users_count < store.max_store_users
     return render(
         request,
         "dashboard/store_users_list.html",
-        {"store": store, "users": users},
+        {
+            "store": store,
+            "users": users,
+            "users_count": users_count,
+            "can_add_store_user": can_add_store_user,
+        },
     )
 
 
@@ -283,16 +471,30 @@ def store_users_list(request, store_slug):
 def store_user_create(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
     warehouses_qs = Warehouse.objects.filter(store=store).order_by("-is_main", "name", "id")
+    main_warehouse = warehouses_qs.filter(is_main=True).first()
+    users_count = StoreUser.objects.filter(store=store).count()
+    if users_count >= store.max_store_users:
+        messages.error(
+            request,
+            f"لا يمكن إضافة مستخدم جديد. الحد المسموح لهذا التاجر هو {store.max_store_users} مستخدم.",
+        )
+        return redirect("dashboard:store_users_list", store_slug=store.slug)
     if request.method == "POST":
         form = StoreUserForm(request.POST, warehouses_qs=warehouses_qs)
         if form.is_valid():
             obj = form.save(commit=False)
             obj.store = store
+            if obj.warehouse_id is None:
+                obj.warehouse = main_warehouse
             obj.save()
             messages.success(request, "تم إضافة المستخدم.")
+            notify_user_sync_required(request)
             return redirect("dashboard:store_users_list", store_slug=store.slug)
     else:
-        form = StoreUserForm(warehouses_qs=warehouses_qs)
+        form = StoreUserForm(
+            warehouses_qs=warehouses_qs,
+            initial={"warehouse": main_warehouse},
+        )
     return render(
         request,
         "dashboard/store_user_form.html",
@@ -309,7 +511,10 @@ def store_user_update(request, store_slug, user_id):
         form = StoreUserForm(request.POST, instance=obj, warehouses_qs=warehouses_qs)
         if form.is_valid():
             form.save()
+            if obj.is_owner and request.user.pk == obj.auth_user_id:
+                update_session_auth_hash(request, User.objects.get(pk=obj.auth_user_id))
             messages.success(request, "تم تعديل المستخدم.")
+            notify_user_sync_required(request)
             return redirect("dashboard:store_users_list", store_slug=store.slug)
     else:
         form = StoreUserForm(instance=obj, warehouses_qs=warehouses_qs)
@@ -327,7 +532,273 @@ def store_user_delete(request, store_slug, user_id):
     obj = get_object_or_404(StoreUser, pk=user_id, store=store)
     obj.delete()
     messages.success(request, "تم حذف المستخدم.")
+    notify_user_sync_required(request)
     return redirect("dashboard:store_users_list", store_slug=store.slug)
+
+
+@login_required
+def employees_list(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    q = (request.GET.get("q") or "").strip()
+    employees = (
+        Employee.objects
+        .filter(store=store)
+        .select_related("department", "job_title", "pay_period")
+        .order_by("name", "id")
+    )
+    if q:
+        employees = employees.filter(
+            Q(name__icontains=q)
+            | Q(national_id__icontains=q)
+            | Q(mobile__icontains=q)
+        )
+
+    paginator = Paginator(employees, 20)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(
+        request,
+        "dashboard/employees/list.html",
+        {
+            "store": store,
+            "page_obj": page_obj,
+            "q": q,
+        },
+    )
+
+
+@login_required
+def employee_create(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    if request.method == "POST":
+        form = EmployeeForm(request.POST, store=store)
+        if form.is_valid():
+            employee = form.save(commit=False)
+            employee.store = store
+            employee.save()
+            messages.success(request, "تم إضافة الموظف.")
+            return redirect("dashboard:employees_list", store_slug=store.slug)
+    else:
+        form = EmployeeForm(store=store)
+    return render(
+        request,
+        "dashboard/employees/form.html",
+        {"store": store, "form": form, "title": "إضافة موظف"},
+    )
+
+
+@login_required
+def employee_update(request, store_slug, employee_id):
+    store = _get_store_for_dashboard(request, store_slug)
+    employee = get_object_or_404(Employee, pk=employee_id, store=store)
+    if request.method == "POST":
+        form = EmployeeForm(request.POST, instance=employee, store=store)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "تم تعديل بيانات الموظف.")
+            return redirect("dashboard:employees_list", store_slug=store.slug)
+    else:
+        form = EmployeeForm(instance=employee, store=store)
+    return render(
+        request,
+        "dashboard/employees/form.html",
+        {"store": store, "form": form, "employee": employee, "title": "تعديل موظف"},
+    )
+
+
+@login_required
+def employee_settings(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    model_map = {
+        "department": EmployeeDepartment,
+        "job_title": EmployeeJobTitle,
+        "pay_period": EmployeePayPeriod,
+    }
+    action = request.POST.get("action", "")
+    if request.method == "POST":
+        action_parts = action.split("_", 1)
+        if len(action_parts) == 2 and action_parts[1] in model_map:
+            verb, key = action_parts
+            model = model_map[key]
+            obj_id = request.POST.get("id")
+            name = (request.POST.get("name") or "").strip()
+            notes = (request.POST.get("notes") or "").strip()
+
+            if verb == "add" and name:
+                model.objects.get_or_create(store=store, name=name, defaults={"notes": notes})
+                messages.success(request, "تمت الإضافة.")
+            elif verb == "update" and obj_id and name:
+                model.objects.filter(pk=obj_id, store=store).update(name=name, notes=notes)
+                messages.success(request, "تم الحفظ.")
+            elif verb == "delete" and obj_id:
+                model.objects.filter(pk=obj_id, store=store).delete()
+                messages.success(request, "تم الحذف.")
+        return redirect("dashboard:employee_settings", store_slug=store.slug)
+
+    return render(
+        request,
+        "dashboard/employees/settings.html",
+        {
+            "store": store,
+            "departments": EmployeeDepartment.objects.filter(store=store),
+            "job_titles": EmployeeJobTitle.objects.filter(store=store),
+            "pay_periods": EmployeePayPeriod.objects.filter(store=store),
+        },
+    )
+
+
+@login_required
+def salary_vouchers_list(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    vouchers = SalaryPaymentVoucher.objects.filter(store=store).order_by("-date", "-id")
+    return render(
+        request,
+        "dashboard/employees/salary_vouchers_list.html",
+        {"store": store, "vouchers": vouchers},
+    )
+
+
+@login_required
+def salary_voucher_create(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    if request.method == "POST":
+        form = SalaryPaymentVoucherForm(request.POST)
+        if form.is_valid():
+            voucher = form.save(commit=False)
+            voucher.store = store
+            voucher.save()
+            messages.success(request, "تم إنشاء سند صرف الراتب.")
+            return redirect("dashboard:salary_vouchers_list", store_slug=store.slug)
+    else:
+        form = SalaryPaymentVoucherForm()
+    return render(
+        request,
+        "dashboard/employees/salary_voucher_form.html",
+        {"store": store, "form": form, "title": "إضافة سند صرف راتب"},
+    )
+
+
+@login_required
+def salary_voucher_update(request, store_slug, voucher_id):
+    store = _get_store_for_dashboard(request, store_slug)
+    voucher = get_object_or_404(SalaryPaymentVoucher, pk=voucher_id, store=store)
+    if request.method == "POST":
+        form = SalaryPaymentVoucherForm(request.POST, instance=voucher)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "تم تعديل سند صرف الراتب.")
+            return redirect("dashboard:salary_vouchers_list", store_slug=store.slug)
+    else:
+        form = SalaryPaymentVoucherForm(instance=voucher)
+    return render(
+        request,
+        "dashboard/employees/salary_voucher_form.html",
+        {"store": store, "form": form, "voucher": voucher, "title": "تعديل سند صرف راتب"},
+    )
+
+
+@login_required
+def salary_payments_list(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    payments = (
+        SalaryPayment.objects
+        .filter(store=store)
+        .select_related("employee", "voucher")
+        .order_by("-date", "-id")
+    )
+    voucher_id = request.GET.get("voucher")
+    if voucher_id:
+        payments = payments.filter(voucher_id=voucher_id)
+    employee_q = (request.GET.get("employee_q") or "").strip()
+    if employee_q:
+        payments = payments.filter(employee__name__icontains=employee_q)
+    return render(
+        request,
+        "dashboard/employees/salary_payments_list.html",
+        {
+            "store": store,
+            "payments": payments,
+            "selected_voucher_id": voucher_id,
+            "employee_q": employee_q,
+            "vouchers": SalaryPaymentVoucher.objects.filter(store=store).order_by("-date", "-id"),
+        },
+    )
+
+
+@login_required
+def salary_payment_create(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    initial = {}
+    voucher_id = request.GET.get("voucher")
+    if voucher_id:
+        initial["voucher"] = voucher_id
+    if request.method == "POST":
+        form = SalaryPaymentForm(request.POST, store=store)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.store = store
+            payment.save()
+            messages.success(request, "تم إضافة تقبيض الراتب.")
+            return redirect("dashboard:salary_payments_list", store_slug=store.slug)
+    else:
+        form = SalaryPaymentForm(store=store, initial=initial)
+    return render(
+        request,
+        "dashboard/employees/salary_payment_form.html",
+        {
+            "store": store,
+            "form": form,
+            "title": "إضافة تقبيض راتب",
+            "employee_advance_remaining": _employee_advance_remaining_map(store),
+        },
+    )
+
+
+@login_required
+def salary_payment_update(request, store_slug, payment_id):
+    store = _get_store_for_dashboard(request, store_slug)
+    payment = get_object_or_404(SalaryPayment, pk=payment_id, store=store)
+    if request.method == "POST":
+        form = SalaryPaymentForm(request.POST, instance=payment, store=store)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "تم تعديل تقبيض الراتب.")
+            return redirect("dashboard:salary_payments_list", store_slug=store.slug)
+    else:
+        form = SalaryPaymentForm(instance=payment, store=store)
+    return render(
+        request,
+        "dashboard/employees/salary_payment_form.html",
+        {
+            "store": store,
+            "form": form,
+            "payment": payment,
+            "title": "تعديل تقبيض راتب",
+            "net_amount": payment.net_amount,
+            "advance_remaining": payment.advance_remaining,
+            "employee_advance_remaining": _employee_advance_remaining_map(store, exclude_payment_id=payment.id),
+        },
+    )
+
+
+def _employee_advance_remaining_map(store, exclude_payment_id=None):
+    payments = SalaryPayment.objects.filter(store=store)
+    if exclude_payment_id:
+        payments = payments.exclude(pk=exclude_payment_id)
+    rows = payments.values("employee_id").annotate(
+        total_advances=Coalesce(
+            Sum("advance_amount"),
+            Value(0, output_field=DecimalField(max_digits=14, decimal_places=2)),
+        ),
+        total_installments=Coalesce(
+            Sum("advance_installment_deduction"),
+            Value(0, output_field=DecimalField(max_digits=14, decimal_places=2)),
+        ),
+    )
+    return {
+        str(row["employee_id"]): row["total_advances"] - row["total_installments"]
+        for row in rows
+        if row["employee_id"]
+    }
 
 
 def _is_store_access_linked(store):
@@ -407,8 +878,21 @@ def dashboard_home(request, store_slug):
 @login_required
 def products_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    stock_movements_qs = (
+        StockMovement.objects
+        .filter(product=OuterRef("pk"), store=store)
+        .values("product")
+        .annotate(
+            total_quantity=Coalesce(
+                Sum("quantity_change"),
+                Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        )
+        .values("total_quantity")[:1]
+    )
     movement_expr = ExpressionWrapper(
-        F("order_items__quantity") * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
+        (F("order_items__quantity") + F("order_items__bonus_quantity")) * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     movements = Coalesce(
@@ -417,12 +901,18 @@ def products_list(request, store_slug):
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     real_stock_calc = ExpressionWrapper(
-        Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2)) + movements,
+        Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2))
+        + movements
+        + Coalesce(
+            Subquery(stock_movements_qs, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        ),
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     sold_qty = Coalesce(
         Sum(Case(
-            When(order_items__direction=-1, then=F("order_items__quantity")),
+            When(order_items__direction=-1, then=F("order_items__quantity") + F("order_items__bonus_quantity")),
             default=Value(0),
             output_field=DecimalField(max_digits=12, decimal_places=2)
         )),
@@ -433,7 +923,7 @@ def products_list(request, store_slug):
         Product.objects
         .filter(store=store)
         .annotate(real_stock_calc=real_stock_calc, sold_qty=sold_qty)
-        .order_by("-sold_qty", "-id")
+        .order_by(*product_display_order())
     )
 
     # البحث بالاسم
@@ -458,7 +948,7 @@ def products_list(request, store_slug):
 
     # جلب كل الفئات الخاصة بهذا المتجر
     from products.models import Category
-    categories = Category.objects.filter(store=store)
+    categories = Category.objects.filter(store=store).order_by(display_order(), "id")
 
     # Pagination
     paginator = Paginator(products_qs, 10)
@@ -475,8 +965,10 @@ def products_list(request, store_slug):
         "current_category": int(category_id) if category_id and category_id.isdigit() else None,
         "current_sub_category": int(sub_category_id) if sub_category_id and sub_category_id.isdigit() else None,
         "current_stock_filter": stock_filter,
+        "is_access_linked": _is_store_access_linked(store),
 
         "products_qs": products_qs,
+        "product_list_query": request.GET.urlencode(),
     }
     return render(request, "dashboard/products_list.html", context)
 
@@ -540,6 +1032,11 @@ def product_create(request, store_slug):
 def product_update(request, store_slug, product_id):
     store = _get_store_for_dashboard(request, store_slug)
     product = get_object_or_404(Product, id=product_id, store=store)
+
+    return_query = request.POST.get("return_query", request.GET.get("return_query", ""))
+    return_url = reverse("dashboard:products_list", kwargs={"store_slug": store.slug})
+    if return_query:
+        return_url += "?" + return_query
 
     if request.method == "POST":
         form = ProductForm(request.POST, request.FILES, instance=product, store=store)
@@ -607,7 +1104,7 @@ def product_update(request, store_slug, product_id):
                     image=img
                 )
 
-            return redirect("dashboard:products_list", store_slug=store.slug)
+            return redirect(return_url)
 
     else:
         form = ProductForm(instance=product, store=store)
@@ -616,6 +1113,8 @@ def product_update(request, store_slug, product_id):
         "store": store,
         "form": form,
         "is_edit": True,
+        "return_query": return_query,
+        "product_list_return_url": return_url,
         "product": product,
     })
 #حذف صورة من المعرض
@@ -636,11 +1135,11 @@ def delete_gallery_image(request, image_id):
 # 🔹 حذف منتج
 @login_required
 def product_delete(request, store_slug, product_id):
-    store = get_object_or_404(
-        Store,
-        slug=store_slug,
-        owner=request.user
-    )
+    store = _get_store_for_dashboard(request, store_slug)
+
+    if store.owner_id != request.user.id:
+        messages.error(request, "لا تملك صلاحية حذف المنتجات.")
+        return redirect("dashboard:products_list", store_slug=store.slug)
 
     product_qs = Product.objects.filter(
         id=product_id,
@@ -650,16 +1149,25 @@ def product_delete(request, store_slug, product_id):
     if not product_qs.exists():
         messages.warning(
             request,
-            "âڑ ï¸ڈ ط§ظ„ظ…ظ†طھط¬ ط؛ظٹط± ظ…ظˆط¬ظˆط¯ ط£ظˆ طھظ… ط­ط°ظپظ‡ ظ…ط³ط¨ظ‚ط§ظ‹"
+            "المنتج غير موجود أو تم حذفه مسبقًا"
         )
         return redirect("dashboard:products_list", store_slug=store.slug)
 
     if request.method == "POST":
-        product_qs.delete()
-        messages.success(
-            request,
-            "ًں—‘ï¸ڈ طھظ… ط­ط°ظپ ط§ظ„ظ…ظ†طھط¬ ط¨ظ†ط¬ط§ط­"
-        )
+        try:
+            with transaction.atomic():
+                product_qs.delete()
+        except ProtectedError:
+            messages.error(
+                request,
+                "لا يمكن حذف هذه المادة لوجود حركات مخزون أو سجلات مرتبطة بها. "
+                "يمكنك إلغاء تفعيلها من تعديل المادة مع الاحتفاظ بسجل حركاتها."
+            )
+        else:
+            messages.success(
+                request,
+                "تم حذف المنتج بنجاح"
+            )
 
     return redirect("dashboard:products_list", store_slug=store.slug)
 
@@ -677,7 +1185,7 @@ def product_detail(request, store_slug, product_id):
 #عرض
 def categories_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
-    categories = Category.objects.filter(store=store).exclude(name__in=HIDDEN_CATEGORY_NAMES_IN_LISTS)
+    categories = Category.objects.filter(store=store).order_by(display_order(), "id").exclude(name__in=HIDDEN_CATEGORY_NAMES_IN_LISTS)
 
     return render(request, 'dashboard/categories_list.html', {
         'store': store,
@@ -690,18 +1198,32 @@ def add_category(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
-        name = request.POST.get("name")
+        name = (request.POST.get("name") or "").strip()
+        image = request.FILES.get("image")
+        try:
+            display_order = int(request.POST.get("display_order") or "0")
+            if not 0 <= display_order <= 2147483647:
+                raise ValueError
+        except (ValueError, TypeError):
+            return render(request, "dashboard/category_form.html", {
+                "store": store,
+                "category": None,
+                "is_edit": False,
+                "error": "ترتيب العرض يجب أن يكون رقماً صحيحاً بين 0 و2147483647",
+            })
 
         if not name:
             return render(request, "dashboard/category_form.html", {
                 "store": store,
-                "error": "ط§ظ„ط±ط¬ط§ط، ط¥ط¯ط®ط§ظ„ ط§ط³ظ… ط§ظ„ظپط¦ط©",
+                "error": "الرجاء إدخال اسم الفئة",
             })
 
         # إنشاء الفئة وربطها تلقائياً بالمتجر
         Category.objects.create(
+            display_order=display_order,
             name=name,
-            store=store
+            store=store,
+            image=image,
         )
 
         return redirect("dashboard:categories_list", store_slug=store.slug)
@@ -718,6 +1240,19 @@ def edit_category(request, store_slug, category_id):
 
     if request.method == "POST":
         name = (request.POST.get("name") or "").strip()
+        image = request.FILES.get("image")
+        try:
+            display_order = int(request.POST.get("display_order") or "0")
+            if not 0 <= display_order <= 2147483647:
+                raise ValueError
+        except (ValueError, TypeError):
+            return render(request, "dashboard/category_form.html", {
+                "store": store,
+                "category": category,
+                "is_edit": True,
+                "error": "ترتيب العرض يجب أن يكون رقماً صحيحاً بين 0 و2147483647",
+            })
+        clear_image = request.POST.get("clear_image") == "1"
 
         if not name:
             return render(request, "dashboard/category_form.html", {
@@ -735,7 +1270,12 @@ def edit_category(request, store_slug, category_id):
                 "is_edit": True,
             })
 
+        category.display_order = display_order
         category.name = name
+        if clear_image:
+            category.image = None
+        elif image:
+            category.image = image
         # save() يحدّث update_time تلقائياً إذا كانت الفئة مربوطة بالمحاسبة.
         category.save()
         return redirect("dashboard:categories_list", store_slug=store.slug)
@@ -851,7 +1391,7 @@ def order_detail_dashboard(request, store_slug, order_id):
     if order.transaction_type == "sale" and order.customer:
         for item in order.items.all():
             buy_price = item.buy_price or 0
-            total_profit += (item.price - buy_price) * item.quantity
+            total_profit += item.price * item.quantity - buy_price * item.stock_quantity
 
         percent = store.cashback_percentage or 0
         suggested_cashback = (total_profit * percent) / 100 if total_profit > 0 else 0
@@ -890,9 +1430,24 @@ def confirm_order(request, store_slug, order_id):
     if order.status != "pending":
         return redirect("dashboard:order_detail_dashboard", store_slug=store.slug, order_id=order.id)
 
+    confirming_store_user = _current_store_user_for_request(request, store)
+
     # تأكيد الطلب
     order.status = "confirmed"
-    order.save(update_fields=["status"])
+    order.update_time = int(time.time() // 60)
+    if confirming_store_user:
+        order.created_by_store_user = confirming_store_user
+        if confirming_store_user.auth_user_id:
+            order.created_by = confirming_store_user.auth_user
+    elif store.owner_id == request.user.id:
+        order.created_by_store_user = _ensure_owner_store_user_for_dashboard(store)
+        order.created_by = store.owner
+    order.save(update_fields=[
+        "status",
+        "created_by_store_user",
+        "created_by",
+        "update_time",
+    ])
 
     # ===============================
     # 🎁 حفظ الكاش باك (للبيع فقط)
@@ -957,10 +1512,16 @@ def _to_decimal(val, default="0"):
 
 
 @login_required
+@transaction.atomic
 def order_create(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
+        try:
+            input_data, input_items, input_base, input_currency, input_rate = prepare_order_input(request, store)
+        except (ValueError, ArithmeticError):
+            messages.error(request, "أرقام عملة الإدخال غير صالحة.")
+            return redirect("dashboard:order_create", store_slug=store.slug)
 
         # 1) نوع العملية
         transaction_type = request.POST.get("transaction_type", "sale")
@@ -969,28 +1530,35 @@ def order_create(request, store_slug):
         customer = None
         supplier = None
 
-        if transaction_type == "sale":
+        if transaction_type in ("sale", "sale_return"):
             customer_id = request.POST.get("customer_id")
             if customer_id and customer_id.isdigit():
                 customer = Customer.objects.filter(id=customer_id, store=store).first()
 
-        elif transaction_type == "purchase":
+        elif transaction_type in ("purchase", "purchase_return"):
             supplier_id = request.POST.get("supplier_id")
             if supplier_id and supplier_id.isdigit():
                 supplier = Supplier.objects.filter(id=supplier_id, store=store).first()
 
-        if transaction_type == "sale" and not customer:
-            messages.error(request, "ظٹط¬ط¨ ط§ط®طھظٹط§ط± ط²ط¨ظˆظ† ظ„ط¥طھظ…ط§ظ… ط¹ظ…ظ„ظٹط© ط§ظ„ط¨ظٹط¹.")
+        if transaction_type in ("sale", "sale_return") and not customer:
+            messages.error(request, "يجب اختيار زبون لإتمام عملية البيع.")
             return redirect("dashboard:order_create", store_slug=store.slug)
 
-        if transaction_type == "purchase" and not supplier:
-            messages.error(request, "ظٹط¬ط¨ ط§ط®طھظٹط§ط± ظ…ظˆط±ط¯ ظ„ط¥طھظ…ط§ظ… ط¹ظ…ظ„ظٹط© ط§ظ„ط´ط±ط§ط،.")
+        if transaction_type in ("purchase", "purchase_return") and not supplier:
+            messages.error(request, "يجب اختيار مورد لإتمام عملية الشراء.")
             return redirect("dashboard:order_create", store_slug=store.slug)
 
         status = "confirmed"
         discount_value = _to_decimal(request.POST.get("discount", 0))
         payment_value = _to_decimal(request.POST.get("payment", 0))
-        warehouse = _current_warehouse_for_request(request, store)
+        note_value = (request.POST.get("note") or "").strip()
+        if transaction_type == "sale" and customer:
+            note_value = apply_customer_private_note(note_value, customer.private_note)
+        warehouse = _order_warehouse(request, store)
+        error = _validate_order_stock(request, store, warehouse)
+        if error:
+            messages.error(request, error)
+            return redirect("dashboard:order_create", store_slug=store.slug)
 
         # 3) إنشاء الطلب
         store_user = None
@@ -1004,15 +1572,17 @@ def order_create(request, store_slug):
             ).first()
 
         order = Order.objects.create(
+            input_data=input_data, base_currency=input_base, payment_currency=input_currency, exchange_rate=input_rate,
             store=store,
             warehouse=warehouse,
             created_by=request.user,
             created_by_store_user=store_user,
             transaction_type=transaction_type,
-            customer=customer if transaction_type == "sale" else None,
-            supplier=supplier if transaction_type == "purchase" else None,
+            customer=customer if transaction_type in ("sale", "sale_return") else None,
+            supplier=supplier if transaction_type in ("purchase", "purchase_return") else None,
             discount=discount_value,
             payment=payment_value,
+            note=note_value,
             status=status,
         )
 
@@ -1032,11 +1602,12 @@ def order_create(request, store_slug):
             price = _to_decimal(prices[i])
             qty   = _to_decimal(qtys[i])
 
-            if transaction_type == "sale":
+            if transaction_type in ("sale", "purchase_return"):
                 buy_price = _to_decimal(product.get_avg_buy_price())
 
                 OrderItem.objects.create(
                     order=order,
+                    input_data=input_items[i],
                     product=product,
                     price=price,
                     quantity=qty,
@@ -1048,9 +1619,10 @@ def order_create(request, store_slug):
                 # الربح = (سعر البيع - سعر الشراء) * الكمية
                 total_profit += (price - buy_price) * qty
 
-            else:  # purchase
+            else:  # purchase / sale_return
                 OrderItem.objects.create(
                     order=order,
+                    input_data=input_items[i],
                     product=product,
                     price=price,
                     quantity=qty,
@@ -1058,15 +1630,16 @@ def order_create(request, store_slug):
                     buy_price=price,
                     warehouse=order.warehouse,
                 )
-                purchase_product_prices[product.id] = (product, price)
+                if transaction_type == "purchase":
+                    purchase_product_prices[product.id] = (product, price)
 
         if transaction_type == "purchase" and purchase_product_prices:
             for _, (product, price) in purchase_product_prices.items():
                 apply_purchase_price_to_empty_sales(product, price)
                 fix_missing_buy_price_for_product(product)
 
-        # للزبون العام: اعتبر الفاتورة مدفوعة بالكامل تلقائياً.
-        if transaction_type == "sale" and customer and (customer.name or "").strip() == "زبون عام":
+        # للزبون العام: اعتبر فاتورة البيع مدفوعة ومرتجع البيع مردوداً بالكامل تلقائياً.
+        if transaction_type in ("sale", "sale_return") and customer and (customer.name or "").strip() == "زبون عام":
             order.payment = order.net_total
             order.save(update_fields=["payment"])
 
@@ -1100,11 +1673,15 @@ def order_create(request, store_slug):
         return redirect("dashboard:orders_list", store_slug=store.slug)
 
     return render(request, "dashboard/order_create.html", {
-        "store": store
+        "store": store,
+        "can_select_warehouse": request.user.id == store.owner_id,
+        "order_warehouses": store.warehouses.filter(is_active=True),
+        "selected_order_warehouse": _current_warehouse_for_request(request, store),
     })
 
 # تعديل الطلب (بيع + شراء) — بدون حقول supplier
 @login_required
+@transaction.atomic
 def order_update(request, store_slug, order_id):
     store = _get_store_for_dashboard(request, store_slug)
     order = get_object_or_404(Order, id=order_id, store=store)
@@ -1114,6 +1691,20 @@ def order_update(request, store_slug, order_id):
     new_orders_count = Order.objects.filter(store=store, is_seen_by_store=False).count()
 
     if request.method == "POST":
+        try:
+            input_data, input_items, input_base, input_currency, input_rate = prepare_order_input(request, store, order)
+        except (ValueError, ArithmeticError):
+            messages.error(request, "أرقام عملة الإدخال غير صالحة.")
+            return redirect("dashboard:order_update", store_slug=store.slug, order_id=order.pk)
+        previous_customer = order.customer
+        previous_transaction_type = order.transaction_type
+
+        warehouse = _order_warehouse(request, store)
+        error = _validate_order_stock(request, store, warehouse, order)
+        if error:
+            messages.error(request, error)
+            return redirect("dashboard:order_update", store_slug=store.slug, order_id=order.pk)
+        order.warehouse = warehouse
 
         # 🟦 1) نوع العملية (بيع / شراء)
         transaction_type = request.POST.get("transaction_type", "sale")
@@ -1122,14 +1713,15 @@ def order_update(request, store_slug, order_id):
         # 🟦 2) خصم ودفع (❌ بدون total)
         order.discount = request.POST.get("discount", 0)
         order.payment = request.POST.get("payment", 0)
+        order.note = (request.POST.get("note") or "").strip()
 
         # 🟦 3) زبون أو مورد (حسب النوع)
-        if transaction_type == "sale":
+        if transaction_type in ("sale", "sale_return"):
             customer_id = request.POST.get("customer_id")
             order.customer_id = customer_id if customer_id else None
             order.supplier = None  # ← مهم جداً
 
-        else:  # purchase
+        else:  # purchase / purchase_return
             supplier_id = request.POST.get("supplier_id")
             order.supplier_id = supplier_id if supplier_id else None
             order.customer = None  # ← مهم جداً
@@ -1137,6 +1729,14 @@ def order_update(request, store_slug, order_id):
         if not order.warehouse_id:
             order.warehouse = _current_warehouse_for_request(request, store)
 
+        if transaction_type == "sale" and order.customer_id and (previous_customer is None or str(previous_customer.pk) != str(order.customer_id)):
+            customer = get_object_or_404(Customer, pk=order.customer_id, store=store)
+            order.note = apply_customer_private_note(order.note, customer.private_note,
+                previous_customer.private_note if previous_customer else "")
+        order.input_data = input_data
+        order.base_currency = input_base
+        order.payment_currency = input_currency
+        order.exchange_rate = input_rate
         order.save()
 
         products = request.POST.getlist("product_id[]")
@@ -1156,12 +1756,7 @@ def order_update(request, store_slug, order_id):
 
             price = _to_decimal(prices[i])
             qty = _to_decimal(qtys[i])
-            direction = -1 if transaction_type == "sale" else 1
-            if transaction_type == "sale":
-                buy_price = _to_decimal(product.get_avg_buy_price())
-            else:
-                buy_price = _to_decimal(price)
-
+            direction = -1 if transaction_type in ("sale", "purchase_return") else 1
             item_id = None
             if i < len(item_ids):
                 raw_item_id = (item_ids[i] or "").strip()
@@ -1169,6 +1764,19 @@ def order_update(request, store_slug, order_id):
                     item_id = int(raw_item_id)
 
             existing_item = existing_items.get(item_id) if item_id else None
+            if transaction_type in ("sale", "sale_return"):
+                saved_buy_price = (
+                    existing_item.buy_price
+                    if existing_item is not None
+                    and existing_item.product_id == product.id
+                    and previous_transaction_type == transaction_type
+                    else None
+                )
+                buy_price = product.get_sale_item_buy_price(order, saved_buy_price)
+            elif transaction_type == "purchase_return":
+                buy_price = _to_decimal(product.get_avg_buy_price())
+            else:
+                buy_price = _to_decimal(price)
             if existing_item:
                 kept_item_ids.add(existing_item.id)
                 changed = (
@@ -1176,20 +1784,23 @@ def order_update(request, store_slug, order_id):
                     existing_item.price != price or
                     existing_item.quantity != qty or
                     existing_item.direction != direction or
-                    existing_item.buy_price != buy_price
+                    existing_item.buy_price != buy_price or
+                    existing_item.warehouse_id != order.warehouse_id
                 )
                 if changed or (order.warehouse_id and existing_item.warehouse_id is None):
                     existing_item.product = product
+                    existing_item.input_data = input_items[i]
                     existing_item.price = price
                     existing_item.quantity = qty
                     existing_item.direction = direction
                     existing_item.buy_price = buy_price
-                    if order.warehouse_id and existing_item.warehouse_id is None:
+                    if order.warehouse_id:
                         existing_item.warehouse_id = order.warehouse_id
                     existing_item.save()
             else:
                 new_item = OrderItem.objects.create(
                     order=order,
+                    input_data=input_items[i],
                     product=product,
                     price=price,
                     quantity=qty,
@@ -1215,6 +1826,9 @@ def order_update(request, store_slug, order_id):
 
     return render(request, "dashboard/order_update.html", {
         "store": store,
+        "can_select_warehouse": request.user.id == store.owner_id,
+        "order_warehouses": store.warehouses.filter(is_active=True),
+        "selected_order_warehouse": order.warehouse or _current_warehouse_for_request(request, store),
         "order": order,
         "new_orders_count": new_orders_count,
     })
@@ -1224,44 +1838,111 @@ def order_update(request, store_slug, order_id):
 #برقم الطلب
 # قائمة الطلبات
 @login_required
+@never_cache
 def orders_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
-
-    status = request.GET.get("status", "")
+    status_filter = request.GET.get("status", "")
     order_id = request.GET.get("order_id", "")
+    mobile_order_id = request.GET.get("mobile_order_id", "")
     transaction_type = request.GET.get("transaction_type", "")
+    store_user_id = request.GET.get("store_user_id", "")
+    customer_id = request.GET.get("customer_id", "")
+    supplier_id = request.GET.get("supplier_id", "")
+    order_load_errors = []
+    orders = []
 
-    # كل طلبات المتجر (الطلبات فقط بدون إشعارات القبض/الصرف)
-    orders = Order.objects.filter(store=store, document_kind=1)
+    store_users = StoreUser.objects.filter(store=store).order_by("name", "id")
+    selected_store_user = store_users.filter(pk=store_user_id).first() if store_user_id.isdigit() else None
+    selected_customer = (
+        Customer.objects.filter(store=store, pk=customer_id).first()
+        if transaction_type == "sale" and customer_id.isdigit()
+        else None
+    )
+    selected_supplier = (
+        Supplier.objects.filter(store=store, pk=supplier_id).first()
+        if transaction_type == "purchase" and supplier_id.isdigit()
+        else None
+    )
 
-    # فلترة حسب الحالة
-    if status:
-        orders = orders.filter(status=status)
+    try:
+        # كل طلبات المتجر (الطلبات فقط بدون إشعارات القبض/الصرف)
+        item_total = ExpressionWrapper(
+            F("items__price") * F("items__quantity"),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        )
+        orders_qs = (
+            Order.objects
+            .filter(store=store, document_kind=1)
+            .select_related("created_by_store_user", "customer", "supplier")
+            .annotate(
+                display_items_total=Coalesce(
+                    Sum(item_total),
+                    Decimal("0"),
+                    output_field=DecimalField(max_digits=14, decimal_places=2),
+                )
+            )
+        )
 
-    # فلترة حسب رقم الطلب
-    if order_id:
-        orders = orders.filter(id=order_id)
+        # فلترة حسب الحالة
+        if status_filter:
+            orders_qs = orders_qs.filter(status=status_filter)
 
-    # فلترة حسب نوع المعاملة (بيع / شراء)
-    if transaction_type:
-        orders = orders.filter(transaction_type=transaction_type)
+        # فلترة حسب رقم الطلب
+        if order_id:
+            orders_qs = orders_qs.filter(id=order_id)
 
-    # ترتيب حسب التاريخ (الأحدث أولاً)
-    orders = orders.order_by("-created_at", "-id")
+        # فلترة حسب رقم الطلب في التطبيق
+        if mobile_order_id:
+            orders_qs = orders_qs.filter(mobile_local_order_id=mobile_order_id)
 
-    # 🟢 عدد الطلبات الجديدة (لسّا is_seen_by_store = False)
-    new_orders_count = Order.objects.filter(
-        store=store,
-        is_seen_by_store=False
-    ).count()
+        if selected_store_user:
+            orders_qs = orders_qs.filter(created_by_store_user=selected_store_user)
+
+        if selected_customer:
+            orders_qs = orders_qs.filter(customer=selected_customer)
+
+        if selected_supplier:
+            orders_qs = orders_qs.filter(supplier=selected_supplier)
+
+        # فلترة حسب نوع المعاملة (بيع / شراء)
+        if transaction_type:
+            orders_qs = orders_qs.filter(transaction_type=transaction_type)
+
+        # ترتيب حسب التاريخ (الأحدث أولاً)
+        paginator = Paginator(orders_qs.order_by("-created_at", "-id"), 100)
+        orders = paginator.get_page(request.GET.get("page"))
+        linked_app = has_linked_app(store)
+        for order in orders:
+            order.alert_state = order_alert_state(order, linked_app)
+
+        # 🟢 عدد الطلبات الجديدة (لسّا is_seen_by_store = False)
+        new_orders_count = Order.objects.filter(
+            store=store,
+            is_seen_by_store=False
+        ).count()
+        orders_page_error = ""
+    except Exception as exc:
+        logger.exception("Failed to load orders list for store_id=%s", store.id)
+        orders_page_error = f"{type(exc).__name__}: {exc}"
+        new_orders_count = 0
 
     context = {
         "store": store,
         "orders": orders,
-        "current_status": status,
+        "current_status": status_filter,
         "current_id": order_id,
+        "current_mobile_id": mobile_order_id,
         "current_transaction_type": transaction_type,
-        "new_orders_count": new_orders_count,  # ظ…ظ‡ظ… ظ„ظ„ظ€ sidebar
+        "current_store_user_id": selected_store_user.id if selected_store_user else "",
+        "current_store_user_name": selected_store_user.name if selected_store_user else "",
+        "current_customer_id": selected_customer.id if selected_customer else "",
+        "current_customer_name": selected_customer.name if selected_customer else "",
+        "current_supplier_id": selected_supplier.id if selected_supplier else "",
+        "current_supplier_name": selected_supplier.name if selected_supplier else "",
+        "store_users": store_users,
+        "new_orders_count": new_orders_count,  # مهم للـ sidebar
+        "orders_page_error": orders_page_error,
+        "order_load_errors": order_load_errors,
     }
 
     # 🔴 انتبه: هون ما عم نغيّر is_seen_by_store
@@ -1307,17 +1988,25 @@ def search_products_by_barcode(request, store_slug):
     return JsonResponse({"results": results})
 #البحث باسماء المستخدمين
 
+@login_required
 def search_customers(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
     q = request.GET.get("q", "")
     
     # جلب زبائن هذا المتجر فقط
-    customers = Customer.objects.filter(store__slug=store_slug, name__icontains=q) | Customer.objects.filter(
-        store__slug=store_slug,
+    customers = Customer.objects.filter(store=store, name__icontains=q) | Customer.objects.filter(
+        store=store,
         phone__icontains=q
     )
 
     results = [
-        {"id": c.id, "name": c.name, "phone": c.phone}
+        {
+            "id": c.id,
+            "name": c.name,
+            "private_note": c.private_note,
+            "phone": c.phone,
+            "preferred_price_level": getattr(c, "preferred_price_level", 0) or 0,
+        }
         for c in customers
     ]
 
@@ -1325,12 +2014,14 @@ def search_customers(request, store_slug):
 # 🔍 بحث الموردين
 
 
+@login_required
 def search_suppliers(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
     q = request.GET.get("q", "").strip()
 
     # جلب الموردين حسب المتجر والكلمة المكتوبة
     suppliers = Supplier.objects.filter(
-        store__slug=store_slug
+        store=store
     ).filter(
         Q(name__icontains=q) | Q(phone__icontains=q)
     )
@@ -1375,6 +2066,8 @@ def notices_list(request, store_slug):
 
     # ===== فلترة الاسم حسب نوع الحركة =====
     keyword = (request.GET.get("keyword") or "").strip()
+    notice_id = (request.GET.get("notice_id") or "").strip()
+    mobile_notice_id = (request.GET.get("mobile_notice_id") or "").strip()
 
     if keyword:
         if normalized_type == "sale":
@@ -1384,6 +2077,12 @@ def notices_list(request, store_slug):
             # فلترة حسب اسم المورد
             notices = notices.filter(supplier__name__icontains=keyword)
 
+    if notice_id:
+        notices = notices.filter(id=notice_id)
+
+    if mobile_notice_id:
+        notices = notices.filter(mobile_local_order_id=mobile_notice_id)
+
     notices = notices.order_by("-created_at")
 
     return render(request, "dashboard/notices_list.html", {
@@ -1391,6 +2090,8 @@ def notices_list(request, store_slug):
         "notices": notices,
         "current_type": transaction_type,
         "current_keyword": keyword,
+        "current_notice_id": notice_id,
+        "current_mobile_notice_id": mobile_notice_id,
         "can_create_notice": True,
         "can_delete_notice": store.owner_id == request.user.id,
     })
@@ -1409,6 +2110,8 @@ def notices_filter(request, store_slug):
     transaction_type = request.GET.get("transaction_type")
     customer_id = request.GET.get("customer_id")
     supplier_id = request.GET.get("supplier_id")
+    notice_id = (request.GET.get("notice_id") or "").strip()
+    mobile_notice_id = (request.GET.get("mobile_notice_id") or "").strip()
 
     if transaction_type:
         if transaction_type == "in":
@@ -1425,11 +2128,18 @@ def notices_filter(request, store_slug):
     if supplier_id and supplier_id.isdigit():
         notices = notices.filter(supplier_id=supplier_id)
 
+    if notice_id:
+        notices = notices.filter(id=notice_id)
+
+    if mobile_notice_id:
+        notices = notices.filter(mobile_local_order_id=mobile_notice_id)
+
     notices = notices.order_by("-created_at")
 
     return render(request, "dashboard/partials/notices_rows.html", {
         "notices": notices,
         "store": store,
+        "can_delete_notice": store.owner_id == request.user.id,
     })
 
 
@@ -1514,6 +2224,9 @@ def notice_create(request, store_slug):
         Order.objects.create(
             store=store,
             document_kind=2,
+            input_data=json.dumps(dict(version=1, currency=store.pricing_currency, values={'subtotal': amount_raw or '0', 'payment': payment_raw or '0'})),
+            base_currency=store.pricing_currency, payment_currency=store.pricing_currency,
+            exchange_rate=store.exchange_rate, amount_payment_currency=payment,
             transaction_type=transaction_type,
             customer=customer,
             supplier=supplier,
@@ -1556,6 +2269,45 @@ def notice_delete(request, store_slug, notice_id):
 
 
 @login_required
+def notice_bulk_delete(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    if store.owner_id != request.user.id:
+        messages.error(request, "لا تملك صلاحية حذف الإشعارات.")
+        return redirect("dashboard:notices_list", store_slug=store.slug)
+
+    if request.method != "POST":
+        return redirect("dashboard:notices_list", store_slug=store.slug)
+
+    notice_ids = []
+    for raw_id in request.POST.getlist("notice_ids"):
+        try:
+            notice_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+
+    if not notice_ids:
+        messages.warning(request, "يرجى تحديد إشعار واحد على الأقل.")
+        return redirect("dashboard:notices_list", store_slug=store.slug)
+
+    notices = Order.objects.filter(
+        id__in=notice_ids,
+        store=store,
+        document_kind=2,
+    )
+    deleted_count = 0
+    for notice in notices:
+        notice.delete()
+        deleted_count += 1
+
+    if deleted_count:
+        messages.success(request, f"تم حذف {deleted_count} إشعار.")
+    else:
+        messages.warning(request, "لم يتم العثور على إشعارات مطابقة للحذف.")
+
+    return redirect("dashboard:notices_list", store_slug=store.slug)
+
+
+@login_required
 def expenses_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
 
@@ -1592,6 +2344,11 @@ def expenses_list(request, store_slug):
         Expense.objects.create(
             store=store,
             amount=amount,
+            input_data=json.dumps(dict(version=1, currency=store.pricing_currency,
+                values={'amount': request.POST.get('amount') or '0'})),
+            payment_currency=store.pricing_currency,
+            exchange_rate=store.exchange_rate,
+            amount_payment_currency=amount,
             date=date_value,
             expense_type=expense_type,
             expense_reason=expense_reason,
@@ -1653,6 +2410,61 @@ def expenses_list(request, store_slug):
 
 
 @login_required
+def fixed_assets_list(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+
+    if request.method == "POST":
+        asset_id = request.POST.get("asset_id")
+        action = request.POST.get("action", "save")
+        if action == "delete" and asset_id:
+            asset = get_object_or_404(FixedAsset, id=asset_id, store=store)
+            asset.delete()
+            messages.success(request, "تم حذف الأصل.")
+            return redirect("dashboard:fixed_assets_list", store_slug=store.slug)
+
+        name = (request.POST.get("name") or "").strip()
+        value_raw = (request.POST.get("value") or "0").replace(",", ".")
+        existed_before_program = request.POST.get("existed_before_program") == "on"
+        try:
+            value = Decimal(value_raw)
+        except Exception:
+            value = Decimal("0")
+
+        if not name:
+            messages.error(request, "اسم الأصل مطلوب.")
+        else:
+            if asset_id:
+                asset = get_object_or_404(FixedAsset, id=asset_id, store=store)
+                asset.name = name
+                asset.value = value
+                asset.existed_before_program = existed_before_program
+                asset.save()
+                messages.success(request, "تم تعديل الأصل.")
+            else:
+                FixedAsset.objects.create(
+                    store=store,
+                    name=name,
+                    value=value,
+                    existed_before_program=existed_before_program,
+                )
+                messages.success(request, "تمت إضافة الأصل.")
+            return redirect("dashboard:fixed_assets_list", store_slug=store.slug)
+
+    assets = FixedAsset.objects.filter(store=store).order_by("-id")
+    total_value = assets.aggregate(total=Sum("value"))["total"] or Decimal("0")
+    opening_value = (
+        assets.filter(existed_before_program=True).aggregate(total=Sum("value"))["total"]
+        or Decimal("0")
+    )
+    return render(request, "dashboard/fixed_assets_list.html", {
+        "store": store,
+        "assets": assets,
+        "total_value": total_value,
+        "opening_value": opening_value,
+    })
+
+
+@login_required
 def expense_edit(request, store_slug, expense_id):
     store = _get_store_for_dashboard(request, store_slug)
     expense = get_object_or_404(Expense, id=expense_id, store=store)
@@ -1689,7 +2501,13 @@ def expense_edit(request, store_slug, expense_id):
             if reason_id and reason_id.isdigit()
             else None
         )
-        expense.amount = amount
+        source = json.loads(expense.input_data) if expense.input_data else None
+        currency = source['currency'] if source else store.pricing_currency
+        expense.input_data = json.dumps(dict(version=1, currency=currency,
+            values={'amount': request.POST.get('amount') or '0'}))
+        expense.amount_payment_currency = amount
+        rate = Decimal(str(expense.exchange_rate or store.exchange_rate or 1))
+        expense.amount = amount if currency == store.pricing_currency else amount / rate if store.pricing_currency == 'USD' else amount * rate
         expense.notes = (request.POST.get("notes") or "").strip()
         expense.save()
 
@@ -1810,12 +2628,35 @@ def suppliers_list(request, store_slug):
             | Q(address__icontains=q)
             | Q(email__icontains=q)
         )
-    suppliers = suppliers.order_by("-id")
+    suppliers = list(suppliers.order_by("-id"))
+
+    supplier_ids = [supplier.id for supplier in suppliers]
+    supplier_balances = {}
+    orders_qs = Order.objects.filter(
+        store=store,
+        supplier_id__in=supplier_ids,
+        document_kind__in=[1, 2],
+        status="confirmed",
+    )
+    for order in orders_qs:
+        balance_delta = _order_balance_delta(order)
+        supplier_balances[order.supplier_id] = supplier_balances.get(order.supplier_id, Decimal("0")) + balance_delta
+
+    for supplier in suppliers:
+        supplier.calc_balance = (supplier.opening_balance or Decimal("0")) + supplier_balances.get(supplier.id, Decimal("0"))
+        supplier.calc_balance_abs = abs(supplier.calc_balance)
+        if supplier.calc_balance > 0:
+            supplier.calc_balance_label = "مدين"
+        elif supplier.calc_balance < 0:
+            supplier.calc_balance_label = "دائن"
+        else:
+            supplier.calc_balance_label = "متوازن"
 
     return render(request, "dashboard/suppliers_list.html", {
         "store": store,
         "suppliers": suppliers,
         "q": q,
+        "currency_symbol": "$" if store.pricing_currency == "USD" else "ل.س",
     })
 
 
@@ -1823,7 +2664,9 @@ def suppliers_list(request, store_slug):
 def customers_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
     customers = Customer.objects.filter(store=store).exclude(name__in=HIDDEN_CUSTOMER_NAMES_IN_LISTS)
+    active_customers_count = customers.filter(is_subscription_active=True).count()
     q = (request.GET.get("q") or "").strip()
+    balance_gt_zero = request.GET.get("balance_gt_zero") == "1"
     if q:
         customers = customers.filter(
             Q(name__icontains=q)
@@ -1831,13 +2674,77 @@ def customers_list(request, store_slug):
             | Q(address__icontains=q)
             | Q(note__icontains=q)
         )
-    customers = customers.order_by("-id")
+    customers = list(customers.order_by("-id"))
+
+    customer_ids = [customer.id for customer in customers]
+    customer_balances = {}
+    orders_qs = (
+        Order.objects
+        .filter(store=store, customer_id__in=customer_ids, document_kind__in=[1, 2], status="confirmed")
+        .prefetch_related("items")
+    )
+    for order in orders_qs:
+        balance_delta = _order_balance_delta(order)
+        customer_balances[order.customer_id] = customer_balances.get(order.customer_id, Decimal("0")) + balance_delta
+
+    for customer in customers:
+        customer.calc_balance = (customer.opening_balance or Decimal("0")) + customer_balances.get(customer.id, Decimal("0"))
+        customer.calc_balance_abs = abs(customer.calc_balance)
+        if customer.calc_balance > 0:
+            customer.calc_balance_label = "مدين"
+        elif customer.calc_balance < 0:
+            customer.calc_balance_label = "دائن"
+        else:
+            customer.calc_balance_label = "متوازن"
+
+    if balance_gt_zero:
+        customers = [customer for customer in customers if customer.calc_balance > 0]
+
+    queue_key = f"bulk_customer_delete_queue:{store.id}"
+    bulk_delete_queue = request.session.get(queue_key, [])
+    bulk_delete_customer = None
+    bulk_delete_remaining = len(bulk_delete_queue)
+    if bulk_delete_queue:
+        bulk_delete_customer = Customer.objects.filter(store=store, id=bulk_delete_queue[0]).first()
 
     return render(request, "dashboard/customers_list.html", {
         "store": store,
         "customers": customers,
+        "active_customers_count": active_customers_count,
         "q": q,
+        "balance_gt_zero": balance_gt_zero,
+        "bulk_delete_customer": bulk_delete_customer,
+        "bulk_delete_remaining": bulk_delete_remaining,
     })
+
+
+def _customer_delete_links(store, customer):
+    linked_orders_qs = Order.objects.filter(store=store, customer=customer)
+    return {
+        "orders_qs": linked_orders_qs,
+        "orders": linked_orders_qs.filter(document_kind=1).count(),
+        "notices": linked_orders_qs.filter(document_kind=2).count(),
+        "points": PointsTransaction.objects.filter(customer=customer).count(),
+    }
+
+
+def _customer_delete_warning_summary(links):
+    warnings = []
+    if links["orders"]:
+        warnings.append(f"{links['orders']} طلب")
+    if links["notices"]:
+        warnings.append(f"{links['notices']} إشعار")
+    if links["points"]:
+        warnings.append(f"{links['points']} سجل نقاط")
+    return "، ".join(warnings) if warnings else "سجلات مرتبطة"
+
+
+def _delete_customer_with_related(store, customer, links=None):
+    links = links or _customer_delete_links(store, customer)
+    with transaction.atomic():
+        links["orders_qs"].delete()
+        PointsTransaction.objects.filter(customer=customer).delete()
+        customer.delete()
 
 
 @login_required
@@ -1845,11 +2752,27 @@ def customer_create(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
-        name = request.POST.get("name")
-        phone = request.POST.get("phone")
+        name = (request.POST.get("name") or "").strip()
+        phone = normalize_phone_number(request.POST.get("phone"))
+        balance_raw = (request.POST.get("balance") or "0").strip()
+        opening_balance_raw = (request.POST.get("opening_balance") or "0").strip()
+        preferred_price_level = _preferred_price_level_from_request(
+            request.POST.get("preferred_price_level")
+        )
+        is_subscription_active = request.POST.get("is_subscription_active") == "on"
+
+        try:
+            balance = Decimal(balance_raw.replace(",", "."))
+            opening_balance = Decimal(opening_balance_raw.replace(",", "."))
+        except (InvalidOperation, TypeError):
+            messages.error(request, "قيمة الاشتراك أو الرصيد الافتتاحي غير صالحة.")
+            return render(request, "dashboard/customer_create.html", {
+                "store": store,
+                "form_data": request.POST,
+            })
 
         duplicate_name = Customer.objects.filter(store=store, name=name).exists()
-        duplicate_phone = Customer.objects.filter(store=store, phone=phone).exists()
+        duplicate_phone = bool(phone) and Customer.objects.filter(store=store, phone=phone).exists()
 
         if duplicate_name or duplicate_phone:
             if duplicate_name and duplicate_phone:
@@ -1863,7 +2786,12 @@ def customer_create(request, store_slug):
         Customer.objects.create(
             store=store,
             name=name,
-            phone=phone
+            phone=phone,
+            private_note=(request.POST.get("private_note") or "").strip(),
+            balance=balance,
+            opening_balance=opening_balance,
+            preferred_price_level=preferred_price_level,
+            is_subscription_active=is_subscription_active
         )
 
         return redirect("dashboard:customers_list", store_slug=store.slug)
@@ -1880,12 +2808,28 @@ def customer_update(request, store_slug, customer_id):
 
     if request.method == "POST":
         name = (request.POST.get("name") or "").strip()
-        phone = (request.POST.get("phone") or "").strip()
+        phone = normalize_phone_number(request.POST.get("phone"))
         address = (request.POST.get("address") or "").strip()
         note = (request.POST.get("note") or "").strip()
+        balance_raw = (request.POST.get("balance") or "0").strip()
+        opening_balance_raw = (request.POST.get("opening_balance") or "0").strip()
+        preferred_price_level = _preferred_price_level_from_request(
+            request.POST.get("preferred_price_level")
+        )
+        is_subscription_active = request.POST.get("is_subscription_active") == "on"
 
-        if not name or not phone:
-            messages.error(request, "الاسم ورقم الموبايل مطلوبان.")
+        if not name:
+            messages.error(request, "اسم العميل مطلوب.")
+            return render(request, "dashboard/customer_update.html", {
+                "store": store,
+                "customer": customer,
+            })
+
+        try:
+            balance = Decimal(balance_raw.replace(",", "."))
+            opening_balance = Decimal(opening_balance_raw.replace(",", "."))
+        except (InvalidOperation, TypeError):
+            messages.error(request, "قيمة الاشتراك أو الرصيد الافتتاحي غير صالحة.")
             return render(request, "dashboard/customer_update.html", {
                 "store": store,
                 "customer": customer,
@@ -1895,7 +2839,7 @@ def customer_update(request, store_slug, customer_id):
             store=store,
             name=name
         ).exclude(id=customer.id).exists()
-        duplicate_phone = Customer.objects.filter(
+        duplicate_phone = bool(phone) and Customer.objects.filter(
             store=store,
             phone=phone
         ).exclude(id=customer.id).exists()
@@ -1917,9 +2861,14 @@ def customer_update(request, store_slug, customer_id):
             "phone": phone,
             "address": address,
             "note": note,
+            "private_note": (request.POST.get("private_note") or "").strip(),
+            "balance": balance,
+            "opening_balance": opening_balance,
+            "preferred_price_level": preferred_price_level,
+            "is_subscription_active": is_subscription_active,
+            "update_time": int(timezone.now().timestamp() // 60),
+            "mobile_update_time": int(timezone.now().timestamp() // 60),
         }
-        if customer.access_id not in (None, 0, ""):
-            update_data["update_time"] = int(timezone.now().timestamp() // 60)
         Customer.objects.filter(id=customer.id, store=store).update(**update_data)
         messages.success(request, "تم تعديل بيانات العميل بنجاح.")
         return redirect("dashboard:customers_list", store_slug=store.slug)
@@ -1937,31 +2886,108 @@ def delete_customer(request, store_slug, customer_id):
 
     if request.method == "POST":
         access_ack_key = f"access_delete_ack:customer:{store.id}:{customer.id}"
-        linked_orders = Order.objects.filter(store=store, customer=customer).count()
-        linked_points = PointsTransaction.objects.filter(customer=customer).count()
-        if linked_orders > 0 or linked_points > 0:
-            messages.error(
-                request,
-                f"لا يمكن حذف العميل. يوجد ارتباطات: طلبات={linked_orders}، نقاط={linked_points}. احذف السجلات المرتبطة أولاً."
-            )
-            request.session.pop(access_ack_key, None)
-            return redirect("dashboard:customers_list", store_slug=store.slug)
+        links = _customer_delete_links(store, customer)
+        has_linked_records = links["orders"] > 0 or links["notices"] > 0 or links["points"] > 0
+        is_access_linked = _is_store_access_linked(store)
+        delete_confirmed = _consume_access_delete_ack(request, access_ack_key)
 
-        if _is_store_access_linked(store) and not _consume_access_delete_ack(request, access_ack_key):
+        if (has_linked_records or is_access_linked) and not delete_confirmed:
             _set_access_delete_ack(request, access_ack_key)
+            linked_summary = _customer_delete_warning_summary(links)
+            sync_note = " ومزامنة حذفها مع برنامج الأمان للمحاسبة" if is_access_linked else ""
             messages.warning(
                 request,
-                "متجرك مرتبط ببرنامج الأمان للمحاسبة. عند المزامنة رح يتم حذف كل الفواتير المرتبطة بهذا العميل. اضغط حذف مرة ثانية للتأكيد."
+                f"هذا العميل مرتبط بـ {linked_summary}. إذا وافقت على الحذف سيتم حذف العميل وكل السجلات المرتبطة به{sync_note}. اضغط حذف مرة ثانية للتأكيد."
             )
             return redirect("dashboard:customers_list", store_slug=store.slug)
 
-        customer.delete()
+        _delete_customer_with_related(store, customer, links)
+        messages.success(request, "تم حذف العميل وكل السجلات المرتبطة به بنجاح.")
         return redirect("dashboard:customers_list", store_slug=store.slug)
 
     return render(request, "dashboard/delete_customer.html", {
         "store": store,
         "customer": customer,
     })
+
+
+@login_required
+@require_POST
+def bulk_delete_customers(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    queue_key = f"bulk_customer_delete_queue:{store.id}"
+    deleted_key = f"bulk_customer_delete_deleted:{store.id}"
+    skipped_key = f"bulk_customer_delete_skipped:{store.id}"
+    action = request.POST.get("bulk_delete_action") or "start"
+
+    if action == "start":
+        customer_ids = []
+        for raw_id in request.POST.getlist("customer_ids"):
+            try:
+                customer_ids.append(int(raw_id))
+            except (TypeError, ValueError):
+                continue
+        customer_ids = list(
+            Customer.objects
+            .filter(store=store, id__in=customer_ids)
+            .exclude(name__in=HIDDEN_CUSTOMER_NAMES_IN_LISTS)
+            .order_by("id")
+            .values_list("id", flat=True)
+        )
+        if not customer_ids:
+            messages.warning(request, "لم يتم تحديد أي عميل للحذف.")
+            return redirect("dashboard:customers_list", store_slug=store.slug)
+        request.session[queue_key] = customer_ids
+        request.session[deleted_key] = 0
+        request.session[skipped_key] = 0
+    elif action == "skip":
+        queue = request.session.get(queue_key, [])
+        if queue:
+            queue.pop(0)
+            request.session[queue_key] = queue
+            request.session[skipped_key] = int(request.session.get(skipped_key, 0)) + 1
+    elif action == "confirm":
+        queue = request.session.get(queue_key, [])
+        if queue:
+            customer = Customer.objects.filter(store=store, id=queue[0]).first()
+            if customer:
+                _delete_customer_with_related(store, customer)
+                request.session[deleted_key] = int(request.session.get(deleted_key, 0)) + 1
+            queue.pop(0)
+            request.session[queue_key] = queue
+    else:
+        return redirect("dashboard:customers_list", store_slug=store.slug)
+
+    while True:
+        queue = request.session.get(queue_key, [])
+        if not queue:
+            deleted = int(request.session.pop(deleted_key, 0))
+            skipped = int(request.session.pop(skipped_key, 0))
+            request.session.pop(queue_key, None)
+            messages.success(request, f"انتهى حذف العملاء المحددين: تم حذف {deleted}، وتم تخطي {skipped}.")
+            return redirect("dashboard:customers_list", store_slug=store.slug)
+
+        customer = Customer.objects.filter(store=store, id=queue[0]).first()
+        if not customer:
+            queue.pop(0)
+            request.session[queue_key] = queue
+            request.session[skipped_key] = int(request.session.get(skipped_key, 0)) + 1
+            continue
+
+        links = _customer_delete_links(store, customer)
+        has_linked_records = links["orders"] > 0 or links["notices"] > 0 or links["points"] > 0
+        if has_linked_records:
+            request.session.modified = True
+            messages.warning(
+                request,
+                f"العميل {customer.name} مرتبط بـ {_customer_delete_warning_summary(links)}. اختر حذف هذا العميل والمتابعة أو تخطيه."
+            )
+            return redirect("dashboard:customers_list", store_slug=store.slug)
+
+        _delete_customer_with_related(store, customer, links)
+        queue.pop(0)
+        request.session[queue_key] = queue
+        request.session[deleted_key] = int(request.session.get(deleted_key, 0)) + 1
 
 
 def points_page(request, store_slug):
@@ -2051,6 +3077,7 @@ def delete_points_transaction(request, store_slug, transaction_id):
 
 
 @login_required
+@sensitive_post_parameters("current_password", "new_password", "confirmation")
 def store_settings(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug)
 
@@ -2062,7 +3089,38 @@ def store_settings(request, store_slug):
         if request.POST.get("reset_action") == "1":
             return _perform_store_reset(request, store)
 
+        selected_ids = None
+        if request.method == "POST":
+            raw_ids = request.POST.getlist("storefront_warehouses")
+            if any(not value.isdigit() for value in raw_ids):
+                messages.error(request, "Invalid warehouse selection.")
+                return redirect("dashboard:store_settings", store_slug=store.slug)
+            if not raw_ids:
+                messages.error(request, "يجب تحديد مستودع واحد على الأقل للمتجر الإلكتروني.")
+                return redirect("dashboard:store_settings", store_slug=store.slug)
+            selected_ids = {int(value) for value in raw_ids}
+            valid_ids = set(store.warehouses.filter(pk__in=selected_ids, is_active=True).values_list("pk", flat=True))
+            if selected_ids != valid_ids:
+                messages.error(request, "Invalid warehouse selection.")
+                return redirect("dashboard:store_settings", store_slug=store.slug)
+
         new_slug = request.POST.get("slug", "").strip()
+
+        product_layout = request.POST.get("product_layout", store.product_layout)
+        product_image_size = request.POST.get("product_image_size", store.product_image_size)
+        if product_layout not in dict(Store._meta.get_field("product_layout").choices):
+            messages.error(request, "طريقة عرض المنتجات غير صحيحة.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
+        if product_image_size not in dict(Store._meta.get_field("product_image_size").choices):
+            messages.error(request, "حجم صور المنتجات غير صحيح.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
+        store.product_layout = product_layout
+        store.product_image_size = product_image_size
+        display_currency = request.POST.get("display_currency", store.display_currency)
+        if display_currency not in dict(Store._meta.get_field("display_currency").choices):
+            messages.error(request, "عملة العرض غير صحيحة.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
+        store.display_currency = display_currency
 
         if new_slug != store.slug:
             if Store.objects.filter(slug=new_slug).exclude(id=store.id).exists():
@@ -2079,6 +3137,7 @@ def store_settings(request, store_slug):
         store.instagram_url = request.POST.get("instagram_url", "").strip()
         store.telegram_url = request.POST.get("telegram_url", "").strip()
         store.whatsapp_url = request.POST.get("whatsapp_url", "").strip()
+        store.allow_negative_warehouse_sale = "allow_negative_warehouse_sale" in request.POST
         store.sales_paused = "sales_paused" in request.POST
         store.sales_pause_message = request.POST.get("sales_pause_message", "").strip()
 
@@ -2088,12 +3147,6 @@ def store_settings(request, store_slug):
 
         if "logo" in request.FILES:
             store.logo = request.FILES["logo"]
-
-        new_password = request.POST.get("new_password", "").strip()
-        if new_password:
-            store.owner.password = make_password(new_password)
-            store.owner.save()
-            messages.success(request, "تم تغيير كلمة المرور بنجاح.")
 
         percent = request.POST.get("payment_required_percentage", "").strip()
         if percent.isdigit():
@@ -2147,13 +3200,47 @@ def store_settings(request, store_slug):
                 messages.error(request, "سعر الصرف مطلوب عند اختيار التسعير بالدولار.")
                 return redirect(f"/dashboard/{store.slug}/settings/")
 
-        store.save()
+        if (store.pricing_currency == "USD" or store.display_currency in ("USD", "BOTH")) and store.exchange_rate <= 0:
+            messages.error(request, "سعر الصرف يجب أن يكون أكبر من صفر لعرض الأسعار بالعملة الأخرى.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
+
+        account_data = {
+            "username": request.POST.get("username", store.owner.username),
+            "current_password": request.POST.get("current_password", ""),
+            "new_password": request.POST.get("new_password", ""),
+            "confirmation": request.POST.get("confirmation", ""),
+        }
+        account_changed = (account_data["username"].strip() != store.owner.username or
+                           bool(account_data["new_password"] or account_data["confirmation"]))
+        try:
+            with transaction.atomic():
+                if account_changed:
+                    owner = User.objects.select_for_update().get(pk=store.owner_id)
+                    account_form = OwnerAccountForm(account_data, owner=owner)
+                    if not account_form.is_valid():
+                        for errors in account_form.errors.values():
+                            for error in errors:
+                                messages.error(request, error)
+                        return redirect("dashboard:store_settings", store_slug=store_slug)
+                    save_owner_account(store, owner, account_form.cleaned_data)
+                store.save()
+                if selected_ids is not None:
+                    store.storefront_warehouses.set(selected_ids)
+        except IntegrityError:
+            messages.error(request, "تعذر حفظ التغييرات؛ اسم المستخدم أو اسم المتجر مستخدم مسبقاً.")
+            return redirect("dashboard:store_settings", store_slug=store_slug)
+
+        if account_changed:
+            update_session_auth_hash(request, owner)
+            notify_user_sync_required(request)
 
         messages.success(request, "تم حفظ إعدادات المتجر بنجاح.")
         return redirect(f"/dashboard/{store.slug}/settings/")
 
     products_count = Product.objects.filter(store=store).count()
-    return render(request, "dashboard/store_settings.html", {"store": store, "products_count": products_count})
+    return render(request, "dashboard/store_settings.html", {"store": store, "products_count": products_count,
+        "storefront_warehouses": store.warehouses.filter(is_active=True).order_by("name"),
+        "selected_storefront_warehouse_ids": set(selected_warehouse_ids(store))})
 
 
 @login_required
@@ -2164,6 +3251,118 @@ def reset_store_data(request, store_slug):
         return redirect(f"/dashboard/{store.slug}/settings/")
 
     return _perform_store_reset(request, store)
+
+
+@login_required
+@require_POST
+def reset_access_export_flags(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+
+    if request.user != store.owner:
+        messages.error(request, "غير مسموح لك بتعديل إعدادات هذا المتجر.")
+        return redirect(f"/dashboard/{store.slug}/settings/")
+
+    password = (request.POST.get("access_reset_password") or "").strip()
+    if not password or not check_password(password, request.user.password):
+        messages.error(request, "كلمة المرور غير صحيحة.")
+        return redirect(f"/dashboard/{store.slug}/settings/")
+
+    reset_count = 0
+    access_models = [
+        Store.objects.filter(id=store.id),
+        Warehouse.objects.filter(store=store),
+        StoreUser.objects.filter(store=store),
+        Customer.objects.filter(store=store),
+        Supplier.objects.filter(store=store),
+        PointsTransaction.objects.filter(customer__store=store),
+        Category.objects.filter(store=store),
+        Product.objects.filter(store=store),
+        ProductDetails.objects.filter(product__store=store),
+        ProductGallery.objects.filter(product__store=store),
+        ProductBarcode.objects.filter(product__store=store),
+        OrderItem.objects.filter(order__store=store),
+        ExpenseType.objects.filter(store=store),
+        ExpenseReason.objects.filter(store=store),
+        Expense.objects.filter(store=store),
+        WarehouseTransfer.objects.filter(store=store),
+        WarehouseTransferItem.objects.filter(store=store),
+        InventoryAdjustment.objects.filter(store=store),
+        StockMovement.objects.filter(store=store),
+        StorePaymentMethod.objects.filter(store=store),
+        Cart.objects.filter(store=store),
+        CartItem.objects.filter(cart__store=store),
+    ]
+
+    with transaction.atomic():
+        for queryset in access_models:
+            reset_count += queryset.exclude(access_id__isnull=True).update(access_id=None)
+
+        reset_count += (
+            Order.objects.filter(store=store)
+            .exclude(accounting_invoice_number__isnull=True)
+            .update(accounting_invoice_number=None)
+        )
+
+        DeleteSync.objects.filter(
+            source_flag=2,
+            store_model_name=DeleteSync.RESET_MARKER_MODEL,
+            store_record_id=store.id,
+        ).delete()
+
+    messages.success(
+        request,
+        f"تم السماح بإعادة إرسال بيانات المتجر إلى أكسس. عدد السجلات التي تم تجهيزها: {reset_count}.",
+    )
+    return redirect(f"/dashboard/{store.slug}/settings/")
+
+
+@login_required
+@require_POST
+def allow_mobile_resend(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+
+    if request.user != store.owner:
+        messages.error(request, "غير مسموح لك بتعديل إعدادات هذا المتجر.")
+        return redirect(f"/dashboard/{store.slug}/settings/")
+
+    password = (request.POST.get("mobile_resend_password") or "").strip()
+    if not password or not check_password(password, request.user.password):
+        messages.error(request, "كلمة المرور غير صحيحة.")
+        return redirect(f"/dashboard/{store.slug}/settings/")
+
+    now_minute = int(time.time() // 60)
+    resend_count = 0
+    mobile_models = [
+        Store.objects.filter(id=store.id),
+        Warehouse.objects.filter(store=store),
+        Customer.objects.filter(store=store),
+        Supplier.objects.filter(store=store),
+        Category.objects.filter(store=store),
+        Product.objects.filter(store=store),
+        ProductBarcode.objects.filter(product__store=store),
+        Order.objects.filter(store=store),
+        OrderItem.objects.filter(order__store=store),
+        ExpenseType.objects.filter(store=store),
+        ExpenseReason.objects.filter(store=store),
+        Expense.objects.filter(store=store),
+        FixedAsset.objects.filter(store=store),
+        ContactInfo.objects.all(),
+        WarehouseTransfer.objects.filter(store=store),
+        WarehouseTransferItem.objects.filter(transfer__store=store),
+        InventoryAdjustment.objects.filter(store=store),
+        StockMovement.objects.filter(store=store),
+        StorePaymentMethod.objects.filter(store=store),
+    ]
+
+    with transaction.atomic():
+        for queryset in mobile_models:
+            resend_count += queryset.update(mobile_update_time=now_minute)
+
+    messages.success(
+        request,
+        f"تم السماح بإعادة إرسال بيانات المتجر إلى التطبيق. عدد السجلات التي تم تجهيزها: {resend_count}.",
+    )
+    return redirect(f"/dashboard/{store.slug}/settings/")
 
 
 def _perform_store_reset(request, store):
@@ -2180,58 +3379,38 @@ def _perform_store_reset(request, store):
             .values_list("id", flat=True)
             .first()
         )
-        delete_sync_targets = {
-            "accounts.Supplier": list(Supplier.objects.filter(store=store).values_list("id", flat=True)),
-            "accounts.Customer": list(Customer.objects.filter(store=store).values_list("id", flat=True)),
-            "products.Category": list(Category.objects.filter(store=store).values_list("id", flat=True)),
-            "products.Product": list(Product.objects.filter(store=store).values_list("id", flat=True)),
-            "products.ProductBarcode": list(
-                ProductBarcode.objects.filter(product__store=store).values_list("id", flat=True)
-            ),
-            "orders.Order": list(Order.objects.filter(store=store).values_list("id", flat=True)),
-            "orders.OrderItem": list(
-                OrderItem.objects.filter(order__store=store).values_list("id", flat=True)
-            ),
-            "accounts.PointsTransaction": list(
-                PointsTransaction.objects.filter(customer__store=store).values_list("id", flat=True)
-            ),
-            "dashboard.Expense": list(Expense.objects.filter(store=store).values_list("id", flat=True)),
-            "stores.Warehouse": list(
-                Warehouse.objects.filter(store=store).exclude(id=main_warehouse_id).values_list("id", flat=True)
-            ),
-            "accounts.StoreUser": list(StoreUser.objects.filter(store=store).values_list("id", flat=True)),
-        }
-
-        Order.objects.filter(store=store).delete()
-        Cart.objects.filter(store=store).delete()
-
-        Product.objects.filter(store=store).delete()
-        Category.objects.filter(store=store).delete()
-
-        Customer.objects.filter(store=store).delete()
-        Supplier.objects.filter(store=store).delete()
-        LoyaltyPoints.objects.filter(store=store).delete()
-
-        StorePaymentMethod.objects.filter(store=store).delete()
-
-        Expense.objects.filter(store=store).delete()
-        ExpenseReason.objects.filter(store=store).delete()
-        ExpenseType.objects.filter(store=store).delete()
-
-        # Clear store users and warehouses, but keep the main warehouse record.
-        StoreUser.objects.filter(store=store).delete()
-        Warehouse.objects.filter(store=store).exclude(id=main_warehouse_id).delete()
-
-        AccountingClient.objects.filter(store=store).delete()
-        SystemNotification.objects.filter(target_store=store).delete()
 
         # Remove pending delete-log records for rows cleared by store reset.
-        for model_name, ids in delete_sync_targets.items():
-            if ids:
-                DeleteSync.objects.filter(
-                    store_model_name=model_name,
-                    store_record_id__in=ids,
-                ).delete()
+        _delete_reset_sync_rows(store, main_warehouse_id)
+
+        with _store_reset_delete_logging_disabled():
+            StockMovement.objects.filter(store=store).delete()
+            InventoryAdjustment.objects.filter(store=store).delete()
+            WarehouseTransferItem.objects.filter(store=store).delete()
+            WarehouseTransfer.objects.filter(store=store).delete()
+
+            Order.objects.filter(store=store).delete()
+            Cart.objects.filter(store=store).delete()
+
+            Product.objects.filter(store=store).delete()
+            Category.objects.filter(store=store).delete()
+
+            Customer.objects.filter(store=store).delete()
+            Supplier.objects.filter(store=store).delete()
+            LoyaltyPoints.objects.filter(store=store).delete()
+
+            StorePaymentMethod.objects.filter(store=store).delete()
+
+            Expense.objects.filter(store=store).delete()
+            ExpenseReason.objects.filter(store=store).delete()
+            ExpenseType.objects.filter(store=store).delete()
+
+            # Clear store users and warehouses, but keep the main warehouse record.
+            StoreUser.objects.filter(store=store).delete()
+            Warehouse.objects.filter(store=store).exclude(id=main_warehouse_id).delete()
+
+            AccountingClient.objects.filter(store=store).delete()
+            SystemNotification.objects.filter(target_store=store).delete()
 
         # Mark that this store was fully reset, so sync clients can warn
         # the user to enable full re-send from Access settings.
@@ -2250,7 +3429,8 @@ def _perform_store_reset(request, store):
 
     messages.success(
         request,
-        "تم تفريغ بيانات المتجر بنجاح (مع الاحتفاظ ببيانات المتجر والمستودع الرئيسي).",
+        "تم تفريغ بيانات المتجر بنجاح (مع الاحتفاظ ببيانات المتجر والمستودع الرئيسي). "
+        "يجب مزامنة المستخدمين في التطبيق أولاً قبل المزامنة أو استبدال البيانات.",
     )
     return redirect(f"/dashboard/{store.slug}/settings/")
 
@@ -2260,7 +3440,12 @@ def balances_report(request, store_slug):
         messages.error(request, "لا تملك صلاحية الاطلاع على أرصدة العملاء.")
         return redirect("dashboard:home", store_slug=store.slug)
 
-    customers = list(Customer.objects.filter(store=store).order_by("name"))
+    customers = list(
+        Customer.objects
+        .filter(store=store)
+        .exclude(name__in=HIDDEN_CUSTOMER_NAMES_IN_LISTS)
+        .order_by("name")
+    )
     suppliers = list(Supplier.objects.filter(store=store).order_by("name"))
 
     # احسب الرصيد من الطلبات: صافي الطلب - الدفعات
@@ -2275,14 +3460,7 @@ def balances_report(request, store_slug):
     supplier_balances = {}
 
     for order in orders_qs:
-        if order.document_kind == 1:
-            amount = order.net_total
-            payment = order.payment
-        else:
-            amount = order.amount or Decimal("0")
-            payment = order.payment
-
-        balance_delta = amount - payment
+        balance_delta = _order_balance_delta(order)
 
         if order.customer_id:
             customer_balances[order.customer_id] = customer_balances.get(order.customer_id, Decimal("0")) + balance_delta
@@ -2293,36 +3471,37 @@ def balances_report(request, store_slug):
     supplier_total = Decimal("0.0")
 
     for customer in customers:
-        bal = customer_balances.get(customer.id, Decimal("0"))
+        bal = (customer.opening_balance or Decimal("0")) + customer_balances.get(customer.id, Decimal("0"))
         customer_total += bal
         customer.calc_balance = bal
         customer.calc_balance_abs = abs(bal)
         if bal > 0:
-            customer.calc_balance_label = "ظ…ط¯ظٹظ†"
+            customer.calc_balance_label = "مدين"
         elif bal < 0:
-            customer.calc_balance_label = "ط¯ط§ط¦ظ†"
+            customer.calc_balance_label = "دائن"
         else:
-            customer.calc_balance_label = "ظ…طھظˆط§ط²ظ†"
+            customer.calc_balance_label = "متوازن"
 
     for supplier in suppliers:
-        bal = supplier_balances.get(supplier.id, Decimal("0"))
+        bal = (supplier.opening_balance or Decimal("0")) + supplier_balances.get(supplier.id, Decimal("0"))
         supplier_total += bal
         supplier.calc_balance = bal
         supplier.calc_balance_abs = abs(bal)
         if bal > 0:
-            supplier.calc_balance_label = "ظ…ط¯ظٹظ†"
+            supplier.calc_balance_label = "مدين"
         elif bal < 0:
-            supplier.calc_balance_label = "ط¯ط§ط¦ظ†"
+            supplier.calc_balance_label = "دائن"
         else:
-            supplier.calc_balance_label = "ظ…طھظˆط§ط²ظ†"
+            supplier.calc_balance_label = "متوازن"
 
+    customer_count = len(customers)
     customers = [customer for customer in customers if customer.calc_balance != 0]
     suppliers = [supplier for supplier in suppliers if supplier.calc_balance != 0]
 
     customer_total_abs = abs(customer_total)
     supplier_total_abs = abs(supplier_total)
-    customer_total_label = "ظ…ط¯ظٹظ†" if customer_total > 0 else "ط¯ط§ط¦ظ†" if customer_total < 0 else "ظ…طھظˆط§ط²ظ†"
-    supplier_total_label = "ظ…ط¯ظٹظ†" if supplier_total > 0 else "ط¯ط§ط¦ظ†" if supplier_total < 0 else "ظ…طھظˆط§ط²ظ†"
+    customer_total_label = "مدين" if customer_total > 0 else "دائن" if customer_total < 0 else "متوازن"
+    supplier_total_label = "مدين" if supplier_total > 0 else "دائن" if supplier_total < 0 else "متوازن"
 
     return render(request, "dashboard/balances_report.html", {
         "store": store,
@@ -2334,12 +3513,27 @@ def balances_report(request, store_slug):
         "supplier_total_abs": supplier_total_abs,
         "customer_total_label": customer_total_label,
         "supplier_total_label": supplier_total_label,
+        "customer_count": customer_count,
+        "currency_symbol": "$" if store.pricing_currency == "USD" else "ل.س",
     })
 
 
 @login_required
 def profits_report(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    stock_movements_qs = (
+        StockMovement.objects
+        .filter(product=OuterRef("pk"), store=store)
+        .values("product")
+        .annotate(
+            total_quantity=Coalesce(
+                Sum("quantity_change"),
+                Value(0, output_field=DecimalField(max_digits=14, decimal_places=2)),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            )
+        )
+        .values("total_quantity")[:1]
+    )
 
     negative_stock_count = (
         Product.objects
@@ -2348,7 +3542,7 @@ def profits_report(request, store_slug):
             movements=Coalesce(
                 Sum(
                     ExpressionWrapper(
-                        F("order_items__quantity") * F("order_items__direction"),
+                        (F("order_items__quantity") + F("order_items__bonus_quantity")) * F("order_items__direction"),
                         output_field=DecimalField(max_digits=14, decimal_places=2),
                     )
                 ),
@@ -2357,7 +3551,13 @@ def profits_report(request, store_slug):
         )
         .annotate(
             real_stock=ExpressionWrapper(
-                F("stock") + F("movements"),
+                F("stock")
+                + F("movements")
+                + Coalesce(
+                    Subquery(stock_movements_qs, output_field=DecimalField(max_digits=14, decimal_places=2)),
+                    Value(0, output_field=DecimalField(max_digits=14, decimal_places=2)),
+                    output_field=DecimalField(max_digits=14, decimal_places=2),
+                ),
                 output_field=DecimalField(max_digits=14, decimal_places=2),
             )
         )
@@ -2368,7 +3568,7 @@ def profits_report(request, store_slug):
     orders = Order.objects.filter(
         store=store,
         status="confirmed",
-        transaction_type="sale",
+        transaction_type__in=["sale", "sale_return"],
         document_kind=1,
     )
 
@@ -2391,25 +3591,38 @@ def profits_report(request, store_slug):
             messages.error(request, "تاريخ النهاية غير صحيح.")
 
     profit_expr = ExpressionWrapper(
-        (F("price") - Coalesce(F("buy_price"), Value(0))) * F("quantity"),
+        (F("price") * Abs(F("quantity")) -
+         Coalesce(F("buy_price"), Value(0)) * (Abs(F("quantity")) + F("bonus_quantity"))) *
+        Case(
+            When(order__transaction_type="sale_return", then=Value(-1)),
+            default=Value(1),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        ),
         output_field=DecimalField(max_digits=14, decimal_places=2),
     )
 
     items_profit = (
         OrderItem.objects
-        .filter(order__in=orders, direction=-1)
+        .filter(order__in=orders)
         .aggregate(total=Coalesce(
             Sum(profit_expr),
             Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
         ))
     )["total"]
 
-    discount_total = (
-        orders.aggregate(total=Coalesce(
-            Sum("discount"),
-            Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
-        ))
-    )["total"]
+    discount_expr = ExpressionWrapper(
+        F("discount") *
+        Case(
+            When(transaction_type="sale_return", then=Value(-1)),
+            default=Value(1),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        ),
+        output_field=DecimalField(max_digits=14, decimal_places=2),
+    )
+    discount_total = orders.aggregate(total=Coalesce(
+        Sum(discount_expr),
+        Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
+    ))["total"]
 
     general_profit = items_profit - discount_total
 
@@ -2435,7 +3648,47 @@ def profits_report(request, store_slug):
         ))
     )["total"]
 
-    actual_profit = general_profit - work_expenses
+    inventory_adjustments = InventoryAdjustment.objects.filter(store=store)
+    if date_from:
+        inventory_adjustments = inventory_adjustments.filter(adjusted_at__date__gte=date_from)
+    if date_to:
+        inventory_adjustments = inventory_adjustments.filter(adjusted_at__date__lte=date_to)
+
+    inventory_adjustments_total = (
+        inventory_adjustments.aggregate(total=Coalesce(
+            Sum("difference_value"),
+            Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
+        ))
+    )["total"]
+
+    salary_payments = SalaryPayment.objects.filter(store=store, is_received=True)
+    if date_from:
+        salary_payments = salary_payments.filter(date__gte=date_from)
+    if date_to:
+        salary_payments = salary_payments.filter(date__lte=date_to)
+
+    salary_expr = ExpressionWrapper(
+        F("salary")
+        + F("extra_amount")
+        - F("discount_amount"),
+        output_field=DecimalField(max_digits=14, decimal_places=2),
+    )
+    salaries_total = salary_payments.aggregate(total=Coalesce(
+        Sum(salary_expr),
+        Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
+    ))["total"]
+
+    disposals = StockMovement.objects.filter(store=store, reference_type="stock_disposal")
+    if date_from:
+        disposals = disposals.filter(occurred_at__date__gte=date_from)
+    if date_to:
+        disposals = disposals.filter(occurred_at__date__lte=date_to)
+    disposal_loss = disposals.aggregate(total=Coalesce(
+        Sum(ExpressionWrapper(-F("quantity_change") * F("unit_cost"),
+                              output_field=DecimalField(max_digits=18, decimal_places=2))),
+        Value(0, output_field=DecimalField(max_digits=18, decimal_places=2)),
+    ))["total"]
+    actual_profit = general_profit - work_expenses - salaries_total - inventory_adjustments_total - disposal_loss
     net_profit = actual_profit - general_expenses
 
     return render(request, "dashboard/profits_report.html", {
@@ -2447,8 +3700,11 @@ def profits_report(request, store_slug):
         "discount_total": discount_total,
         "general_profit": general_profit,
         "work_expenses": work_expenses,
+        "salaries_total": salaries_total,
         "actual_profit": actual_profit,
         "general_expenses": general_expenses,
+        "inventory_adjustments_total": inventory_adjustments_total,
+        "disposal_loss": disposal_loss,
         "net_profit": net_profit,
     })
 #اضافة 
@@ -2463,7 +3719,16 @@ def supplier_create(request, store_slug):
         phone = request.POST.get("phone", "").strip()
         address = request.POST.get("address")
         email = request.POST.get("email")
-        opening_balance = request.POST.get("opening_balance") or 0
+        opening_balance_raw = (request.POST.get("opening_balance") or "0").strip()
+
+        try:
+            opening_balance = Decimal(opening_balance_raw.replace(",", "."))
+        except (InvalidOperation, TypeError):
+            messages.error(request, "قيمة الرصيد الافتتاحي غير صالحة.")
+            return render(request, "dashboard/supplier_create.html", {
+                "store": store,
+                "form_data": request.POST,
+            })
 
         duplicate_name = bool(name) and Supplier.objects.filter(store=store, name=name).exists()
         duplicate_phone = bool(phone) and Supplier.objects.filter(store=store, phone=phone).exists()
@@ -2534,9 +3799,9 @@ def supplier_update(request, store_slug, supplier_id):
             })
 
         try:
-            opening_balance = Decimal(opening_balance_raw)
+            opening_balance = Decimal(opening_balance_raw.replace(",", "."))
         except (InvalidOperation, TypeError):
-            messages.error(request, "قيمة الرصيد السابق غير صالحة.")
+            messages.error(request, "قيمة الرصيد الافتتاحي غير صالحة.")
             return render(request, "dashboard/supplier_update.html", {
                 "store": store,
                 "supplier": supplier,
@@ -2638,12 +3903,23 @@ from django.db.models.functions import Coalesce, Cast
 @login_required
 def inventory_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    if not _can_access_store_permission(request, store, "stock.view"):
+        messages.error(request, "لا تملك صلاحية عرض المخزون والجرد.")
+        return redirect("dashboard:home", store_slug=store.slug)
 
     # 🔹 آخر سعر شراء لكل منتج
     last_buy_price_qs = OrderItem.objects.filter(
         product=OuterRef("pk"),
-        direction=1
+        order__document_kind=1,
+        order__status__in=["confirmed", "completed"],
+        order__transaction_type="purchase",
     ).order_by("-order__created_at", "-id").values("price")[:1]
+
+    warehouses = store.warehouses.all().order_by("name")
+    warehouse_id = request.GET.get("warehouse", "")
+    if warehouse_id and not warehouse_id.isdigit():
+        raise Http404
+    selected_warehouse = get_object_or_404(warehouses, pk=warehouse_id) if warehouse_id else None
 
     base_qs = Product.objects.filter(store=store)
 
@@ -2667,39 +3943,17 @@ def inventory_list(request, store_slug):
 
     qty_filter = (request.GET.get("qty_filter") or "").strip()
 
-    products_qs = (
-        base_qs
-        .annotate(
-            # ✅ الكمية المتبقية (Decimal مضمون)
-            remaining_qty=Coalesce(
-                Sum(
-                    ExpressionWrapper(
-                        F("order_items__quantity") * F("order_items__direction"),
-                        output_field=DecimalField(max_digits=10, decimal_places=2)
-                    )
-                ),
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
-            ),
-
-            # ✅ آخر سعر شراء (Decimal مضمون)
-            last_buy_price=Coalesce(
-                Subquery(
-                    last_buy_price_qs,
-                    output_field=DecimalField(max_digits=10, decimal_places=2)
-                ),
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
-            ),
-        )
-        .annotate(
-            # ✅ قيمة المخزون (Decimal × Decimal)
-            stock_value=ExpressionWrapper(
-                F("remaining_qty") * F("last_buy_price"),
-                output_field=DecimalField(max_digits=14, decimal_places=2)
-            )
-        )
-        # ترتيب تصاعدي حسب اسم الصنف (مع id لضمان ثبات الترتيب عند تكرار الأسماء)
-        .order_by("name", "id")
-    )
+    products_qs = with_storefront_stock(
+        base_qs, store, [selected_warehouse.pk] if selected_warehouse else [], active_only=False
+    ).annotate(
+        remaining_qty=F("real_stock_calc"),
+        last_buy_price=Coalesce(Subquery(last_buy_price_qs,
+            output_field=DecimalField(max_digits=10, decimal_places=2)), "buy_price",
+            Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))),
+    ).annotate(stock_value=ExpressionWrapper(
+        F("remaining_qty") * F("last_buy_price"),
+        output_field=DecimalField(max_digits=14, decimal_places=2),
+    )).order_by("name", "id")
 
     if qty_filter == "gt0":
         products_qs = products_qs.filter(remaining_qty__gt=0)
@@ -2802,7 +4056,7 @@ def inventory_list(request, store_slug):
         response["Content-Disposition"] = f'attachment; filename="inventory_{store.slug}.xlsx"'
         return response
 
-    categories = Category.objects.filter(store=store)
+    categories = Category.objects.filter(store=store).order_by(display_order(), "id")
 
     # 💰 إجمالي قيمة المخزون
     total_inventory_value = products_qs.aggregate(
@@ -2823,6 +4077,8 @@ def inventory_list(request, store_slug):
 
     context = {
         "store": store,
+        "inventory_warehouses": warehouses,
+        "selected_inventory_warehouse": selected_warehouse,
         "page_obj": page_obj,
         "categories": categories,
         "q": q,

@@ -223,8 +223,48 @@
                             <label class="form-label">سعر الصرف (1 دولار = ؟ ل.س)</label>
                             <input type="number" name="exchange_rate" value="{{ store.exchange_rate }}" min="0" step="0.01" class="form-control">
                             <div class="text-muted mt-1" style="font-size:13px;">
-                                عند اختيار الدولار سيتم عرض السعر بالدولار وبالليرة السورية حسب هذا السعر.
+                                يُستخدم للتحويل بين الدولار والليرة السورية حسب عملة التسعير وعملة العرض.
                             </div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label for="display_currency" class="form-label">العملة الظاهرة للزبون</label>
+                            <select id="display_currency" name="display_currency" class="form-select">
+                                <option value="USD" {% if store.display_currency == "USD" %}selected{% endif %}>دولار فقط</option>
+                                <option value="SYP" {% if store.display_currency == "SYP" %}selected{% endif %}>ليرة سورية فقط</option>
+                                <option value="BOTH" {% if store.display_currency == "BOTH" %}selected{% endif %}>الدولار والليرة معاً</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <input type="hidden" name="storefront_warehouses_present" value="1">
+                            <fieldset class="mb-4">
+                                <legend class="h6">مستودعات العرض بالمتجر الإلكتروني</legend>
+                                <p class="text-muted small">اختَر المستودعات التي يُحسب منها توفر المواد للعرض والطلب. يجب تحديد مستودع واحد على الأقل. المستودع الرئيسي هو الافتراضي. المواد المسموح بيعها بدون مخزون تبقى متاحة.</p>
+                                {% for warehouse in storefront_warehouses %}
+                                <label class="d-block mb-2">
+                                    <input type="checkbox" name="storefront_warehouses" value="{{ warehouse.pk }}" {% if warehouse.pk in selected_storefront_warehouse_ids %}checked{% endif %}>
+                                    {{ warehouse.name }}
+                                </label>
+                                {% empty %}<p class="text-muted">لا توجد مستودعات فعالة.</p>{% endfor %}
+                            </fieldset>
+                                                          <label class="d-block mb-4">
+                                  <input type="checkbox" name="allow_negative_warehouse_sale" {% if store.allow_negative_warehouse_sale %}checked{% endif %}>
+                                  السماح بالبيع السالب في مستودع الطلب الداخلي المحدد
+                              </label>
+<label for="product_layout" class="form-label">طريقة عرض المنتجات</label>
+                            <select id="product_layout" class="form-select" name="product_layout">
+                                <option value="vertical" {% if store.product_layout == "vertical" %}selected{% endif %}>عمودي — الصورة فوق التفاصيل</option>
+                                <option value="horizontal" {% if store.product_layout == "horizontal" %}selected{% endif %}>أفقي — الصورة بجانب التفاصيل</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="product_image_size" class="form-label">حجم صور المنتجات</label>
+                            <select id="product_image_size" class="form-select" name="product_image_size">
+                                <option value="small" {% if store.product_image_size == "small" %}selected{% endif %}>صغير</option>
+                                <option value="medium" {% if store.product_image_size == "medium" %}selected{% endif %}>متوسط</option>
+                                <option value="large" {% if store.product_image_size == "large" %}selected{% endif %}>كبير (الحالي)</option>
+                            </select>
+                            <div class="text-muted mt-1" style="font-size:13px;">الحجم الصغير يقلل مساحة البطاقة، ويعرض 3 منتجات بكل صف على الموبايل في العرض العمودي. العرض الأفقي يعرض منتجاً بكل صف.</div>
                         </div>
 
                         {% if store.accounting_clients.exists %}
@@ -323,8 +363,40 @@
             <div class="tab-pane fade" id="security">
                 <div class="settings-card">
                     <h4 class="mb-3">🔒 الإعدادات الأمنية</h4>
-                    <label class="form-label">كلمة مرور جديدة (اختياري)</label>
-                    <input type="password" class="form-control" name="new_password">
+                    <label for="owner_username" class="form-label">اسم المستخدم</label>
+                    <input id="owner_username" type="text" class="form-control mb-3" name="username" value="{{ store.owner.username }}" maxlength="50" autocomplete="username">
+                    <label for="owner_new_password" class="form-label">كلمة مرور جديدة (اختياري)</label>
+                    <input id="owner_new_password" type="password" class="form-control mb-3" name="new_password" autocomplete="new-password">
+                    <label for="owner_confirmation" class="form-label">تأكيد كلمة المرور الجديدة</label>
+                    <input id="owner_confirmation" type="password" class="form-control mb-3" name="confirmation" autocomplete="new-password">
+                    <label for="owner_current_password" class="form-label">كلمة المرور الحالية</label>
+                    <input id="owner_current_password" type="password" class="form-control mb-3" name="current_password" autocomplete="current-password">
+                    <p class="text-muted">مطلوبة عند تغيير اسم المستخدم أو كلمة المرور. لا تُطلب عند تعديل إعدادات المتجر الأخرى فقط.</p>
+                    <button type="submit" class="btn btn-primary px-4">💾 حفظ التغييرات</button>
+                </div>
+
+                <div class="settings-card border border-warning">
+                    <h4 class="mb-3 text-warning">إعادة إرسال البيانات إلى أكسس</h4>
+                    <p class="text-muted mb-2">
+                        هذا الإجراء لا يحذف أي بيانات، لكنه يفرغ علامات التصدير حتى يعيد برنامج أكسس سحب بيانات المتجر مرة أخرى.
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label">تأكيد كلمة المرور</label>
+                        <input type="password" class="form-control" name="access_reset_password" form="access-reset-form" placeholder="كلمة مرور التاجر">
+                    </div>
+                    <button type="submit" class="btn btn-warning" form="access-reset-form">السماح بإعادة الإرسال الآن</button>
+                </div>
+
+                <div class="settings-card border border-info">
+                    <h4 class="mb-3 text-info">إعادة إرسال البيانات إلى التطبيق</h4>
+                    <p class="text-muted mb-2">
+                        هذا الإجراء لا يحذف أي بيانات، لكنه يحدّث علامات المزامنة حتى يعيد التطبيق سحب بيانات المتجر مرة أخرى.
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label">تأكيد كلمة المرور</label>
+                        <input type="password" class="form-control" name="mobile_resend_password" form="mobile-resend-form" placeholder="كلمة مرور التاجر">
+                    </div>
+                    <button type="submit" class="btn btn-info text-white" form="mobile-resend-form">السماح بإعادة الإرسال إلى التطبيق</button>
                 </div>
 
                 <div class="settings-card border border-danger">
@@ -333,6 +405,9 @@
                         هذا الإجراء يحذف كل بيانات المتجر الحالية (المنتجات، الطلبات، الزبائن، الموردين،
                         الصرفيات، وسائل الدفع، الكاش باك، السلات...) مع الاحتفاظ ببيانات المتجر نفسه.
                     </p>
+                    <div class="alert alert-warning py-2">
+                        بعد التفريغ يجب مزامنة المستخدمين في التطبيق أولاً قبل المزامنة أو استبدال البيانات.
+                    </div>
                     <div class="mb-2">
                         <label class="form-label">تأكيد كلمة المرور</label>
                         <input type="password" class="form-control" name="reset_password" form="reset-form" placeholder="كلمة مرور التاجر">
@@ -346,6 +421,12 @@
     </form>
 
     <form id="reset-form" method="post" action="{% url 'dashboard:reset_store_data' store.slug %}">
+        {% csrf_token %}
+    </form>
+    <form id="access-reset-form" method="post" action="{% url 'dashboard:reset_access_export_flags' store.slug %}">
+        {% csrf_token %}
+    </form>
+    <form id="mobile-resend-form" method="post" action="{% url 'dashboard:allow_mobile_resend' store.slug %}">
         {% csrf_token %}
     </form>
 </div>
@@ -366,5 +447,6 @@
     });
 </script>
 
+{% include "dashboard/user_sync_notice.html" %}
 </body>
 </html>

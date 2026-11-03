@@ -17,8 +17,20 @@ def _touch_update_time(instance, kwargs):
         update_fields = set(update_fields)
         update_fields.add("update_time")
         kwargs["update_fields"] = update_fields
+
+
+def _touch_mobile_update_time(instance, kwargs):
+    instance.mobile_update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("mobile_update_time")
+        kwargs["update_fields"] = update_fields
+
+
 class ExpenseType(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="expense_types")
     name = models.CharField(max_length=120)
@@ -32,9 +44,11 @@ class ExpenseType(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 class ExpenseReason(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="expense_reasons")
     name = models.CharField(max_length=120)
@@ -48,12 +62,25 @@ class ExpenseReason(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 class Expense(models.Model):
+    @property
+    def input_amount(self):
+        import json
+        return json.loads(self.input_data)['values']['amount'] if self.input_data else self.amount
+
+    input_data = models.TextField(blank=True, null=True)
+    payment_currency = models.CharField(max_length=3, blank=True, null=True)
+    exchange_rate = models.FloatField(blank=True, null=True)
+    amount_payment_currency = models.FloatField(blank=True, null=True)
+
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
+    mobile_sync_key = models.CharField(max_length=160, blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="expenses")
-    amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    amount = models.DecimalField(max_digits=28, decimal_places=12, default=Decimal("0.00"))
     date = models.DateField(default=timezone.now)
     expense_type = models.ForeignKey(
         ExpenseType,
@@ -73,9 +100,85 @@ class Expense(models.Model):
 
     class Meta:
         ordering = ["-date", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store", "mobile_sync_key"],
+                condition=models.Q(mobile_sync_key__isnull=False),
+                name="unique_expense_mobile_sync_key_per_store",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.store} - {self.amount}"
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
+
+
+class FixedAsset(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="fixed_assets")
+    name = models.CharField(max_length=160)
+    value = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    existed_before_program = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def __str__(self):
+        return f"{self.store} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
+
+
+class ContactInfo(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
+    label = models.CharField(max_length=160)
+    statement = models.TextField(blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["label", "id"]
+
+    def __str__(self):
+        return self.label
+
+    def save(self, *args, **kwargs):
+        _touch_mobile_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
+
+
+class AppUpdate(models.Model):
+    PLATFORM_ANDROID = "android"
+    PLATFORM_WINDOWS = "windows"
+    PLATFORM_CHOICES = [
+        (PLATFORM_ANDROID, "Android"),
+        (PLATFORM_WINDOWS, "Windows"),
+    ]
+
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    version = models.CharField(max_length=40)
+    build = models.PositiveIntegerField()
+    file = models.FileField(upload_to="app_updates/")
+    required = models.BooleanField(default=False)
+    notes = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["platform", "-build", "-id"]
+        indexes = [
+            models.Index(fields=["platform", "is_active", "-build"]),
+        ]
+
+    def __str__(self):
+        return f"{self.platform} b{self.build} v{self.version}"

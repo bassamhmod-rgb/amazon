@@ -20,6 +20,15 @@ def _touch_update_time(instance, kwargs):
         kwargs["update_fields"] = update_fields
 
 
+def _touch_mobile_update_time(instance, kwargs):
+    instance.mobile_update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("mobile_update_time")
+        kwargs["update_fields"] = update_fields
+
+
 def normalize_phone_number(value):
     phone = str(value or "").strip()
     if not phone:
@@ -29,6 +38,67 @@ def normalize_phone_number(value):
 
 def default_store_user_permissions():
     return {
+        "sales.view": False,
+        "sales.create": False,
+        "sales.edit": False,
+        "sales.delete": False,
+        "purchases.view": False,
+        "purchases.create": False,
+        "purchases.edit": False,
+        "purchases.delete": False,
+        "products.view": False,
+        "products.create": False,
+        "products.edit": False,
+        "products.delete": False,
+        "products.prices": False,
+        "products.stock": False,
+        "customers.view": False,
+        "customers.create": False,
+        "customers.edit": False,
+        "customers.delete": False,
+        "customers.balances": False,
+        "suppliers.view": False,
+        "suppliers.create": False,
+        "suppliers.edit": False,
+        "suppliers.delete": False,
+        "suppliers.balances": False,
+        "employees.view": False,
+        "employees.manage": False,
+        "partners.view": False,
+        "partners.manage": False,
+        "warehouses.view": False,
+        "warehouses.create": False,
+        "warehouses.edit": False,
+        "warehouses.delete": False,
+        "warehouses.transfer": False,
+        "stock.view": False,
+        "stock_view": False,
+        "stock.adjust": False,
+        "stock.movement": False,
+        "production.view": False,
+        "production.manage": False,
+        "expenses.view": False,
+        "expenses.create": False,
+        "expenses.edit": False,
+        "expenses.delete": False,
+        "expenses.settings": False,
+        "fixed_assets.view": False,
+        "fixed_assets.manage": False,
+        "installments.view": False,
+        "installments.manage": False,
+        "notices.receipt": False,
+        "notices.receipt.create": False,
+        "notices.receipt.edit": False,
+        "notices.receipt.delete": False,
+        "notices.disbursement": False,
+        "notices.disbursement.create": False,
+        "notices.disbursement.edit": False,
+        "notices.disbursement.delete": False,
+        "reports.profits": False,
+        "reports.history": False,
+        "sync.run": False,
+        "store.open": False,
+        "settings.open": False,
         "sales_orders": False,
         "purchase_orders": False,
         "products": False,
@@ -37,9 +107,82 @@ def default_store_user_permissions():
     }
 
 
+def ensure_owner_store_user(store, owner_name=None):
+    owner = getattr(store, "owner", None)
+    if owner is None:
+        return None
+
+    main_warehouse = Warehouse.objects.filter(store=store, is_main=True).first()
+
+    owner_profile = getattr(owner, "store_user_profile", None)
+    if owner_profile and owner_profile.store_id == store.id:
+        update_fields = []
+        if main_warehouse and not owner_profile.warehouse_id:
+            owner_profile.warehouse = main_warehouse
+            update_fields.append("warehouse")
+        if owner.password and owner_profile.password != owner.password:
+            owner_profile.password = owner.password
+            update_fields.append("password")
+        if owner_profile.is_active != owner.is_active:
+            owner_profile.is_active = owner.is_active
+            update_fields.append("is_active")
+        if update_fields:
+            owner_profile.save(update_fields=update_fields)
+        return owner_profile
+
+    existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
+    if existing:
+        update_fields = []
+        if main_warehouse and not existing.warehouse_id:
+            existing.warehouse = main_warehouse
+            update_fields.append("warehouse")
+        if owner.password and existing.password != owner.password:
+            existing.password = owner.password
+            update_fields.append("password")
+        if existing.is_active != owner.is_active:
+            existing.is_active = owner.is_active
+            update_fields.append("is_active")
+        if update_fields:
+            existing.save(update_fields=update_fields)
+        return existing
+
+    display_name = (
+        str(owner_name or "").strip()
+        or (owner.get_full_name() or owner.username or store.name).strip()
+    )
+    identifier = (owner.username or f"owner_{store.id}").strip()
+
+    try:
+        with transaction.atomic():
+            return StoreUser.objects.create(
+                store=store,
+                auth_user=owner,
+                identifier=identifier,
+                name=display_name,
+                warehouse=main_warehouse,
+                password=owner.password,
+                is_active=owner.is_active,
+            )
+    except IntegrityError:
+        with transaction.atomic():
+            existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
+            if existing:
+                return existing
+            return StoreUser.objects.create(
+                store=store,
+                auth_user=owner,
+                identifier=f"{identifier}_{store.id}",
+                name=f"{display_name} ({store.id})",
+                warehouse=main_warehouse,
+                password=owner.password,
+                is_active=owner.is_active,
+            )
+
+
 class StoreUser(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="store_users")
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
 
     auth_user = models.OneToOneField(
@@ -63,6 +206,7 @@ class StoreUser(models.Model):
 
     password = models.CharField(max_length=128, blank=True, default="")
     permissions = models.JSONField(default=default_store_user_permissions)
+    sync_device_id = models.CharField(max_length=128, blank=True, default="")
 
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -81,13 +225,21 @@ class StoreUser(models.Model):
         ordering = ["store_id", "name"]
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        sync_identifier = not self._state.adding and (update_fields is None or "identifier" in update_fields)
         _touch_update_time(self, kwargs)
-        super().save(*args, **kwargs)
-        if self.auth_user_id:
-            self._sync_auth_user()
-        else:
-            self._ensure_auth_user()
+        _touch_mobile_update_time(self, kwargs)
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if self.auth_user_id:
+                self._sync_auth_user(sync_identifier=sync_identifier)
+            else:
+                self._ensure_auth_user()
         return None
+
+    @property
+    def is_owner(self):
+        return bool(self.auth_user_id and self.store_id and self.auth_user_id == self.store.owner_id)
 
     def __str__(self):
         return f"{self.store} - {self.name} ({self.identifier})"
@@ -128,12 +280,15 @@ class StoreUser(models.Model):
 
         StoreUser.objects.filter(pk=self.pk).update(auth_user=self.auth_user)
 
-    def _sync_auth_user(self):
+    def _sync_auth_user(self, sync_identifier=True):
         auth_user = User.objects.filter(pk=self.auth_user_id).first()
         if not auth_user:
             return
 
         update_fields = []
+        if sync_identifier and self.is_owner and auth_user.username != self.identifier:
+            auth_user.username = self.identifier
+            update_fields.append("username")
         if self.password and auth_user.password != self.password:
             auth_user.password = self.password
             update_fields.append("password")
@@ -145,12 +300,14 @@ class StoreUser(models.Model):
             auth_user.save(update_fields=update_fields)
 
 class Customer(models.Model):
+    private_note = models.TextField(blank=True, default="")
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
 
     name = models.CharField(max_length=150)
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=20, blank=True, default="")
 
     address = models.TextField(blank=True, null=True)
     note = models.TextField(blank=True, null=True)
@@ -171,6 +328,19 @@ class Customer(models.Model):
         help_text="ط§ظ„ط±طµظٹط¯ ط§ظ„ط³ط§ط¨ظ‚ ط¨ظٹظ† ط§ظ„طھط§ط¬ط± ظˆط§ظ„ط¹ظ…ظٹظ„"
     )
 
+    is_subscription_active = models.BooleanField(default=False)
+    preferred_price_level = models.PositiveSmallIntegerField(
+        default=0,
+        choices=[
+            (0, "اتباع النظام"),
+            (1, "سعر المفرق"),
+            (2, "سعر نص جملة"),
+            (3, "سعر جملة"),
+            (4, "آخر سعر بيع لهذا العميل"),
+            (5, "آخر سعر بيع للمادة عموماً"),
+        ],
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -181,14 +351,16 @@ class Customer(models.Model):
             ),
             models.UniqueConstraint(
                 fields=["store", "phone"],
-                name="unique_customer_phone_per_store"
+                condition=Q(phone__isnull=False) & ~Q(phone=""),
+                name="unique_customer_phone_per_store_when_exists"
             ),
         ]
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
+        self.name = self.name.strip()
         self.phone = normalize_phone_number(self.phone)
-        # ًں”گ ط¶ظ…ط§ظ† ط§ظ„ط§ط³ظ…: ط¥ط°ط§ ظپط§ط¶ظٹ â†’ ط®ظ„ظټظ‡ ط±ظ‚ظ… ط§ظ„ظ‡ط§طھظپ
-        if not self.name:
+        if not self.name and self.phone:
             self.name = self.phone
         super().save(*args, **kwargs)
     def __str__(self):
@@ -207,6 +379,7 @@ class PointsTransaction(models.Model):
     ]
 
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="points")
     customer_name = models.CharField(max_length=150)
     points = models.DecimalField(max_digits=10, decimal_places=2)
@@ -223,6 +396,7 @@ class PointsTransaction(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 # ط§ظ„ظ…ظˆط±ط¯ظٹظ†
 
@@ -233,6 +407,7 @@ class Supplier(models.Model):
         related_name="suppliers"
     )
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
 
     name = models.CharField(max_length=200)
@@ -277,6 +452,7 @@ class Supplier(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 #ط±ط³ط§ط¦ظ„ ظ„ظ„ط¨ط±ط§ظ…ط¬ ظˆ ط§ظ„ظ…طھط§ط¬ط±
 

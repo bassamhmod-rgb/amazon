@@ -64,46 +64,56 @@
         <div><strong>المستودع:</strong> {{ current_store_warehouse.name|default:"-" }}</div>
     </div>
 
-    <!-- زر العودة -->
-    <a href="/store/{{ store.slug }}/"
-       class="back-to-store-btn mb-3 d-block text-center">
-        → العودة إلى صفحة العرض
-    </a>
+    {% if store.is_active %}
+        <!-- زر العودة -->
+        <a href="/store/{{ store.slug }}/"
+           class="back-to-store-btn mb-3 d-block text-center">
+            → العودة إلى صفحة العرض
+        </a>
+    {% endif %}
 
     <hr class="my-3">
 
     <!-- روابط القائمة -->
     <nav class="sidebar-links">
-
         {% with su=current_store_user %}
 
-            <a href="{% url 'dashboard:home' store.slug %}">
-                🏠 لوحة التحكم
-            </a>
+            {% if not store.is_active %}
 
-            {% if store.owner == request.user %}
+                <a href="{% url 'dashboard:store_users_list' store.slug %}">
+                    👤 المستخدمين
+                </a>
 
-                <details class="sidebar-group">
-                    <summary class="sidebar-summary">🛍 المنتجات</summary>
-                    <div class="sidebar-submenu">
-                        <a href="{% url 'dashboard:products_list' store.slug %}">قائمة المنتجات</a>
-                        <a href="{% url 'dashboard:product_create' store.slug %}">إضافة منتج</a>
-                        <a href="{% url 'dashboard:categories_list' store.slug %}">الفئات</a>
-                        <a href="{% url 'dashboard:warehouses_list' store.slug %}">المستودعات</a>
-                        <a href="{% url 'dashboard:inventory_list' store.slug %}">جرد المنتجات</a>
-                    </div>
-                </details>
+            {% else %}
+
+                <a href="{% url 'dashboard:home' store.slug %}">
+                    🏠 لوحة التحكم
+                </a>
+
+                {% if store.owner == request.user %}
+
+                    <details class="sidebar-group">
+                        <summary class="sidebar-summary">🛍 المنتجات</summary>
+                        <div class="sidebar-submenu">
+                            <a href="{% url 'dashboard:products_list' store.slug %}">قائمة المنتجات</a>
+                            <a href="{% url 'dashboard:product_create' store.slug %}">إضافة منتج</a>
+                            <a href="{% url 'dashboard:categories_list' store.slug %}">الفئات</a>
+                            <a href="{% url 'dashboard:warehouses_list' store.slug %}">المستودعات</a>
+                            <a href="{% url 'dashboard:warehouse_transfers' store.slug %}">&#1605;&#1606;&#1575;&#1602;&#1604;&#1575;&#1578; &#1575;&#1604;&#1605;&#1587;&#1578;&#1608;&#1583;&#1593;&#1575;&#1578;</a>
+                            <a href="{% url 'dashboard:inventory_list' store.slug %}">جرد المنتجات</a>
+                        </div>
+                    </details>
 
                 <details class="sidebar-group">
                     <summary class="sidebar-summary">📝 الطلبات</summary>
                     <div class="sidebar-submenu">
                         <a href="{% url 'dashboard:orders_list' store.slug %}" class="position-relative">
                             قائمة الطلبات
-                            {% if new_orders_count > 0 %}
-                            <span class="badge bg-danger position-absolute top-50 start-0 translate-middle-y"
-                                  style="font-size:0.7rem;">
-                                {{ new_orders_count }}
-                            </span>
+                            {% if pending_confirmation_orders_count > 0 %}
+                                <span class="badge bg-danger" title="طلبات بانتظار التأكيد">تأكيد {{ pending_confirmation_orders_count }}</span>
+                            {% endif %}
+                            {% if awaiting_export_orders_count > 0 %}
+                                <span class="badge bg-warning text-dark" title="طلبات مؤكدة بانتظار الترحيل">ترحيل {{ awaiting_export_orders_count }}</span>
                             {% endif %}
                         </a>
                         <a href="{% url 'dashboard:order_create' store.slug %}">إنشاء طلب</a>
@@ -115,20 +125,19 @@
                 </a>
 
                 <details class="sidebar-group">
-                    <summary class="sidebar-summary">👥 العملاء</summary>
+                    <summary class="sidebar-summary">👥 العلاقات التجارية</summary>
                     <div class="sidebar-submenu">
                         <a href="{% url 'dashboard:customers_list' store.slug %}">قائمة العملاء</a>
                         <a href="{% url 'dashboard:customer_create' store.slug %}">إضافة عميل</a>
+                        <a href="{% url 'dashboard:suppliers_list' store.slug %}">قائمة الموردين</a>
+                        <a href="{% url 'dashboard:supplier_create' store.slug %}">إضافة مورد</a>
+                        <a href="{% url 'dashboard:employees_list' store.slug %}">الموظفين</a>
                     </div>
                 </details>
 
-                <details class="sidebar-group">
-                    <summary class="sidebar-summary">🏭 الموردين</summary>
-                    <div class="sidebar-submenu">
-                        <a href="{% url 'dashboard:suppliers_list' store.slug %}">قائمة الموردين</a>
-                        <a href="{% url 'dashboard:supplier_create' store.slug %}">إضافة مورد</a>
-                    </div>
-                </details>
+                <a href="{% url 'dashboard:fixed_assets_list' store.slug %}">
+                    🏢 الأصول الثابتة
+                </a>
 
                 <details class="sidebar-group">
                     <summary class="sidebar-summary">💼 التقارير</summary>
@@ -148,16 +157,23 @@
                     </div>
                 </details>
 
-            {% else %}
+                {% else %}
 
-                {% if su.permissions.products %}
+                {% if su.permissions.products or su.permissions.stock_view or su.permissions.warehouse_transfer %}
                     <details class="sidebar-group">
                         <summary class="sidebar-summary">🛍 المنتجات</summary>
                         <div class="sidebar-submenu">
+                            {% if su.permissions.products %}
                             <a href="{% url 'dashboard:products_list' store.slug %}">قائمة المنتجات</a>
                             <a href="{% url 'dashboard:product_create' store.slug %}">إضافة منتج</a>
                             <a href="{% url 'dashboard:categories_list' store.slug %}">الفئات</a>
+                            {% endif %}
+                            {% if su.permissions.warehouse_transfer %}
+                            <a href="{% url 'dashboard:warehouse_transfers' store.slug %}">&#1605;&#1606;&#1575;&#1602;&#1604;&#1575;&#1578; &#1575;&#1604;&#1605;&#1587;&#1578;&#1608;&#1583;&#1593;&#1575;&#1578;</a>
+                            {% endif %}
+                            {% if su.permissions.stock_view %}
                             <a href="{% url 'dashboard:inventory_list' store.slug %}">جرد المنتجات</a>
+                            {% endif %}
                         </div>
                     </details>
                 {% endif %}
@@ -184,16 +200,18 @@
                         <div class="sidebar-submenu">
                             <a href="{% url 'dashboard:orders_list' store.slug %}" class="position-relative">
                                 قائمة الطلبات
-                                {% if new_orders_count > 0 %}
-                                <span class="badge bg-danger position-absolute top-50 start-0 translate-middle-y"
-                                      style="font-size:0.7rem;">
-                                    {{ new_orders_count }}
-                                </span>
-                                {% endif %}
+                                {% if pending_confirmation_orders_count > 0 %}
+                                <span class="badge bg-danger" title="طلبات بانتظار التأكيد">تأكيد {{ pending_confirmation_orders_count }}</span>
+                            {% endif %}
+                            {% if awaiting_export_orders_count > 0 %}
+                                <span class="badge bg-warning text-dark" title="طلبات مؤكدة بانتظار الترحيل">ترحيل {{ awaiting_export_orders_count }}</span>
+                            {% endif %}
                             </a>
                             <a href="{% url 'dashboard:order_create' store.slug %}">إنشاء طلب</a>
                         </div>
                     </details>
+                {% endif %}
+
                 {% endif %}
 
             {% endif %}
@@ -210,3 +228,4 @@
     </a>
 
 </div>
+

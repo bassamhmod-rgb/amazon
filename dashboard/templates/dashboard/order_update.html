@@ -138,6 +138,19 @@
 
     <form method="post">
         {% csrf_token %}
+        <p>{{ order.input_currency_label }}</p>
+<div class="mb-3">
+    <label class="form-label">مستودع الطلب</label>
+    {% if can_select_warehouse %}
+    <select name="warehouse_id" class="form-select" required>
+        {% for w in order_warehouses %}
+        <option value="{{ w.pk }}" {% if w.pk == selected_order_warehouse.pk %}selected{% endif %}>{{ w.name }}</option>
+        {% endfor %}
+    </select>
+    {% else %}
+    <div>{{ selected_order_warehouse.name|default:"يجب ربط المستخدم بمستودع فعال قبل إنشاء الطلب." }}</div>
+    {% endif %}
+</div>
 
         <input type="hidden" name="transaction_type" id="transaction_type" value="{{ order.transaction_type }}">
         <input type="hidden" name="customer_id" id="customer_id" value="{% if order.customer %}{{ order.customer.id }}{% endif %}">
@@ -156,15 +169,13 @@
         <div id="customerBox" class="card p-3 mb-3">
             <label class="fw-bold">الزبون</label>
 
-            <div id="customerSearchContainer" class="position-relative"
-                 style="{% if order.customer %}display:none{% endif %}">
+            <div id="customerSearchContainer" class="position-relative{% if order.customer %} d-none{% endif %}">
                 <input type="text" id="customerSearch" class="form-control" placeholder="ابحث عن زبون..." autocomplete="off">
                 <div id="customerResults" class="list-group mt-1"></div>
             </div>
 
             <div id="selectedCustomerCard"
-                 class="alert alert-success d-flex justify-content-between align-items-center m-0"
-                 style="{% if order.customer %}display:flex{% else %}display:none{% endif %}">
+                 class="alert alert-success {% if order.customer %}d-flex{% else %}d-none{% endif %} justify-content-between align-items-center m-0">
                 <span id="selectedCustomerName">{% if order.customer %}{{ order.customer }}{% endif %}</span>
                 <button type="button" class="btn btn-sm btn-outline-danger bg-white" onclick="removeCustomer()">❌</button>
             </div>
@@ -221,14 +232,14 @@
                             <input type="hidden" name="item_id[]" value="{{ item.id }}">
                         </td>
                         <td>
-                            <input type="number" name="price[]" value="{{ item.price }}" step="0.01"
+                            <input type="number" name="price[]" value="{{ item.input_price }}" step="any"
                                    class="form-control price en-num" oninput="calculateTotal()">
                         </td>
                         <td>
-                            <input type="number" name="quantity[]" value="{{ item.quantity }}" step="0.01" min="0.01"
+                            <input type="number" name="quantity[]" value="{{ item.input_quantity }}" step="any" min="0.01"
                                    class="form-control quantity en-num" oninput="calculateTotal()">
                         </td>
-                        <td class="subtotal fw-bold en-num">{{ item.subtotal }}</td>
+                        <td class="subtotal fw-bold en-num">{{ item.input_subtotal }}</td>
                         <td>
                             <button type="button" class="btn btn-danger btn-sm"
                                     onclick="this.closest('tr').remove();calculateTotal()">×</button>
@@ -242,26 +253,33 @@
         <div class="row g-3 mt-3">
             <div class="col-md-4">
                 <label>الحسم</label>
-                <input type="number" name="discount" value="{{ order.discount }}" step="0.01"
+                <input type="number" name="discount" value="{{ order.input_discount }}" step="any"
                        class="form-control en-num" oninput="calculateTotal()">
             </div>
             <div class="col-md-4">
                 <label>المدفوع</label>
-                <input type="number" name="payment" value="{{ order.payment }}" step="0.01"
+                <input type="number" name="payment" value="{{ order.input_payment }}" step="any"
                        class="form-control en-num">
             </div>
             <div class="col-md-4">
                 <label>المجموع الكلي</label>
                 <input type="text" id="totalDisplay" readonly
                        class="form-control fw-bold text-success en-num"
-                       value="{{ order.items_total }}">
+                       value="{{ order.input_total }}">
             </div>
         </div>
 
+        <div class="row g-3 mt-3">
+            <div class="col-12">
+                <label>&#1605;&#1604;&#1575;&#1581;&#1592;&#1577;</label>
+                <textarea name="note" class="form-control" rows="2" placeholder="&#1575;&#1603;&#1578;&#1576; &#1605;&#1604;&#1575;&#1581;&#1592;&#1577;">{{ order.note|default:'' }}</textarea>
+            </div>
+        </div>
 <button class="btn btn-primary mt-4" name="save_only">💾 حفظ التعديلات</button>
     </form>
 </div>
 
+{% include 'dashboard/customer_note_script.html' %}
 <script>
 /* منع Enter من إرسال الفورم بالغلط */
 document.addEventListener("DOMContentLoaded", function () {
@@ -389,11 +407,11 @@ function selectProduct(item){
             <input type="hidden" name="item_id[]" value="">
         </td>
         <td>
-            <input type="number" name="price[]" value="${item.price}" step="0.01"
+            <input type="number" name="price[]" value="${item.price}" step="any"
                    class="form-control price en-num" oninput="calculateTotal()">
         </td>
         <td>
-            <input type="number" name="quantity[]" value="1" step="0.01" min="0.01"
+            <input type="number" name="quantity[]" value="1" step="any" min="0.01"
                    class="form-control quantity en-num" oninput="calculateTotal()">
         </td>
         <td class="subtotal fw-bold en-num">${item.price}</td>
@@ -477,24 +495,29 @@ if (customerSearchEl){
 }
 
 function selectCustomer(item){
+    applyInvoiceCustomerPrivateNote(item.private_note);
     customerIdEl.value = item.id;
     selectedCustomerNameEl.innerText = item.name;
 
-    customerSearchContainerEl.style.display="none";
-    selectedCustomerCardEl.style.display="flex";
+    customerSearchContainerEl.classList.add("d-none");
+    selectedCustomerCardEl.classList.remove("d-none");
+    selectedCustomerCardEl.classList.add("d-flex");
     customerResultsEl.style.display="none";
     customerResultsEl.innerHTML="";
     customerIndex=-1;
 }
 
 function removeCustomer(){
+    applyInvoiceCustomerPrivateNote('');
     customerIdEl.value="";
     customerSearchEl.value="";
-    customerSearchContainerEl.style.display="block";
-    selectedCustomerCardEl.style.display="none";
+    customerSearchContainerEl.classList.remove("d-none");
+    selectedCustomerCardEl.classList.remove("d-flex");
+    selectedCustomerCardEl.classList.add("d-none");
     customerResultsEl.style.display="none";
     customerResultsEl.innerHTML="";
     customerIndex=-1;
+    customerSearchEl.focus();
 }
 
 /* ============================ SUPPLIERS (أسهم + Enter) ============================ */
@@ -586,5 +609,6 @@ function calculateTotal(){
 calculateTotal();
 </script>
 
+{% include "core/message_dialog.html" %}
 </body>
 </html>

@@ -106,9 +106,12 @@
 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">المعرف</label>
+                        <label class="form-label">اسم المستخدم</label>
                         {{ form.identifier }}
                         {% for error in form.identifier.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        {% if form.is_owner %}
+                        <div class="form-text">تغيير اسم المستخدم يحدّث دخول المدير إلى المتجر، ويصل إلى التطبيق بعد مزامنة المستخدمين.</div>
+                        {% endif %}
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">الاسم</label>
@@ -138,39 +141,31 @@
                     <div class="col-12">
                         <div class="card border-0 bg-light">
                             <div class="card-body">
-                                <div class="fw-bold mb-2">الصلاحيات</div>
-                                <div class="row g-2">
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            {{ form.sales_orders }}
-                                            <label class="form-check-label">{{ form.sales_orders.label }}</label>
-                                        </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                    <div class="fw-bold">الصلاحيات</div>
+                                    {% if form.is_owner %}
+                                    <span class="badge bg-success">المدير صلاحيات كاملة</span>
+                                    {% else %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="permissionsToggleAll">
+                                        <label class="form-check-label" for="permissionsToggleAll">تحديد الكل</label>
                                     </div>
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            {{ form.purchase_orders }}
-                                            <label class="form-check-label">{{ form.purchase_orders.label }}</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            {{ form.products }}
-                                            <label class="form-check-label">{{ form.products.label }}</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            {{ form.customer_balances }}
-                                            <label class="form-check-label">{{ form.customer_balances.label }}</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            {{ form.receipt_notices }}
-                                            <label class="form-check-label">{{ form.receipt_notices.label }}</label>
-                                        </div>
-                                    </div>
+                                    {% endif %}
                                 </div>
+                                {% if form.is_owner %}
+                                <div class="text-muted">المدير لديه صلاحيات كاملة تلقائياً ولا يحتاج إلى تحديد الصلاحيات.</div>
+                                {% else %}
+                                <div class="row g-2">
+                                    {% for field in form.permission_fields %}
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                {{ field }}
+                                                <label class="form-check-label">{{ field.label }}</label>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -201,6 +196,25 @@
             arrow.textContent = sidebar.classList.contains("active") ? "❮" : "❯";
         };
     }
+
+    const permissionsToggleAll = document.getElementById("permissionsToggleAll");
+    const permissionCheckboxes = Array.from(document.querySelectorAll(".permission-checkbox"));
+    const syncPermissionsToggle = () => {
+        if (!permissionsToggleAll) return;
+        const checkedCount = permissionCheckboxes.filter((checkbox) => checkbox.checked).length;
+        permissionsToggleAll.checked = permissionCheckboxes.length > 0 && checkedCount === permissionCheckboxes.length;
+        permissionsToggleAll.indeterminate = checkedCount > 0 && checkedCount < permissionCheckboxes.length;
+    };
+    if (permissionsToggleAll) {
+        permissionsToggleAll.addEventListener("change", () => {
+            permissionCheckboxes.forEach((checkbox) => {
+                checkbox.checked = permissionsToggleAll.checked;
+            });
+            syncPermissionsToggle();
+        });
+    }
+    permissionCheckboxes.forEach((checkbox) => checkbox.addEventListener("change", syncPermissionsToggle));
+    syncPermissionsToggle();
 </script>
 
 </body>
