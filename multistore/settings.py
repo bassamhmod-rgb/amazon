@@ -1,10 +1,11 @@
 from pathlib import Path
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "change-me"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me")
 
-DEBUG = True
+DEBUG = os.getenv("DJANGO_DEBUG", "true").strip().lower() in {"1", "true", "yes", "on"}
 ADMINS = [("Admin", "admin@example.com")]
 LOGGING = {
     "version": 1,
@@ -33,6 +34,10 @@ ALLOWED_HOSTS = [
     "localhost",
 ]
 
+# HTTPS requests arrive through PythonAnywhere's reverse proxy.
+CSRF_TRUSTED_ORIGINS = ["https://amazonsyria.pythonanywhere.com"]
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -41,7 +46,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    "core",
+    "core.apps.CoreConfig",
     "accounts.apps.AccountsConfig",
     "stores",
     "products",
@@ -49,6 +54,7 @@ INSTALLED_APPS = [
     "orders",
     "loyalty",
     "dashboard",
+    "employees.apps.EmployeesConfig",
     'rest_framework',
     "mobile_sync.apps.MobileSyncConfig",
 
@@ -110,7 +116,9 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(os.getenv("DJANGO_MEDIA_ROOT", str(BASE_DIR / "media")))
+# PythonAnywhere serves /media/ through the Web tab static file mapping.
+SERVE_MEDIA_FILES = False
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 DEFAULT_CHARSET = "utf-8"
